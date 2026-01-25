@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from '../../config/axios';
+import { ExclamationCircleIcon } from '@heroicons/react/24/outline';
 
 const VehicleHire = () => {
     const [vehicles, setVehicles] = useState([]);
@@ -115,6 +116,17 @@ const VehicleHire = () => {
                 <div className="mb-6">
                     <h3 className="text-xl font-bold text-slate-900">Vehicle Hire</h3>
                     <p className="text-sm text-slate-500">Book comfortable vehicles for your travel needs</p>
+                </div>
+
+                {/* Cancellation Policy */}
+                <div className="mb-6 bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-start gap-4 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-500">
+                    <ExclamationCircleIcon className="w-6 h-6 text-orange-600 shrink-0 mt-0.5" />
+                    <div>
+                        <h4 className="font-semibold text-orange-900 text-base mb-1">Cancellation Policy</h4>
+                        <p className="text-sm text-orange-700 leading-relaxed">
+                            Cancellations made 24 hours before trip start are eligible for a full refund. Refunds are processed within 5-7 business days.
+                        </p>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

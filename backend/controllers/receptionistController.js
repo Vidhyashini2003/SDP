@@ -3,10 +3,10 @@ const db = require('../config/db');
 // Dashboard Stats
 exports.getDashboardStats = async (req, res) => {
     try {
-        const [rooms] = await db.query("SELECT COUNT(*) as count FROM RoomBooking WHERE rb_status = 'Booked' OR rb_status = 'Checked-in'");
-        const [activities] = await db.query("SELECT COUNT(*) as count FROM ActivityBooking WHERE ab_status = 'Reserved'");
-        const [vehicles] = await db.query("SELECT COUNT(*) as count FROM VehicleBooking WHERE vb_status = 'Booked'");
-        const [guests] = await db.query("SELECT COUNT(*) as count FROM Guest");
+        const [rooms] = await db.query("SELECT COUNT(*) as count FROM roombooking WHERE rb_status = 'Booked' OR rb_status = 'Checked-in'");
+        const [activities] = await db.query("SELECT COUNT(*) as count FROM activitybooking WHERE ab_status = 'Reserved'");
+        const [vehicles] = await db.query("SELECT COUNT(*) as count FROM vehiclebooking WHERE vb_status = 'Booked'");
+        const [guests] = await db.query("SELECT COUNT(*) as count FROM guest");
 
         res.json({
             activeRoomBookings: rooms[0].count,
@@ -27,7 +27,7 @@ exports.updateRoomBookingStatus = async (req, res) => {
 
         // If check-in, verify if room is actually available? 
         // Simplified logic: Just update status
-        await db.query('UPDATE RoomBooking SET rb_status = ? WHERE rb_id = ?', [status, id]);
+        await db.query('UPDATE roombooking SET rb_status = ? WHERE rb_id = ?', [status, id]);
         res.json({ message: `Room booking status updated to ${status}` });
     } catch (error) {
         res.status(500).json({ error: 'Failed to update booking' });
@@ -37,7 +37,11 @@ exports.updateRoomBookingStatus = async (req, res) => {
 // Get All Guests
 exports.getAllGuests = async (req, res) => {
     try {
-        const [guests] = await db.query('SELECT * FROM Guest');
+        const [guests] = await db.query(
+            `SELECT g.*, u.name as guest_name, u.email as guest_email, u.phone as guest_phone, u.created_at
+             FROM Guest g
+             JOIN Users u ON g.user_id = u.user_id`
+        );
         res.json(guests);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch guests' });
@@ -48,10 +52,11 @@ exports.getAllGuests = async (req, res) => {
 exports.getAllRoomBookings = async (req, res) => {
     try {
         const [bookings] = await db.query(
-            `SELECT rb.*, g.guest_name, g.guest_phone, r.room_type, r.room_price_per_day
-             FROM RoomBooking rb 
-             JOIN Guest g ON rb.guest_id = g.guest_id 
-             JOIN Room r ON rb.room_id = r.room_id
+            `SELECT rb.*, u.name as guest_name, u.phone as guest_phone, r.room_type, r.room_price_per_day
+             FROM roombooking rb 
+             JOIN Guest g ON rb.guest_id = g.guest_id
+             JOIN Users u ON g.user_id = u.user_id
+             JOIN room r ON rb.room_id = r.room_id
              ORDER BY rb.rb_checkin DESC`
         );
         res.json(bookings);
@@ -65,10 +70,11 @@ exports.getAllRoomBookings = async (req, res) => {
 exports.getAllActivityBookings = async (req, res) => {
     try {
         const [bookings] = await db.query(
-            `SELECT ab.*, g.guest_name, g.guest_phone, a.activity_name, a.activity_price_per_hour
-             FROM ActivityBooking ab 
+            `SELECT ab.*, u.name as guest_name, u.phone as guest_phone, a.activity_name, a.activity_price_per_hour
+             FROM activitybooking ab 
              JOIN Guest g ON ab.guest_id = g.guest_id 
-             JOIN Activity a ON ab.activity_id = a.activity_id
+             JOIN Users u ON g.user_id = u.user_id
+             JOIN activity a ON ab.activity_id = a.activity_id
              ORDER BY ab.ab_start_time DESC`
         );
         res.json(bookings);
@@ -81,7 +87,7 @@ exports.updateActivityBookingStatus = async (req, res) => {
     try {
         const { id } = req.params;
         const { status } = req.body;
-        await db.query('UPDATE ActivityBooking SET ab_status = ? WHERE ab_id = ?', [status, id]);
+        await db.query('UPDATE activitybooking SET ab_status = ? WHERE ab_id = ?', [status, id]);
         res.json({ message: `Activity booking status updated to ${status}` });
     } catch (error) {
         res.status(500).json({ error: 'Failed to update activity booking' });
@@ -91,9 +97,22 @@ exports.updateActivityBookingStatus = async (req, res) => {
 // Refunds Management
 exports.getRefundRequests = async (req, res) => {
     try {
-        const [refunds] = await db.query('SELECT * FROM Refund WHERE refund_status = "Pending"');
+        const [refunds] = await db.query(
+            `SELECT r.*, p.service_type, u.name as guest_name, u.email as guest_email 
+             FROM refund r
+             JOIN payment p ON r.payment_id = p.payment_id
+             LEFT JOIN roombooking rb ON p.service_type = 'Room' AND p.service_id = rb.rb_id
+             LEFT JOIN activitybooking ab ON p.service_type = 'Activity' AND p.service_id = ab.ab_id
+             LEFT JOIN vehiclebooking vb ON p.service_type = 'Vehicle' AND p.service_id = vb.vb_id
+             LEFT JOIN foodorder fo ON p.service_type = 'Food' AND p.service_id = fo.order_id
+             LEFT JOIN Guest g ON COALESCE(rb.guest_id, ab.guest_id, vb.guest_id, fo.guest_id) = g.guest_id
+             LEFT JOIN Users u ON g.user_id = u.user_id
+             WHERE r.refund_status = "Pending"
+             ORDER BY r.refund_date DESC`
+        );
         res.json(refunds);
     } catch (error) {
+        console.error(error);
         res.status(500).json({ error: 'Failed to fetch refunds' });
     }
 }
@@ -103,9 +122,38 @@ exports.processRefund = async (req, res) => {
         const { id } = req.params;
         const { status } = req.body; // 'Approved', 'Rejected'
 
-        await db.query('UPDATE Refund SET refund_status = ? WHERE refund_id = ?', [status, id]);
+        await db.query('UPDATE refund SET refund_status = ? WHERE refund_id = ?', [status, id]);
         res.json({ message: `Refund ${status}` });
     } catch (error) {
         res.status(500).json({ error: 'Failed to process refund' });
+    }
+}
+exports.getAllVehicleBookings = async (req, res) => {
+    try {
+        const [bookings] = await db.query(
+            `SELECT vb.*, u.name as guest_name, u.phone as guest_phone 
+             FROM vehiclebooking vb 
+             JOIN Guest g ON vb.guest_id = g.guest_id
+             JOIN Users u ON g.user_id = u.user_id
+             ORDER BY vb.vb_trip_start DESC`
+        );
+        res.json(bookings);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch vehicle bookings' });
+    }
+}
+
+exports.getAllFoodOrders = async (req, res) => {
+    try {
+        const [orders] = await db.query(
+            `SELECT fo.*, u.name as guest_name, u.phone as guest_phone 
+             FROM foodorder fo 
+             JOIN Guest g ON fo.guest_id = g.guest_id
+             JOIN Users u ON g.user_id = u.user_id
+             ORDER BY fo.order_date DESC`
+        );
+        res.json(orders);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch food orders' });
     }
 }

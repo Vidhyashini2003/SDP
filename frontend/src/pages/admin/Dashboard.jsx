@@ -4,32 +4,66 @@ import { useAuth } from '../../context/AuthContext';
 import axios from '../../config/axios';
 import Card from '../../components/Card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+    UsersIcon,
+    ClipboardDocumentCheckIcon,
+    BanknotesIcon,
+    TruckIcon
+} from '@heroicons/react/24/outline';
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
-    const [stats, setStats] = useState({ totalRooms: 0, totalStaff: 0, totalRevenue: 0 });
-    const [revenueData, setRevenueData] = useState([]);
-    const [bookingSummary, setBookingSummary] = useState([
-        { type: 'Rooms', count: 128, revenue: 'Rs. 21619' },
-        { type: 'Food & Beverage', count: 98, revenue: 'Rs. 8204' },
-        { type: 'Activities', count: 74, revenue: 'Rs. 6226' },
-        { type: 'Transport', count: 45, revenue: 'Rs. 3608' }
-    ]);
+
+    // Initial State - Pure Structure, No Values
+    const [dashboardData, setDashboardData] = useState({
+        counts: {
+            guests: 0,
+            staff: 0,
+            rooms: 0,
+            activeVehicles: 0,
+            bookings: 0
+        },
+        financials: {
+            totalRevenue: 0,
+            revenueByType: []
+        }
+    });
+
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        axios.get('/api/admin/dashboard')
-            .then(res => setStats(res.data))
-            .catch(err => console.error(err));
+        const fetchDashboardData = async () => {
+            try {
+                const res = await axios.get('/api/admin/dashboard');
+                if (res.data && res.data.success) {
+                    setDashboardData(res.data);
+                }
+            } catch (err) {
+                console.error('Dashboard Load Error:', err);
+                // In production, you might show a toast here
+            } finally {
+                setLoading(false);
+            }
+        };
 
-        // Mock chart data - monthly revenue breakdown
-        setRevenueData([
-            { name: 'Rooms', revenue: 135000 },
-            { name: 'Food', revenue: 95000 },
-            { name: 'Activities', revenue: 65000 },
-            { name: 'Transport', revenue: 42000 },
-        ]);
+        fetchDashboardData();
     }, []);
+
+    // --- Data Processing for UI ---
+
+    // 1. Chart Data Mapping
+    const chartData = (dashboardData.financials.revenueByType || []).map(item => ({
+        name: item.booking_type, // 'Room', 'Food', 'Activity', 'Vehicle'
+        revenue: parseFloat(item.total)
+    }));
+
+    // 2. Summary List Mapping
+    const summaryList = (dashboardData.financials.revenueByType || []).map(item => ({
+        type: item.booking_type,
+        count: item.count,
+        revenue: parseFloat(item.total)
+    }));
 
     const getGreeting = () => {
         const hour = new Date().getHours();
@@ -38,108 +72,133 @@ const AdminDashboard = () => {
         return 'Good Evening';
     };
 
+    if (loading) {
+        return <div className="p-8 text-center text-slate-500">Loading dashboard...</div>;
+    }
+
     return (
-        <div className="p-8">
-            {/* Welcome Section */}
+        <div className="p-8 fade-in">
+            {/* Header */}
             <div className="mb-8">
                 <h1 className="text-3xl font-bold text-slate-900">
-                    Welcome, {user?.name || 'Manager'}
+                    Welcome, <span className="text-blue-600">{user?.name}</span>
                 </h1>
-                <p className="text-slate-600 mt-1">{getGreeting()}! Manage your hotel operations</p>
+                <p className="text-slate-600 mt-1">{getGreeting()} - Overview</p>
             </div>
 
-            {/* Stats Cards */}
+            {/* Key Metrics Grid */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <Card className="bg-white">
-                    <p className="text-slate-500 text-sm mb-1">Total Guests</p>
-                    <p className="text-3xl font-bold text-slate-900">128</p>
-                    <p className="text-xs text-slate-400 mt-1">All time</p>
-                </Card>
-                <Card className="bg-white">
-                    <p className="text-slate-500 text-sm mb-1">Total Bookings</p>
-                    <p className="text-3xl font-bold text-slate-900">58</p>
-                    <p className="text-xs text-slate-400 mt-1">This month</p>
-                </Card>
-                <Card className="bg-white">
-                    <p className="text-slate-500 text-sm mb-1">Total Revenue</p>
-                    <p className="text-3xl font-bold text-primary-600">Rs. {stats.totalRevenue.toLocaleString()}</p>
-                    <p className="text-xs text-slate-400 mt-1">This month</p>
-                </Card>
-                <Card className="bg-white">
-                    <p className="text-slate-500 text-sm mb-1">Active Vehicles</p>
-                    <p className="text-3xl font-bold text-slate-900">5</p>
-                    <p className="text-xs text-slate-400 mt-1">N and general</p>
-                </Card>
+
+                {/* Total Guests */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <p className="text-sm font-medium text-slate-500 uppercase">Total Guests</p>
+                            <h3 className="text-3xl font-bold text-slate-900 mt-2">{dashboardData.counts.guests}</h3>
+                        </div>
+                        <div className="p-3 bg-blue-50 text-blue-600 rounded-lg">
+                            <UsersIcon className="w-6 h-6" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Total Bookings */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <p className="text-sm font-medium text-slate-500 uppercase">Total Bookings</p>
+                            <h3 className="text-3xl font-bold text-slate-900 mt-2">{dashboardData.counts.bookings}</h3>
+                        </div>
+                        <div className="p-3 bg-purple-50 text-purple-600 rounded-lg">
+                            <ClipboardDocumentCheckIcon className="w-6 h-6" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Total Revenue */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <p className="text-sm font-medium text-slate-500 uppercase">Revenue</p>
+                            <h3 className="text-3xl font-bold text-emerald-600 mt-2">
+                                Rs. {dashboardData.financials.totalRevenue.toLocaleString()}
+                            </h3>
+                        </div>
+                        <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg">
+                            <BanknotesIcon className="w-6 h-6" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Active Vehicles */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <p className="text-sm font-medium text-slate-500 uppercase">Active Vehicles</p>
+                            <h3 className="text-3xl font-bold text-slate-900 mt-2">{dashboardData.counts.activeVehicles}</h3>
+                        </div>
+                        <div className="p-3 bg-orange-50 text-orange-600 rounded-lg">
+                            <TruckIcon className="w-6 h-6" />
+                        </div>
+                    </div>
+                </div>
             </div>
 
+            {/* Charts & Details Section */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Revenue by Service Type Chart */}
+
+                {/* Revenue Chart */}
                 <Card>
-                    <h3 className="text-lg font-bold text-slate-900 mb-4">Revenue by Service Type</h3>
-                    <p className="text-sm text-slate-500 mb-4">Monthly revenue breakdown</p>
+                    <h3 className="text-lg font-bold text-slate-900 mb-6">Revenue Distribution</h3>
                     <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={revenueData}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                                <YAxis tick={{ fontSize: 12 }} />
-                                <Tooltip
-                                    contentStyle={{
-                                        backgroundColor: '#fff',
-                                        border: '1px solid #e2e8f0',
-                                        borderRadius: '8px'
-                                    }}
-                                />
-                                <Bar dataKey="revenue" fill="#0ea5e9" radius={[8, 8, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </Card>
-
-                {/* Booking/Revenue Summary */}
-                <Card>
-                    <h3 className="text-lg font-bold text-slate-900 mb-4">Revenue Summary</h3>
-                    <p className="text-sm text-slate-500 mb-6">By category</p>
-                    <div className="space-y-4">
-                        {bookingSummary.map((item, index) => (
-                            <div key={index} className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
-                                <div>
-                                    <p className="font-semibold text-slate-900">{item.type}</p>
-                                    <p className="text-xs text-slate-500">{item.count} bookings</p>
-                                </div>
-                                <div className="px-4 py-2 bg-primary-50 text-primary-700 font-semibold rounded-lg text-sm">
-                                    {item.revenue}
-                                </div>
+                        {chartData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                                    <YAxis axisLine={false} tickLine={false} />
+                                    <Tooltip
+                                        cursor={{ fill: '#f1f5f9' }}
+                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                    />
+                                    <Bar dataKey="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={40} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-slate-400">
+                                No revenue data available
                             </div>
-                        ))}
+                        )}
                     </div>
                 </Card>
 
-                {/* Quick Actions */}
-                <Card className="lg:col-span-2">
-                    <h3 className="text-lg font-bold text-slate-900 mb-4">Quick Actions</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <button
-                            onClick={() => navigate('/admin/staff')}
-                            className="p-6 bg-slate-50 hover:bg-slate-100 rounded-xl text-center border border-slate-200 transition-all hover:shadow-md"
-                        >
-                            <span className="block text-4xl mb-3">👥</span>
-                            <span className="font-semibold text-slate-700">Manage Staff</span>
-                        </button>
-                        <button className="p-6 bg-slate-50 hover:bg-slate-100 rounded-xl text-center border border-slate-200 transition-all hover:shadow-md">
-                            <span className="block text-4xl mb-3">📊</span>
-                            <span className="font-semibold text-slate-700">Reports</span>
-                        </button>
-                        <button className="p-6 bg-slate-50 hover:bg-slate-100 rounded-xl text-center border border-slate-200 transition-all hover:shadow-md">
-                            <span className="block text-4xl mb-3">🍽️</span>
-                            <span className="font-semibold text-slate-700">Menu</span>
-                        </button>
-                        <button className="p-6 bg-slate-50 hover:bg-slate-100 rounded-xl text-center border border-slate-200 transition-all hover:shadow-md">
-                            <span className="block text-4xl mb-3">🏷️</span>
-                            <span className="font-semibold text-slate-700">Offers</span>
-                        </button>
+                {/* Breakdown List */}
+                <Card>
+                    <h3 className="text-lg font-bold text-slate-900 mb-6">Performance Summary</h3>
+                    <div className="space-y-4">
+                        {summaryList.length > 0 ? (
+                            summaryList.map((item, index) => (
+                                <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-2 h-10 bg-blue-500 rounded-l-md"></div>
+                                        <div>
+                                            <p className="font-semibold text-slate-700">{item.type}</p>
+                                            <p className="text-xs text-slate-500">{item.count} Transactions</p>
+                                        </div>
+                                    </div>
+                                    <span className="font-bold text-slate-900">
+                                        Rs. {item.revenue.toLocaleString()}
+                                    </span>
+                                    heroicons</div>
+                            ))
+                        ) : (
+                            <div className="text-center py-8 text-slate-500">
+                                No transactions recorded yet.
+                            </div>
+                        )}
                     </div>
                 </Card>
+
             </div>
         </div>
     );

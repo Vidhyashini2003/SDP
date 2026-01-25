@@ -9,19 +9,23 @@ import { HomeIcon, BuildingOfficeIcon, TicketIcon, CurrencyDollarIcon, Exclamati
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ActivateAccount from './pages/auth/ActivateAccount';
 
 // Guest Pages
 import GuestDashboard from './pages/guest/Dashboard';
+import GuestBookings from './pages/guest/Bookings'; // Import GuestBookings
 import RoomBooking from './pages/guest/RoomBooking';
 import Profile from './pages/guest/Profile';
 import ActivityBooking from './pages/guest/ActivityBooking';
 import FoodOrders from './pages/guest/FoodOrders';
 import VehicleHire from './pages/guest/VehicleHire';
+import Notifications from './pages/guest/Notifications';
 
 // Staff Pages
 import ReceptionistDashboard from './pages/receptionist/Dashboard';
 import AdminDashboard from './pages/admin/Dashboard';
 import StaffManagement from './pages/admin/StaffManagement';
+import CustomerManagement from './pages/admin/CustomerManagement';
 import ReceptionistBookings from './pages/receptionist/Bookings';
 import ReceptionistActivities from './pages/receptionist/Activities';
 import ReceptionistRefunds from './pages/receptionist/Refunds';
@@ -30,12 +34,13 @@ import DriverDashboard from './pages/driver/Dashboard';
 import DriverTrips from './pages/driver/Trips';
 import DriverRefunds from './pages/driver/Refunds';
 
-import DriverDamages from './pages/driver/Damages';
 import KitchenDashboard from './pages/kitchen/Dashboard';
 import KitchenOrders from './pages/kitchen/Orders';
 import KitchenMenu from './pages/kitchen/Menu';
 import KitchenDamages from './pages/kitchen/Damages';
 import KitchenHistory from './pages/kitchen/History';
+import StaffProfile from './pages/common/StaffProfile';
+import ChangePassword from './pages/common/ChangePassword';
 
 // Layouts
 const PublicLayout = () => (
@@ -54,7 +59,7 @@ const DashboardLayout = ({ items }) => (
     <div className="min-h-screen bg-slate-50">
         <Navbar />
         <Sidebar items={items} />
-        <div className="md:ml-64 pt-6"> {/* Offset for sidebar */}
+        <div className="md:ml-64 pt-20 px-6"> {/* Offset for sidebar and fixed header */}
             <Outlet />
         </div>
     </div>
@@ -63,13 +68,14 @@ const DashboardLayout = ({ items }) => (
 const adminItems = [
     { name: 'Dashboard', path: '/admin/dashboard' },
     { name: 'Staff Management', path: '/admin/staff' },
+    { name: 'Customer Management', path: '/admin/customers' },
     { name: 'Reports', path: '/admin/reports' },
     // more items...
 ];
 
 const receptionistItems = [
     { name: 'Dashboard', path: '/receptionist/dashboard', icon: HomeIcon },
-    { name: 'Manage Room Bookings', path: '/receptionist/bookings', icon: BuildingOfficeIcon },
+    { name: 'Manage Bookings', path: '/receptionist/bookings', icon: BuildingOfficeIcon },
     { name: 'Activity Bookings', path: '/receptionist/activities', icon: TicketIcon },
     { name: 'Refund Requests', path: '/receptionist/refunds', icon: CurrencyDollarIcon },
     { name: 'Damages', path: '/receptionist/damages', icon: ExclamationCircleIcon },
@@ -79,7 +85,6 @@ const driverItems = [
     { name: 'Dashboard', path: '/driver/dashboard', icon: HomeIcon },
     { name: 'My Trips', path: '/driver/trips', icon: TruckIcon },
     { name: 'Refund Requests', path: '/driver/refunds', icon: CurrencyDollarIcon },
-    { name: 'Damages', path: '/driver/damages', icon: ExclamationCircleIcon },
 ];
 
 const kitchenItems = [
@@ -99,6 +104,7 @@ function App() {
                         <Route path="/" element={<Home />} />
                         <Route path="/login" element={<Login />} />
                         <Route path="/register" element={<Register />} />
+                        <Route path="/activate-account" element={<ActivateAccount />} />
                     </Route>
 
                     {/* Guest Routes */}
@@ -108,12 +114,15 @@ function App() {
                         </ProtectedRoute>
                     }>
                         <Route path="bookings" element={<GuestDashboard />} />
-                        <Route path="my-bookings" element={<GuestDashboard />} />
+                        <Route path="my-bookings" element={<GuestBookings />} />
+                        <Route path="booking-history" element={<GuestBookings />} />
                         <Route path="profile" element={<Profile />} />
+                        <Route path="change-password" element={<ChangePassword />} />
                         <Route path="rooms" element={<RoomBooking />} />
                         <Route path="activities" element={<ActivityBooking />} />
                         <Route path="food-orders" element={<FoodOrders />} />
                         <Route path="vehicle-hire" element={<VehicleHire />} />
+                        <Route path="notifications" element={<Notifications />} />
                         <Route index element={<Navigate to="my-bookings" replace />} />
                     </Route>
 
@@ -125,6 +134,9 @@ function App() {
                     }>
                         <Route path="dashboard" element={<AdminDashboard />} />
                         <Route path="staff" element={<StaffManagement />} />
+                        <Route path="customers" element={<CustomerManagement />} /> {/* Added Route */}
+                        <Route path="profile" element={<StaffProfile />} />
+                        <Route path="change-password" element={<ChangePassword />} />
                         <Route index element={<Navigate to="dashboard" replace />} />
                     </Route>
 
@@ -139,6 +151,8 @@ function App() {
                         <Route path="activities" element={<ReceptionistActivities />} />
                         <Route path="refunds" element={<ReceptionistRefunds />} />
                         <Route path="damages" element={<ReceptionistDamages />} />
+                        <Route path="profile" element={<StaffProfile />} />
+                        <Route path="change-password" element={<ChangePassword />} />
                         <Route index element={<Navigate to="dashboard" replace />} />
                     </Route>
 
@@ -151,7 +165,8 @@ function App() {
                         <Route path="dashboard" element={<DriverDashboard />} />
                         <Route path="trips" element={<DriverTrips />} />
                         <Route path="refunds" element={<DriverRefunds />} />
-                        <Route path="damages" element={<DriverDamages />} />
+                        <Route path="profile" element={<StaffProfile />} />
+                        <Route path="change-password" element={<ChangePassword />} />
                         <Route index element={<Navigate to="dashboard" replace />} />
                     </Route>
 
@@ -166,6 +181,8 @@ function App() {
                         <Route path="menu" element={<KitchenMenu />} />
                         <Route path="damages" element={<KitchenDamages />} />
                         <Route path="history" element={<KitchenHistory />} />
+                        <Route path="profile" element={<StaffProfile />} />
+                        <Route path="change-password" element={<ChangePassword />} />
                         <Route index element={<Navigate to="dashboard" replace />} />
                     </Route>
 

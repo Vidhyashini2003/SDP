@@ -45,6 +45,7 @@ app.use('/api/kitchen', kitchenRoutes);
 app.use('/api/driver', driverRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/notifications', require('./routes/notifications'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -61,4 +62,5 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📍 API URL: http://localhost:${PORT}/api`);
+    // Server Ready
 });

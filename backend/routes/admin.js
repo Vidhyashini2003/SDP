@@ -10,8 +10,12 @@ router.get('/dashboard', adminController.getDashboardStats);
 
 // Staff
 router.get('/staff', adminController.getAllStaff);
-router.post('/staff', adminController.addStaff);
+router.post('/staff/invite', adminController.inviteStaff);
 router.delete('/staff/:type/:id', adminController.deleteStaff);
+
+// Customers
+router.get('/customers', adminController.getAllGuests);
+router.delete('/customers/:id', adminController.deleteStaff); // Reusing deleteStaff as it deletes by user_id from Users table
 
 // Rooms
 router.post('/rooms', adminController.addRoom);

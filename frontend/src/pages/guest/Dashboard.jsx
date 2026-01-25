@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from '../../config/axios';
+import { toast } from 'react-hot-toast';
 
 const GuestDashboard = () => {
     const [activeTab, setActiveTab] = useState('all');
@@ -34,6 +35,24 @@ const GuestDashboard = () => {
         } catch (error) {
             console.error('Error fetching bookings:', error);
             setLoading(false);
+        }
+    };
+
+    const handleCancel = async (bookingId) => {
+        if (!window.confirm('Are you sure you want to cancel this booking? Cancellation is only allowed 24 hours before check-in.')) {
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post(`/api/guest/bookings/rooms/${bookingId}/cancel`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            toast.success('Booking cancelled successfully');
+            fetchAllBookings(); // Refresh list
+        } catch (error) {
+            console.error('Cancellation error:', error);
+            toast.error(error.response?.data?.error || 'Failed to cancel booking');
         }
     };
 
@@ -86,283 +105,104 @@ const GuestDashboard = () => {
         <div className="p-6 overflow-auto">
             {/* Header */}
             <div className="mb-6">
-                <h1 className="text-2xl font-bold text-slate-900">My Bookings</h1>
-                <p className="text-sm text-slate-500 mt-1">View and manage all your bookings in one place</p>
+                <h1 className="text-3xl font-bold text-slate-900">Guest <span className="bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">Dashboard</span></h1>
+                <p className="text-slate-500 mt-1">Welcome back! Here's an overview of your activity.</p>
             </div>
 
             {/* Stats Summary */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-                <div className="bg-white p-4 rounded-lg border border-slate-200">
-                    <div className="text-3xl font-bold text-slate-900">{getTotalCount()}</div>
-                    <div className="text-xs text-slate-500 mt-1">Total Bookings</div>
+            {/* Stats Summary */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+                {/* Total Bookings */}
+                <div className="bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 border border-slate-100 relative overflow-hidden group">
+                    <div className="flex justify-between items-start z-10 relative">
+                        <div>
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Total Bookings</p>
+                            <h3 className="text-2xl font-bold text-slate-900">{getTotalCount()}</h3>
+                        </div>
+                        <div className="p-2 bg-slate-100 rounded-lg text-slate-600 group-hover:bg-slate-800 group-hover:text-white transition-colors duration-300">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+                        </div>
+                    </div>
+                    <div className="absolute -bottom-4 -right-4 w-16 h-16 bg-slate-100 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-500 ease-out" />
                 </div>
-                <div className="bg-white p-4 rounded-lg border border-slate-200">
-                    <div className="text-3xl font-bold text-blue-600">{bookings.rooms.length}</div>
-                    <div className="text-xs text-slate-500 mt-1">Room Bookings</div>
+
+                {/* Room Bookings */}
+                <div className="bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 border border-slate-100 relative overflow-hidden group">
+                    <div className="flex justify-between items-start z-10 relative">
+                        <div>
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Rooms</p>
+                            <h3 className="text-2xl font-bold text-slate-900">{bookings.rooms.length}</h3>
+                        </div>
+                        <div className="p-2 bg-blue-50 rounded-lg text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors duration-300">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                        </div>
+                    </div>
+                    <div className="absolute -bottom-4 -right-4 w-16 h-16 bg-blue-50 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-500 ease-out" />
                 </div>
-                <div className="bg-white p-4 rounded-lg border border-slate-200">
-                    <div className="text-3xl font-bold text-purple-600">{bookings.activities.length}</div>
-                    <div className="text-xs text-slate-500 mt-1">Activities</div>
+
+                {/* Activities */}
+                <div className="bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 border border-slate-100 relative overflow-hidden group">
+                    <div className="flex justify-between items-start z-10 relative">
+                        <div>
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Activities</p>
+                            <h3 className="text-2xl font-bold text-slate-900">{bookings.activities.length}</h3>
+                        </div>
+                        <div className="p-2 bg-purple-50 rounded-lg text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-colors duration-300">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" /></svg>
+                        </div>
+                    </div>
+                    <div className="absolute -bottom-4 -right-4 w-16 h-16 bg-purple-50 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-500 ease-out" />
                 </div>
-                <div className="bg-white p-4 rounded-lg border border-slate-200">
-                    <div className="text-3xl font-bold text-green-600">{bookings.foodOrders.length}</div>
-                    <div className="text-xs text-slate-500 mt-1">Food Orders</div>
+
+                {/* Food Orders */}
+                <div className="bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 border border-slate-100 relative overflow-hidden group">
+                    <div className="flex justify-between items-start z-10 relative">
+                        <div>
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Food Orders</p>
+                            <h3 className="text-2xl font-bold text-slate-900">{bookings.foodOrders.length}</h3>
+                        </div>
+                        <div className="p-2 bg-green-50 rounded-lg text-green-600 group-hover:bg-green-600 group-hover:text-white transition-colors duration-300">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                        </div>
+                    </div>
+                    <div className="absolute -bottom-4 -right-4 w-16 h-16 bg-green-50 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-500 ease-out" />
                 </div>
-                <div className="bg-white p-4 rounded-lg border border-slate-200">
-                    <div className="text-3xl font-bold text-orange-600">{bookings.vehicles.length}</div>
-                    <div className="text-xs text-slate-500 mt-1">Vehicle Hire</div>
+
+                {/* Vehicle Hire */}
+                <div className="bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 border border-slate-100 relative overflow-hidden group">
+                    <div className="flex justify-between items-start z-10 relative">
+                        <div>
+                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Vehicle Hire</p>
+                            <h3 className="text-2xl font-bold text-slate-900">{bookings.vehicles.length}</h3>
+                        </div>
+                        <div className="p-2 bg-orange-50 rounded-lg text-orange-600 group-hover:bg-orange-600 group-hover:text-white transition-colors duration-300">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        </div>
+                    </div>
+                    <div className="absolute -bottom-4 -right-4 w-16 h-16 bg-orange-50 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-500 ease-out" />
                 </div>
             </div>
 
-            {/* Tabs */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-                <div className="border-b border-slate-200 px-6">
-                    <div className="flex gap-1 overflow-x-auto">
-                        {tabs.map(tab => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`px-4 py-3 text-sm font-medium transition-all whitespace-nowrap ${activeTab === tab.id
-                                    ? 'text-blue-600 border-b-2 border-blue-600'
-                                    : 'text-slate-600 hover:text-slate-900'
-                                    }`}
-                            >
-                                {tab.icon} {tab.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="p-6">
-                    {/* All Bookings Tab */}
-                    {activeTab === 'all' && (
-                        <div className="space-y-6">
-                            {/* Room Bookings */}
-                            {bookings.rooms.length > 0 && (
-                                <div>
-                                    <h3 className="font-semibold text-slate-900 mb-3">🏨 Room Bookings</h3>
-                                    <div className="space-y-2">
-                                        {bookings.rooms.map((booking, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                                                <div>
-                                                    <p className="font-medium text-slate-900">{booking.room_type}</p>
-                                                    <p className="text-sm text-slate-500">
-                                                        {formatDate(booking.check_in_date)} - {formatDate(booking.check_out_date)}
-                                                    </p>
-                                                </div>
-                                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(booking.rb_status)}`}>
-                                                    {booking.rb_status}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Food Orders */}
-                            {bookings.foodOrders.length > 0 && (
-                                <div>
-                                    <h3 className="font-semibold text-slate-900 mb-3">🍽️ Food Orders</h3>
-                                    <div className="space-y-2">
-                                        {bookings.foodOrders.map((order, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                                                <div>
-                                                    <p className="font-medium text-slate-900">{order.item_name}</p>
-                                                    <p className="text-sm text-slate-500">
-                                                        Qty: {order.order_quantity} • Rs. {order.order_total_amount}
-                                                    </p>
-                                                </div>
-                                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.order_status)}`}>
-                                                    {order.order_status}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Vehicles */}
-                            {bookings.vehicles.length > 0 && (
-                                <div>
-                                    <h3 className="font-semibold text-slate-900 mb-3">🚗 Vehicle Bookings</h3>
-                                    <div className="space-y-2">
-                                        {bookings.vehicles.map((vehicle, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                                                <div>
-                                                    <p className="font-medium text-slate-900">{vehicle.vehicle_type}</p>
-                                                    <p className="text-sm text-slate-500">{vehicle.vehicle_number}</p>
-                                                </div>
-                                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(vehicle.vb_status)}`}>
-                                                    {vehicle.vb_status || 'Active'}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Activities */}
-                            {bookings.activities.length > 0 && (
-                                <div>
-                                    <h3 className="font-semibold text-slate-900 mb-3">🎯 Activities</h3>
-                                    <div className="space-y-2">
-                                        {bookings.activities.map((activity, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                                                <div>
-                                                    <p className="font-medium text-slate-900">{activity.activity_name}</p>
-                                                    <p className="text-sm text-slate-500">
-                                                        {formatDate(activity.booking_date)}
-                                                    </p>
-                                                </div>
-                                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(activity.ab_status)}`}>
-                                                    {activity.ab_status}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {getTotalCount() === 0 && (
-                                <div className="text-center py-12">
-                                    <div className="text-6xl mb-4">📋</div>
-                                    <p className="text-slate-500">No bookings yet</p>
-                                    <p className="text-sm text-slate-400 mt-1">Start booking rooms, activities, or order food!</p>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Room Bookings Tab */}
-                    {activeTab === 'rooms' && (
-                        <div className="space-y-3">
-                            {bookings.rooms.length > 0 ? (
-                                bookings.rooms.map((booking, idx) => (
-                                    <div key={idx} className="p-5 border border-slate-200 rounded-lg">
-                                        <div className="flex items-start justify-between mb-3">
-                                            <div>
-                                                <h4 className="font-semibold text-slate-900 text-lg">{booking.room_type}</h4>
-                                                <p className="text-sm text-slate-500">Booking ID: {booking.rb_id}</p>
-                                            </div>
-                                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(booking.rb_status)}`}>
-                                                {booking.rb_status}
-                                            </span>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4 text-sm">
-                                            <div>
-                                                <p className="text-slate-500">Check-in</p>
-                                                <p className="font-medium text-slate-900">{formatDate(booking.check_in_date)}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-slate-500">Check-out</p>
-                                                <p className="font-medium text-slate-900">{formatDate(booking.check_out_date)}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-slate-500">Total Price</p>
-                                                <p className="font-medium text-slate-900">Rs. {booking.total_price || 'N/A'}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="text-center py-12 text-slate-500">No room bookings</div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Activities Tab */}
-                    {activeTab === 'activities' && (
-                        <div className="space-y-3">
-                            {bookings.activities.length > 0 ? (
-                                bookings.activities.map((activity, idx) => (
-                                    <div key={idx} className="p-5 border border-slate-200 rounded-lg">
-                                        <div className="flex items-start justify-between">
-                                            <div>
-                                                <h4 className="font-semibold text-slate-900 text-lg">{activity.activity_name}</h4>
-                                                <p className="text-sm text-slate-500 mt-1">
-                                                    Date: {formatDate(activity.booking_date)}
-                                                </p>
-                                                <p className="text-sm text-slate-500">
-                                                    Duration: {activity.duration_hours} hours
-                                                </p>
-                                            </div>
-                                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(activity.ab_status)}`}>
-                                                {activity.ab_status}
-                                            </span>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="text-center py-12 text-slate-500">No activity bookings</div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Food Orders Tab */}
-                    {activeTab === 'food' && (
-                        <div className="space-y-3">
-                            {bookings.foodOrders.length > 0 ? (
-                                bookings.foodOrders.map((order, idx) => (
-                                    <div key={idx} className="p-5 border border-slate-200 rounded-lg">
-                                        <div className="flex items-start justify-between mb-3">
-                                            <div>
-                                                <h4 className="font-semibold text-slate-900 text-lg">{order.item_name}</h4>
-                                                <p className="text-sm text-slate-500">Order #{order.order_item_id}</p>
-                                            </div>
-                                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.order_status)}`}>
-                                                {order.order_status}
-                                            </span>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4 text-sm">
-                                            <div>
-                                                <p className="text-slate-500">Quantity</p>
-                                                <p className="font-medium text-slate-900">{order.order_quantity}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-slate-500">Total</p>
-                                                <p className="font-medium text-slate-900">Rs. {order.order_total_amount}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="text-center py-12 text-slate-500">No food orders</div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Vehicles Tab */}
-                    {activeTab === 'vehicles' && (
-                        <div className="space-y-3">
-                            {bookings.vehicles.length > 0 ? (
-                                bookings.vehicles.map((vehicle, idx) => (
-                                    <div key={idx} className="p-5 border border-slate-200 rounded-lg">
-                                        <div className="flex items-start justify-between mb-3">
-                                            <div>
-                                                <h4 className="font-semibold text-slate-900 text-lg">{vehicle.vehicle_type}</h4>
-                                                <p className="text-sm text-slate-500">{vehicle.vehicle_number}</p>
-                                            </div>
-                                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(vehicle.vb_status)}`}>
-                                                {vehicle.vb_status || 'Active'}
-                                            </span>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4 text-sm">
-                                            <div>
-                                                <p className="text-slate-500">Pickup</p>
-                                                <p className="font-medium text-slate-900">{vehicle.vb_pickup_point || 'N/A'}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-slate-500">Drop-off</p>
-                                                <p className="font-medium text-slate-900">{vehicle.vb_drop_point || 'N/A'}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="text-center py-12 text-slate-500">No vehicle bookings</div>
-                            )}
-                        </div>
-                    )}
+            {/* Dashboard Actions */}
+            <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Quick Actions</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <a href="/guest/rooms" className="flex flex-col items-center justify-center p-4 bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 transition-colors">
+                        <span className="text-2xl mb-2">🏨</span>
+                        <span className="font-medium text-sm">Book a Room</span>
+                    </a>
+                    <a href="/guest/food-orders" className="flex flex-col items-center justify-center p-4 bg-green-50 text-green-700 rounded-xl hover:bg-green-100 transition-colors">
+                        <span className="text-2xl mb-2">🍽️</span>
+                        <span className="font-medium text-sm">Order Food</span>
+                    </a>
+                    <a href="/guest/activities" className="flex flex-col items-center justify-center p-4 bg-purple-50 text-purple-700 rounded-xl hover:bg-purple-100 transition-colors">
+                        <span className="text-2xl mb-2">🎯</span>
+                        <span className="font-medium text-sm">Book Activity</span>
+                    </a>
+                    <a href="/guest/vehicle-hire" className="flex flex-col items-center justify-center p-4 bg-orange-50 text-orange-700 rounded-xl hover:bg-orange-100 transition-colors">
+                        <span className="text-2xl mb-2">🚗</span>
+                        <span className="font-medium text-sm">Hire Vehicle</span>
+                    </a>
                 </div>
             </div>
         </div>

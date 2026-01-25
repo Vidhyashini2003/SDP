@@ -1,121 +1,286 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import axios from '../../config/axios';
+import { useAuth } from '../../context/AuthContext';
 import { toast } from 'react-hot-toast';
 
 const ReceptionistBookings = () => {
-    const [bookings, setBookings] = useState([]);
+    const { user } = useAuth();
+    const [activeTab, setActiveTab] = useState('all');
+    const [bookings, setBookings] = useState({
+        rooms: [],
+        activities: [],
+        foodOrders: [],
+        vehicles: []
+    });
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        const fetchBookings = async () => {
+            try {
+                const [roomsRes, actRes, ordersRes, vehiclesRes] = await Promise.all([
+                    axios.get('/api/receptionist/bookings/rooms'),
+                    axios.get('/api/receptionist/bookings/activities'),
+                    axios.get('/api/receptionist/bookings/orders'),
+                    axios.get('/api/receptionist/bookings/vehicles')
+                ]);
+                setBookings({
+                    rooms: roomsRes.data || [],
+                    activities: actRes.data || [],
+                    foodOrders: ordersRes.data || [],
+                    vehicles: vehiclesRes.data || []
+                });
+                setLoading(false);
+            } catch (error) {
+                console.error('Error fetching bookings:', error);
+                toast.error('Failed to load bookings');
+                setLoading(false);
+            }
+        };
         fetchBookings();
     }, []);
 
-    const fetchBookings = async () => {
-        try {
-            const token = localStorage.getItem('token');
-            const response = await axios.get('http://localhost:5000/api/receptionist/bookings/rooms', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setBookings(response.data);
-            setLoading(false);
-        } catch (error) {
-            console.error('Error fetching bookings:', error);
-            toast.error('Failed to load bookings');
-            setLoading(false);
-        }
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
     };
 
-    const handleStatusUpdate = async (id, newStatus) => {
+    const getStatusColor = (status) => {
+        const statusColors = {
+            'checked-in': 'bg-blue-500',
+            'confirmed': 'bg-green-500',
+            'pending': 'bg-yellow-500',
+            'active': 'bg-blue-500',
+            'booked': 'bg-green-500',
+            'delivered': 'bg-green-500',
+            'ordered': 'bg-yellow-500',
+            'cancelled': 'bg-red-500',
+            'completed': 'bg-slate-500',
+            'rejected': 'bg-red-500'
+        };
+        return `${statusColors[status?.toLowerCase()] || 'bg-slate-500'} text-white`;
+    };
+
+    const handleStatusUpdate = async (type, id, newStatus) => {
+        // Implementation for easy status updates directly from the list if needed
+        // For now, let's keep it simple or port the existing logic for rooms/activities
         try {
-            const token = localStorage.getItem('token');
-            await axios.put(
-                `http://localhost:5000/api/receptionist/bookings/rooms/${id}/status`,
-                { status: newStatus },
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-            toast.success(`Booking marked as ${newStatus}`);
-            fetchBookings(); // Refresh data
+            let endpoint = '';
+            if (type === 'room') endpoint = `/api/receptionist/bookings/rooms/${id}/status`;
+            else if (type === 'activity') endpoint = `/api/receptionist/bookings/activities/${id}/status`;
+
+            if (endpoint) {
+                await axios.put(endpoint, { status: newStatus });
+                toast.success('Status updated');
+                // Refresh logic would be ideal here
+                window.location.reload(); // Simple refresh for now
+            }
         } catch (error) {
-            console.error('Error updating status:', error);
             toast.error('Failed to update status');
         }
     };
 
-    const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleDateString('en-CA');
-    };
+    const tabs = [
+        { id: 'all', label: 'All Bookings', icon: '📋' },
+        { id: 'rooms', label: 'Rooms', icon: '🏨' },
+        { id: 'activities', label: 'Activities', icon: '🎯' },
+        { id: 'food', label: 'Food Orders', icon: '🍽️' },
+        { id: 'vehicles', label: 'Vehicles', icon: '🚗' }
+    ];
 
-    if (loading) return <div className="p-8 text-center text-slate-600">Loading bookings...</div>;
+    if (loading) return <div className="p-8">Loading...</div>;
 
     return (
         <div className="p-8">
-            <h1 className="text-2xl font-bold mb-2">Manage Room Bookings</h1>
-            <p className="text-slate-600 mb-8">Check-in and check-out guests</p>
+            <div className="mb-8">
+                <h1 className="text-3xl font-bold text-slate-900">Manage Bookings</h1>
+                <p className="text-slate-500 mt-1">View and manage all guest bookings and orders.</p>
+            </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-50 border-b border-slate-200">
-                            <tr>
-                                <th className="px-6 py-4 font-semibold text-slate-700">Guest Name</th>
-                                <th className="px-6 py-4 font-semibold text-slate-700">Room</th>
-                                <th className="px-6 py-4 font-semibold text-slate-700">Check-In</th>
-                                <th className="px-6 py-4 font-semibold text-slate-700">Check-Out</th>
-                                <th className="px-6 py-4 font-semibold text-slate-700">Phone</th>
-                                <th className="px-6 py-4 font-semibold text-slate-700">Status</th>
-                                <th className="px-6 py-4 font-semibold text-slate-700">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {bookings.map((booking) => (
-                                <tr key={booking.rb_id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-6 py-4 font-medium text-slate-900">{booking.guest_name}</td>
-                                    <td className="px-6 py-4 text-slate-600">
-                                        {booking.room_id} - {booking.room_type}
-                                    </td>
-                                    <td className="px-6 py-4 text-slate-600">{formatDate(booking.rb_checkin)}</td>
-                                    <td className="px-6 py-4 text-slate-600">{formatDate(booking.rb_checkout)}</td>
-                                    <td className="px-6 py-4 text-slate-600">{booking.guest_phone || 'N/A'}</td>
-                                    <td className="px-6 py-4">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                            ${booking.rb_status === 'Booked' ? 'bg-green-100 text-green-800' :
-                                                booking.rb_status === 'Checked-in' ? 'bg-blue-100 text-blue-800' :
-                                                    booking.rb_status === 'Checked-out' ? 'bg-slate-100 text-slate-800' :
-                                                        booking.rb_status === 'Cancelled' ? 'bg-red-100 text-red-800' :
-                                                            'bg-yellow-100 text-yellow-800' // Pending
-                                            }`}>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+                <div className="border-b border-slate-200 px-6">
+                    <div className="flex gap-4 overflow-x-auto">
+                        {tabs.map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`px-4 py-4 text-sm font-medium transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === tab.id
+                                    ? 'text-blue-600 border-b-2 border-blue-600'
+                                    : 'text-slate-600 hover:text-slate-900 border-b-2 border-transparent'
+                                    }`}
+                            >
+                                <span className="text-lg">{tab.icon}</span> {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="p-6">
+                    {/* All Bookings */}
+                    {activeTab === 'all' && (
+                        <div className="space-y-6">
+                            {bookings.rooms.map((booking, idx) => (
+                                <div key={idx} className="flex justify-between items-center p-4 bg-slate-50 rounded-lg">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-bold text-slate-900">Room: {booking.room_type}</span>
+                                            <span className="text-xs text-slate-500">({booking.guest_name})</span>
+                                        </div>
+                                        <div className="text-sm text-slate-500">
+                                            {formatDate(booking.check_in_date)} - {formatDate(booking.check_out_date)}
+                                        </div>
+                                    </div>
+                                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(booking.rb_status)}`}>
+                                        {booking.rb_status}
+                                    </span>
+                                </div>
+                            ))}
+                            {bookings.activities.map((booking, idx) => (
+                                <div key={'act' + idx} className="flex justify-between items-center p-4 bg-slate-50 rounded-lg">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-bold text-slate-900">Activity: {booking.activity_name}</span>
+                                            <span className="text-xs text-slate-500">({booking.guest_name})</span>
+                                        </div>
+                                        <div className="text-sm text-slate-500">
+                                            {formatDate(booking.booking_date)}
+                                        </div>
+                                    </div>
+                                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(booking.ab_status)}`}>
+                                        {booking.ab_status}
+                                    </span>
+                                </div>
+                            ))}
+                            {bookings.foodOrders.map((order, idx) => (
+                                <div key={'food' + idx} className="flex justify-between items-center p-4 bg-slate-50 rounded-lg">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-bold text-slate-900">Order: {order.item_name} (x{order.order_quantity})</span>
+                                            <span className="text-xs text-slate-500">({order.guest_name})</span>
+                                        </div>
+                                        <div className="text-sm text-slate-500">
+                                            {formatDate(order.order_date)}
+                                        </div>
+                                    </div>
+                                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.item_status)}`}>
+                                        {order.item_status}
+                                    </span>
+                                </div>
+                            ))}
+                            {bookings.vehicles.map((vb, idx) => (
+                                <div key={'veh' + idx} className="flex justify-between items-center p-4 bg-slate-50 rounded-lg">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-bold text-slate-900">Vehicle: {vb.vehicle_type}</span>
+                                            <span className="text-xs text-slate-500">({vb.guest_name})</span>
+                                        </div>
+                                        <div className="text-sm text-slate-500">
+                                            {formatDate(vb.vb_date)}
+                                        </div>
+                                    </div>
+                                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(vb.vb_status)}`}>
+                                        {vb.vb_status}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Rooms Tab */}
+                    {activeTab === 'rooms' && (
+                        <div className="space-y-4">
+                            {bookings.rooms.map((booking, idx) => (
+                                <div key={idx} className="p-4 border border-slate-200 rounded-lg">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                            <h4 className="font-bold text-slate-900">{booking.room_type}</h4>
+                                            <p className="text-sm text-slate-500">Guest: {booking.guest_name} ({booking.guest_phone})</p>
+                                        </div>
+                                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(booking.rb_status)}`}>
                                             {booking.rb_status}
                                         </span>
-                                    </td>
-                                    <td className="px-6 py-4">
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4 text-sm mt-2">
+                                        <div><span className="text-slate-500">Check-in:</span> {formatDate(booking.check_in_date)}</div>
+                                        <div><span className="text-slate-500">Check-out:</span> {formatDate(booking.check_out_date)}</div>
+                                    </div>
+                                    <div className="mt-3 flex gap-2">
                                         {booking.rb_status === 'Booked' && (
-                                            <button
-                                                onClick={() => handleStatusUpdate(booking.rb_id, 'Checked-in')}
-                                                className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all"
-                                            >
-                                                Check-In
-                                            </button>
+                                            <button onClick={() => handleStatusUpdate('room', booking.rb_id, 'Checked-in')} className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">Check-In</button>
                                         )}
                                         {booking.rb_status === 'Checked-in' && (
-                                            <button
-                                                onClick={() => handleStatusUpdate(booking.rb_id, 'Checked-out')}
-                                                className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg shadow-sm transition-all"
-                                            >
-                                                Check-Out
-                                            </button>
+                                            <button onClick={() => handleStatusUpdate('room', booking.rb_id, 'Checked-out')} className="px-3 py-1 bg-slate-600 text-white text-xs rounded hover:bg-slate-700">Check-Out</button>
                                         )}
-                                    </td>
-                                </tr>
+                                    </div>
+                                </div>
                             ))}
-                            {bookings.length === 0 && (
-                                <tr>
-                                    <td colSpan="7" className="px-6 py-8 text-center text-slate-500">
-                                        No bookings found.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
+                        </div>
+                    )}
+
+                    {/* Activities Tab */}
+                    {activeTab === 'activities' && (
+                        <div className="space-y-4">
+                            {bookings.activities.map((booking, idx) => (
+                                <div key={idx} className="p-4 border border-slate-200 rounded-lg">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                            <h4 className="font-bold text-slate-900">{booking.activity_name}</h4>
+                                            <p className="text-sm text-slate-500">Guest: {booking.guest_name} ({booking.guest_phone})</p>
+                                        </div>
+                                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(booking.ab_status)}`}>
+                                            {booking.ab_status}
+                                        </span>
+                                    </div>
+                                    <div className="text-sm text-slate-500 mt-2">Date: {formatDate(booking.booking_date)}</div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Food Tab */}
+                    {activeTab === 'food' && (
+                        <div className="space-y-4">
+                            {bookings.foodOrders.map((order, idx) => (
+                                <div key={idx} className="p-4 border border-slate-200 rounded-lg">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                            <h4 className="font-bold text-slate-900">{order.item_name} (x{order.order_quantity})</h4>
+                                            <p className="text-sm text-slate-500">Guest: {order.guest_name}</p>
+                                        </div>
+                                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.item_status)}`}>
+                                            {order.item_status}
+                                        </span>
+                                    </div>
+                                    <div className="text-sm text-slate-500 mt-2">Total: Rs. {order.order_total_amount}</div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Vehicles Tab */}
+                    {activeTab === 'vehicles' && (
+                        <div className="space-y-4">
+                            {bookings.vehicles.map((vb, idx) => (
+                                <div key={idx} className="p-4 border border-slate-200 rounded-lg">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                            <h4 className="font-bold text-slate-900">{vb.vehicle_type}</h4>
+                                            <p className="text-sm text-slate-500">Guest: {vb.guest_name}</p>
+                                        </div>
+                                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(vb.vb_status)}`}>
+                                            {vb.vb_status}
+                                        </span>
+                                    </div>
+                                    <div className="text-sm text-slate-500 mt-2">
+                                        From: {vb.vb_pickup_point} To: {vb.vb_drop_point}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

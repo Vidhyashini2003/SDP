@@ -80,7 +80,6 @@ CREATE TABLE IF NOT EXISTS Driver (
     driver_email VARCHAR(100) UNIQUE NOT NULL,
     driver_phone VARCHAR(15),
     driver_password VARCHAR(255) NOT NULL,
-    license_number VARCHAR(50),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

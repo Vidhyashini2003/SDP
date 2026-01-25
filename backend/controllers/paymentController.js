@@ -3,7 +3,7 @@ const db = require('../config/db');
 exports.getPaymentDetails = async (req, res) => {
     try {
         const { id } = req.params;
-        const [payments] = await db.query('SELECT * FROM Payment WHERE payment_id = ?', [id]);
+        const [payments] = await db.query('SELECT * FROM payment WHERE payment_id = ?', [id]);
         if (payments.length === 0) return res.status(404).json({ error: 'Payment not found' });
         res.json(payments[0]);
     } catch (error) {

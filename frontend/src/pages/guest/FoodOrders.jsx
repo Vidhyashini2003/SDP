@@ -8,6 +8,7 @@ const FoodOrders = () => {
     const [currentBooking, setCurrentBooking] = useState(null);
     const [loading, setLoading] = useState(true);
     const [paymentMethod, setPaymentMethod] = useState('');
+    const [diningOption, setDiningOption] = useState('Delivery');
 
     const paymentMethods = [
         { value: 'Cash', label: 'Cash', icon: '💵', description: 'Pay with cash on delivery' },
@@ -113,9 +114,12 @@ const FoodOrders = () => {
             const orderData = {
                 items: cart.map(item => ({
                     item_id: item.item_id,
-                    quantity: item.quantity
+                    quantity: item.quantity,
+                    price: item.item_price
                 })),
-                payment_method: paymentMethod
+                total_amount: getTotalAmount(),
+                payment_method: paymentMethod,
+                dining_option: diningOption
             };
 
             await axios.post('/api/guest/orders', orderData);
@@ -248,6 +252,31 @@ const FoodOrders = () => {
 
                 {cart.length > 0 && (
                     <div>
+                        {/* Dining Option Selection */}
+                        <div className="border-t border-slate-200 pt-4 mb-4">
+                            <h4 className="font-semibold text-slate-900 mb-3">Dining Option</h4>
+                            <div className="flex gap-4">
+                                <button
+                                    onClick={() => setDiningOption('Delivery')}
+                                    className={`flex-1 p-3 rounded-lg border-2 transition-all text-center font-medium ${diningOption === 'Delivery'
+                                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                                        }`}
+                                >
+                                    🛵 Delivery
+                                </button>
+                                <button
+                                    onClick={() => setDiningOption('Dine-in')}
+                                    className={`flex-1 p-3 rounded-lg border-2 transition-all text-center font-medium ${diningOption === 'Dine-in'
+                                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                                        }`}
+                                >
+                                    🍽️ Dine-in
+                                </button>
+                            </div>
+                        </div>
+
                         {/* Payment Method Selection */}
                         <div className="border-t border-slate-200 pt-4 mb-4">
                             <h4 className="font-semibold text-slate-900 mb-3">Payment Method</h4>
@@ -257,8 +286,8 @@ const FoodOrders = () => {
                                         key={method.value}
                                         onClick={() => setPaymentMethod(method.value)}
                                         className={`w-full p-3 rounded-lg border-2 transition-all text-left ${paymentMethod === method.value
-                                                ? 'border-blue-500 bg-blue-50'
-                                                : 'border-slate-200 bg-white hover:border-slate-300'
+                                            ? 'border-blue-500 bg-blue-50'
+                                            : 'border-slate-200 bg-white hover:border-slate-300'
                                             }`}
                                     >
                                         <div className="flex items-center gap-3">
@@ -291,8 +320,8 @@ const FoodOrders = () => {
                             onClick={handlePlaceOrder}
                             disabled={!paymentMethod}
                             className={`w-full py-3 rounded-lg font-semibold transition-all ${paymentMethod
-                                    ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                                    : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                                ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                                : 'bg-slate-300 text-slate-500 cursor-not-allowed'
                                 }`}
                         >
                             {paymentMethod ? 'Place Order' : 'Select Payment Method'}
