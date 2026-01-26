@@ -18,18 +18,16 @@ const GuestBookings = () => {
 
     const fetchAllBookings = async () => {
         try {
-            const [bookingsRes, actRes, ordersRes, vehiclesRes] = await Promise.all([
+            const [bookingsRes, ordersRes] = await Promise.all([
                 axios.get('/api/guest/bookings'),
-                axios.get('/api/guest/activities'),
-                axios.get('/api/guest/orders'),
-                axios.get('/api/guest/vehicles')
+                axios.get('/api/guest/orders')
             ]);
 
             setBookings({
                 rooms: bookingsRes.data?.rooms || [],
-                activities: actRes.data || [],
+                activities: bookingsRes.data?.activities || [],
                 foodOrders: ordersRes.data || [],
-                vehicles: vehiclesRes.data || []
+                vehicles: bookingsRes.data?.vehicles || []
             });
             setLoading(false);
         } catch (error) {
@@ -58,14 +56,34 @@ const GuestBookings = () => {
             'checked-in': 'bg-blue-500',
             'confirmed': 'bg-green-500',
             'pending': 'bg-yellow-500',
+            'pending approval': 'bg-yellow-100 text-yellow-800',
+            'pending payment': 'bg-orange-100 text-orange-800',
             'active': 'bg-blue-500',
             'booked': 'bg-green-500',
             'delivered': 'bg-green-500',
             'ordered': 'bg-yellow-500',
             'cancelled': 'bg-red-500',
-            'completed': 'bg-slate-500'
+            'completed': 'bg-slate-500',
+            'rejected': 'bg-red-500'
         };
         return `${statusColors[status?.toLowerCase()] || 'bg-slate-500'} text-white`;
+    };
+
+    const handleVehiclePayment = async (vehicle) => {
+        const amount = vehicle.vehicle_price_per_day * vehicle.vb_days;
+        if (!confirm(`Confirm payment of Rs. ${amount} for ${vehicle.vehicle_type}?`)) return;
+
+        try {
+            await axios.post(`/api/guest/bookings/vehicles/${vehicle.vb_id}/pay`, {
+                payment_method: 'Card', // Hardcoded for demo/simplicity or ask user
+                total_amount: amount
+            });
+            toast.success('Payment successful! Trip confirmed.');
+            window.location.reload();
+        } catch (error) {
+            console.error('Payment error:', error);
+            toast.error('Payment failed');
+        }
     };
 
     const formatDate = (dateString) => {
@@ -342,15 +360,33 @@ const GuestBookings = () => {
                                                 {vehicle.vb_status || 'Active'}
                                             </span>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-4 text-sm">
-                                            <div>
-                                                <p className="text-slate-500">Pickup</p>
-                                                <p className="font-medium text-slate-900">{vehicle.vb_pickup_point || 'N/A'}</p>
+                                        <div className="mt-3 flex items-center justify-between">
+                                            <div className="text-sm">
+                                                <div>
+                                                    <p className="text-slate-500">Date</p>
+                                                    <p className="font-medium text-slate-900">
+                                                        {new Date(vehicle.booking_date).toLocaleDateString()}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="text-slate-500">Drop-off</p>
-                                                <p className="font-medium text-slate-900">{vehicle.vb_drop_point || 'N/A'}</p>
-                                            </div>
+
+                                            {vehicle.vb_status === 'Pending Payment' && (
+                                                <button
+                                                    onClick={() => {
+                                                        const amount = vehicle.total_amount || (vehicle.vehicle_price_per_day || 0) * (vehicle.vb_days || 1);
+                                                        handleVehiclePayment(vehicle);
+                                                    }}
+                                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg transition-colors"
+                                                >
+                                                    Pay Now
+                                                </button>
+                                            )}
+
+                                            {vehicle.vb_status === 'Cancelled' && vehicle.cancel_reason && (
+                                                <div className="mt-2 text-red-600 bg-red-50 p-2 rounded text-xs">
+                                                    <strong>Cancelled:</strong> {vehicle.cancel_reason}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 ))

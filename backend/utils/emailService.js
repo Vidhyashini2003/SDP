@@ -43,3 +43,27 @@ exports.sendActivationEmail = async (email, token, type = 'activation') => {
         return false;
     }
 };
+// Send Reset Password Email
+exports.sendResetPasswordEmail = async (email, resetUrl) => {
+    const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject: 'Password Reset Request',
+        html: `
+            <h1>Password Reset</h1>
+            <p>You requested a password reset. Please click the link below to reset your password:</p>
+            <a href="${resetUrl}">${resetUrl}</a>
+            <p>If you did not request this, please ignore this email.</p>
+            <p>This link will expire in 1 hour.</p>
+        `
+    };
+
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log(`Reset password email sent to ${email}`);
+        return true;
+    } catch (error) {
+        console.error('Error sending reset password email:', error);
+        return false;
+    }
+};

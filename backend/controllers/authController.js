@@ -245,9 +245,12 @@ exports.updateProfile = async (req, res) => {
                 'UPDATE KitchenStaff SET staff_address = ? WHERE user_id = ?',
                 [address, userId]
             );
+        } else if (role === 'driver') {
+            await connection.query(
+                'UPDATE Driver SET driver_address = ? WHERE user_id = ?',
+                [address, userId]
+            );
         }
-        // Admin has no extra table
-        // Driver has vehicle_id but maybe address logic?
 
         await connection.commit();
         res.json({ message: 'Profile updated successfully' });
@@ -292,5 +295,131 @@ exports.changePassword = async (req, res) => {
     } catch (error) {
         console.error('Change password error:', error);
         res.status(500).json({ error: 'Failed to change password' });
+    }
+};
+// Forgot Password
+exports.forgotPassword = async (req, res) => {
+    const { email } = req.body;
+    const connection = await db.getConnection();
+    try {
+        // 1. Find User
+        const [users] = await connection.query('SELECT * FROM Users WHERE email = ?', [email]);
+        if (users.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        const user = users[0];
+
+        // 2. Generate Reset Token
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const resetExpires = new Date(Date.now() + 3600000); // 1 hour
+
+        // 3. Save Token to Database (New Table)
+        // First invalidate any existing tokens for this user
+        await connection.query('DELETE FROM password_resets WHERE user_id = ?', [user.user_id]);
+
+        await connection.query(
+            'INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)',
+            [user.user_id, resetToken, resetExpires]
+        );
+
+        // 4. Send Email
+        const resetUrl = `http://localhost:5173/reset-password/${resetToken}`;
+        const emailSent = await emailService.sendResetPasswordEmail(user.email, resetUrl);
+
+        if (!emailSent) {
+            return res.status(500).json({ error: 'Failed to send reset email' });
+        }
+
+        res.json({ message: 'Password reset link sent to your email' });
+
+    } catch (error) {
+        console.error('Forgot password error:', error);
+        res.status(500).json({ error: 'Failed to process request' });
+    } finally {
+        connection.release();
+    }
+};
+
+// Reset Password
+exports.resetPassword = async (req, res) => {
+    const { token, password, confirmPassword } = req.body;
+
+    if (password !== confirmPassword) {
+        return res.status(400).json({ error: 'Passwords do not match' });
+    }
+
+    const connection = await db.getConnection();
+    try {
+        // 1. Find Valid Token in New Table
+        const [tokens] = await connection.query(
+            'SELECT * FROM password_resets WHERE token = ? AND expires_at > NOW()',
+            [token]
+        );
+
+        if (tokens.length === 0) {
+            return res.status(400).json({ error: 'Invalid or expired token' });
+        }
+        const resetEntry = tokens[0];
+
+        // 2. Hash New Password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // 3. Update User Password and Delete Token
+        await connection.beginTransaction();
+
+        await connection.query(
+            'UPDATE Users SET password = ? WHERE user_id = ?',
+            [hashedPassword, resetEntry.user_id]
+        );
+
+        await connection.query(
+            'DELETE FROM password_resets WHERE id = ?',
+            [resetEntry.id]
+        );
+
+        await connection.commit();
+
+        res.json({ message: 'Password reset successfully. You can now login.' });
+
+    } catch (error) {
+        await connection.rollback();
+        console.error('Reset password error:', error);
+        res.status(500).json({ error: 'Failed to reset password' });
+    } finally {
+        connection.release();
+    }
+};
+
+// Get Current User Profile
+exports.getMe = async (req, res) => {
+    const userId = req.user.id;
+    const role = req.user.role;
+    const connection = await db.getConnection();
+    try {
+        let query = 'SELECT u.user_id, u.name, u.email, u.phone, u.role, u.account_status';
+        let params = [userId];
+
+        if (role === 'receptionist') {
+            query += ', r.receptionist_address as address FROM Users u LEFT JOIN Receptionist r ON u.user_id = r.user_id WHERE u.user_id = ?';
+        } else if (role === 'kitchen') {
+            query += ', k.staff_address as address FROM Users u LEFT JOIN KitchenStaff k ON u.user_id = k.user_id WHERE u.user_id = ?';
+        } else if (role === 'driver') {
+            query += ', d.driver_address as address FROM Users u LEFT JOIN Driver d ON u.user_id = d.user_id WHERE u.user_id = ?';
+        } else if (role === 'guest') {
+            query += ', g.guest_address as address, g.nationality FROM Users u LEFT JOIN Guest g ON u.user_id = g.user_id WHERE u.user_id = ?';
+        } else {
+            query += ' FROM Users u WHERE u.user_id = ?';
+        }
+
+        const [users] = await connection.query(query, params);
+        if (users.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        res.json(users[0]);
+    } catch (error) {
+        console.error('Get profile error:', error);
+        res.status(500).json({ error: 'Failed to fetch profile' });
+    } finally {
+        connection.release();
     }
 };

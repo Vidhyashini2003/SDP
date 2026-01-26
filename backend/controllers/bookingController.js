@@ -32,7 +32,7 @@ exports.getAvailableRooms = async (req, res) => {
 exports.createRoomBooking = async (req, res) => {
     try {
         const { room_id, checkIn, checkOut, totalAmount, paymentMethod } = req.body;
-        const guest_id = req.user.id;
+        const userId = req.user.id;
 
         // Basic Validation
         if (!room_id || !checkIn || !checkOut || !totalAmount || !paymentMethod) {
@@ -40,9 +40,17 @@ exports.createRoomBooking = async (req, res) => {
         }
 
         const connection = await db.getConnection();
-        await connection.beginTransaction();
 
         try {
+            // Get Guest ID correctly
+            const [guests] = await connection.query('SELECT guest_id FROM Guest WHERE user_id = ?', [userId]);
+            if (guests.length === 0) {
+                return res.status(404).json({ error: 'Guest profile not found' });
+            }
+            const guest_id = guests[0].guest_id;
+
+            await connection.beginTransaction();
+
             // 1. Create Payment Record
             const [paymentResult] = await connection.query(
                 'INSERT INTO payment (payment_amount, payment_method, service_type, payment_status) VALUES (?, ?, ?, ?)',
@@ -101,15 +109,79 @@ exports.getAvailableActivities = async (req, res) => {
     }
 };
 
+exports.getActivitySlots = async (req, res) => {
+    const { activity_id, date } = req.query;
+    if (!activity_id || !date) return res.status(400).json({ error: 'Activity ID and Date are required' });
+
+    try {
+        // Define all slots 09 AM to 06 PM (17:00 start)
+        const slots = [
+            "09:00:00", "10:00:00", "11:00:00",
+            "12:00:00", "13:00:00", "14:00:00", "15:00:00", "16:00:00", "17:00:00"
+        ]; // Start times
+
+        // Fetch bookings for this activity and date
+        // Note: Assuming ab_start_time is DATETIME, we check DATE part
+        const [bookings] = await db.query(
+            `SELECT TIME(ab_start_time) as booked_time 
+             FROM activitybooking 
+             WHERE activity_id = ? 
+             AND DATE(ab_start_time) = ? 
+             AND ab_status != 'Cancelled'`,
+            [activity_id, date]
+        );
+
+        const bookedTimes = bookings.map(b => b.booked_time);
+
+        const availableSlots = slots.map(time => {
+            const isBooked = bookedTimes.includes(time);
+            return {
+                time: time.substring(0, 5), // '08:00'
+                isBooked: isBooked
+            };
+        });
+
+        res.json(availableSlots);
+
+    } catch (error) {
+        console.error('Error fetching slots:', error);
+        res.status(500).json({ error: 'Failed to fetch slots' });
+    }
+};
+
 exports.createActivityBooking = async (req, res) => {
     try {
         const { activity_id, start_time, end_time, total_amount, payment_method } = req.body;
-        const guest_id = req.user.id;
+        const userId = req.user.id;
 
         const connection = await db.getConnection();
-        await connection.beginTransaction();
 
         try {
+            // Get Guest ID correctly
+            const [guests] = await connection.query('SELECT guest_id FROM Guest WHERE user_id = ?', [userId]);
+            if (guests.length === 0) {
+                return res.status(404).json({ error: 'Guest profile not found' });
+            }
+            const guest_id = guests[0].guest_id;
+
+            await connection.beginTransaction();
+
+            // 1. Check for Overlapping Bookings for this Guest
+            // Overlap: (ExistingStart < NewEnd) AND (ExistingEnd > NewStart)
+            const [existing] = await connection.query(
+                `SELECT ab_id FROM activitybooking 
+                 WHERE guest_id = ? 
+                 AND ab_status != 'Cancelled'
+                 AND ab_start_time < ? 
+                 AND ab_end_time > ?`,
+                [guest_id, end_time, start_time]
+            );
+
+            if (existing.length > 0) {
+                await connection.rollback();
+                return res.status(400).json({ error: 'You already have a booking overlapping with this time slot.' });
+            }
+
             const [paymentResult] = await connection.query(
                 'INSERT INTO payment (payment_amount, payment_method, service_type, payment_status) VALUES (?, ?, ?, ?)',
                 [total_amount, payment_method, 'Activity', 'Success']
@@ -139,42 +211,100 @@ exports.createActivityBooking = async (req, res) => {
 
 // --- Vehicle Bookings ---
 
+
 exports.getAvailableVehicles = async (req, res) => {
     try {
-        const [vehicles] = await db.query("SELECT * FROM vehicle WHERE vehicle_status = 'Available'");
+        const { date, days } = req.query;
+
+        if (!date || !days) {
+            // If no search params, return empty or all? 
+            // Better to return empty or just available based on status 'Available' but realistically search is needed.
+            // Let's just return all 'Available' status vehicles for now to populate the initial list if desired, 
+            // OR return strict empty. Given the UI change, let's allow fetching all but client side filters or just return all 'Available' generally.
+            // BUT user wants "Date Search".
+            const [vehicles] = await db.query("SELECT * FROM vehicle WHERE vehicle_status = 'Available'");
+            return res.json(vehicles);
+        }
+
+        const vb_date = date;
+        const vb_days = parseInt(days);
+
+        // Find vehicles that are NOT booked during the requested period.
+        // And also must have vehicle_status = 'Available' (or 'In Use' but not for these dates? - Simplification: static status 'Available' is usually general availability. 
+        // Real availability is checked against bookings. Let's rely on bookings.)
+        // But if vehicle_status is 'Maintenance', it shouldn't be shown.
+
+        const [vehicles] = await db.query(`
+            SELECT * FROM vehicle v
+            WHERE v.vehicle_status = 'Available'
+            AND v.vehicle_id NOT IN (
+                SELECT vehicle_id FROM vehiclebooking 
+                WHERE vb_status NOT IN ('Cancelled', 'Completed') 
+                AND (
+                    DATE_ADD(vb_date, INTERVAL vb_days DAY) > ? 
+                    AND vb_date < DATE_ADD(?, INTERVAL ? DAY)
+                )
+            )
+        `, [vb_date, vb_date, vb_days]);
+
         res.json(vehicles);
     } catch (error) {
+        console.error(error);
         res.status(500).json({ error: 'Failed to fetch vehicles' });
     }
 };
 
 exports.createVehicleBooking = async (req, res) => {
     try {
-        const { vehicle_id, pickup_point, drop_point, trip_start, trip_end, total_amount, payment_method } = req.body;
-        const guest_id = req.user.id;
+        const { vehicle_id, vb_date, vb_days } = req.body;
+        const userId = req.user.id;
+
+        // Validation
+        if (!vb_date || !vb_days || vb_days < 1) {
+            return res.status(400).json({ error: 'Valid date and number of days required' });
+        }
 
         const connection = await db.getConnection();
-        await connection.beginTransaction();
 
         try {
-            const [paymentResult] = await connection.query(
-                'INSERT INTO payment (payment_amount, payment_method, service_type, payment_status) VALUES (?, ?, ?, ?)',
-                [total_amount, payment_method, 'Vehicle', 'Success']
+            // Get Guest ID correctly
+            const [guests] = await connection.query('SELECT guest_id FROM Guest WHERE user_id = ?', [userId]);
+            if (guests.length === 0) {
+                return res.status(404).json({ error: 'Guest profile not found' });
+            }
+            const guest_id = guests[0].guest_id;
+
+            await connection.beginTransaction();
+
+            // 1. Check for availability (Overlap Logic)
+            // Requested Range: Start = vb_date, End = vb_date + vb_days
+            // Existing Booking: Start = existing.vb_date, End = existing.vb_date + existing.vb_days
+            // Overlap Condition: (StartA < EndB) && (EndA > StartB)
+
+            // We can do this calculation in SQL for robust checking
+            const [overlaps] = await connection.query(`
+                SELECT vb_id FROM vehiclebooking 
+                WHERE vehicle_id = ? 
+                AND vb_status NOT IN ('Cancelled', 'Completed')
+                AND (
+                    DATE_ADD(vb_date, INTERVAL vb_days DAY) > ? 
+                    AND vb_date < DATE_ADD(?, INTERVAL ? DAY)
+                )
+            `, [vehicle_id, vb_date, vb_date, vb_days]);
+
+            if (overlaps.length > 0) {
+                await connection.rollback();
+                return res.status(400).json({ error: 'Vehicle is already booked for these dates' });
+            }
+
+            // Insert with Pending Approval, NO Driver, NO Payment
+            await connection.query(
+                'INSERT INTO vehiclebooking (guest_id, vehicle_id, vb_date, vb_days, vb_status) VALUES (?, ?, ?, ?, ?)',
+                [guest_id, vehicle_id, vb_date, vb_days, 'Pending Approval']
             );
-            const payment_id = paymentResult.insertId;
-
-            const [drivers] = await connection.query("SELECT driver_id FROM driver LIMIT 1");
-            const driver_id = drivers.length > 0 ? drivers[0].driver_id : null;
-
-            const [bookingResult] = await connection.query(
-                'INSERT INTO vehiclebooking (guest_id, vehicle_id, driver_id, vb_pickup_point, vb_drop_point, vb_trip_start, vb_trip_end, vb_total_amount, vb_payment_id, vb_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                [guest_id, vehicle_id, driver_id, pickup_point, drop_point, trip_start, trip_end, total_amount, payment_id, 'Booked']
-            );
-
-            await connection.query('UPDATE payment SET service_id = ? WHERE payment_id = ?', [bookingResult.insertId, payment_id]);
 
             await connection.commit();
-            res.status(201).json({ message: 'Vehicle booked successfully' });
+            res.status(201).json({ message: 'Hire request sent successfully! Waiting for driver acceptance.' });
         } catch (err) {
             await connection.rollback();
             throw err;
@@ -183,7 +313,7 @@ exports.createVehicleBooking = async (req, res) => {
         }
     } catch (error) {
         console.error('Error creating vehicle booking:', error);
-        res.status(500).json({ error: 'Failed to book vehicle' });
+        res.status(500).json({ error: 'Failed to request vehicle' });
     }
 };
 

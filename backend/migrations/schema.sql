@@ -146,15 +146,16 @@ CREATE TABLE IF NOT EXISTS RoomBooking (
 );
 
 -- ActivityBooking Table
+-- ActivityBooking Table
 CREATE TABLE IF NOT EXISTS ActivityBooking (
     ab_id INT AUTO_INCREMENT PRIMARY KEY,
     guest_id INT NOT NULL,
     activity_id INT NOT NULL,
-    booking_date DATE NOT NULL,
-    booking_time TIME,
-    duration_hours DECIMAL(5,2),
-    ab_status ENUM('Pending', 'Confirmed', 'Completed', 'Cancelled') DEFAULT 'Pending',
-    total_price DECIMAL(10,2),
+    ab_start_time DATETIME NOT NULL,
+    ab_end_time DATETIME NOT NULL,
+    ab_status ENUM('Pending', 'Reserved', 'Confirmed', 'Completed', 'Cancelled') DEFAULT 'Pending',
+    ab_total_amount DECIMAL(10,2),
+    ab_payment_id INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (guest_id) REFERENCES Guest(guest_id) ON DELETE CASCADE,
     FOREIGN KEY (activity_id) REFERENCES Activity(activity_id) ON DELETE CASCADE

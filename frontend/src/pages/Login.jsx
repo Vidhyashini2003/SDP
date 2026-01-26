@@ -48,9 +48,9 @@ const Login = () => {
             {/* Login Form */}
             <div className="max-w-md w-full bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-slate-100 relative z-10">
                 <div className="text-center mb-8">
-                    <h1 className="text-2xl font-bold text-blue-600 mb-4">Janas Blue Water Corner</h1>
-                    <h2 className="text-3xl font-bold text-slate-900">Sign In</h2>
-                    <p className="text-slate-500 mt-2">Access your account</p>
+                    <h1 className="text-3xl font-serif font-bold text-gold-600 mb-4 uppercase tracking-wider">Janas Blue Water Corner</h1>
+                    <h2 className="text-2xl font-sans font-light text-slate-600 uppercase tracking-widest">Sign In</h2>
+                    <p className="text-slate-400 mt-2 font-serif italic">Welcome back to luxury</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
@@ -59,7 +59,7 @@ const Login = () => {
                         <input
                             type="email"
                             required
-                            className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all"
+                            className="w-full px-4 py-3 rounded-none border-b-2 border-slate-200 focus:border-gold-500 bg-slate-50 focus:bg-white outline-none transition-all placeholder:text-slate-400"
                             placeholder="Enter your email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
@@ -72,7 +72,7 @@ const Login = () => {
                             <input
                                 type={showPassword ? "text" : "password"}
                                 required
-                                className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all pr-10"
+                                className="w-full px-4 py-3 rounded-none border-b-2 border-slate-200 focus:border-gold-500 bg-slate-50 focus:bg-white outline-none transition-all pr-10 placeholder:text-slate-400"
                                 placeholder="••••••••"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
@@ -96,9 +96,15 @@ const Login = () => {
                         </div>
                     </div>
 
+                    <div className="flex justify-end">
+                        <Link to="/forgot-password" className="text-sm font-semibold text-gold-600 hover:text-gold-500 mb-6">
+                            Forgot Password?
+                        </Link>
+                    </div>
+
                     <button
                         type="submit"
-                        className="w-full py-3 px-4 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg shadow-lg shadow-primary-500/30 transition-all transform active:scale-95"
+                        className="w-full py-4 px-4 bg-black hover:bg-slate-800 text-white font-serif font-bold text-lg uppercase tracking-widest shadow-lg hover:shadow-gold-500/20 transition-all transform active:scale-95"
                     >
                         Sign In
                     </button>
@@ -106,11 +112,12 @@ const Login = () => {
 
                 <div className="mt-6 text-center text-sm text-slate-500">
                     Don't have an account? {' '}
-                    <Link to="/register" className="text-primary-600 font-semibold hover:text-primary-700">
+                    <Link to="/register" className="text-gold-600 font-semibold hover:text-gold-700 uppercase tracking-wide text-xs">
                         Create Account
                     </Link>
                 </div>
             </div>
+
         </div>
     );
 };

@@ -16,7 +16,12 @@ export default {
                 },
                 secondary: '#64748b',
                 dark: '#0f172a',
-                light: '#f8fafc'
+                light: '#f8fafc',
+                gold: {
+                    400: '#fbbf24',
+                    500: '#f59e0b',
+                    600: '#d97706',
+                }
             },
             fontFamily: {
                 sans: ['Inter', 'sans-serif'],

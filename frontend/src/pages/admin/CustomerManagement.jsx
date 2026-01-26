@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from '../../config/axios';
 import { toast } from 'react-hot-toast';
-import { TrashIcon, UserGroupIcon } from '@heroicons/react/24/outline';
+import { UserGroupIcon } from '@heroicons/react/24/outline';
 
 const CustomerManagement = () => {
     const [customers, setCustomers] = useState([]);
@@ -21,19 +21,19 @@ const CustomerManagement = () => {
         }
     };
 
-    const handleDelete = async (id) => {
-        if (window.confirm('Are you sure you want to remove this customer? This action cannot be undone.')) {
-            try {
-                // Reusing the generic Delete Staff endpoint logic which works on User ID
-                // Note: Router mapped /customers/:id to deleteStaff, so url is /api/admin/customers/${id}
-                await axios.delete(`/api/admin/customers/${id}`);
-                toast.success('Customer removed successfully!');
-                fetchCustomers();
-            } catch (err) {
-                toast.error('Failed to remove customer');
-            }
+
+
+    const handleStatusChange = async (id, status) => {
+        try {
+            await axios.put(`/api/admin/customers/${id}/status`, { status });
+            toast.success(`Customer status updated to ${status}`);
+            fetchCustomers();
+        } catch (err) {
+            toast.error('Failed to update status');
         }
     };
+
+
 
     // Filter logic
     const filteredCustomers = customers.filter(customer =>
@@ -104,13 +104,28 @@ const CustomerManagement = () => {
                                         {new Date(customer.created_at).toLocaleDateString()}
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        <button
-                                            onClick={() => handleDelete(customer.id)}
-                                            className="text-red-400 hover:text-red-600 transition-colors"
-                                            title="Remove Customer"
-                                        >
-                                            <TrashIcon className="w-5 h-5" />
-                                        </button>
+                                        <div className="flex justify-end gap-2 items-center">
+                                            {/* Edit Button */}
+
+
+                                            {/* Status Buttons */}
+                                            {customer.account_status === 'Active' ? (
+                                                <button
+                                                    onClick={() => handleStatusChange(customer.id, 'Inactive')}
+                                                    className="px-3 py-1.5 text-xs font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors shadow-sm"
+                                                >
+                                                    Inactive
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleStatusChange(customer.id, 'Active')}
+                                                    className="px-3 py-1.5 text-xs font-medium text-white bg-green-500 hover:bg-green-600 rounded-lg transition-colors shadow-sm"
+                                                >
+                                                    Active
+                                                </button>
+                                            )}
+
+                                        </div>
                                     </td>
                                 </tr>
                             ))
@@ -128,6 +143,10 @@ const CustomerManagement = () => {
             <div className="mt-4 text-sm text-gray-500 text-center">
                 Total Customers: {customers.length}
             </div>
+
+            {/* Edit Modal */}
+
+
         </div>
     );
 };

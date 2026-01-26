@@ -75,12 +75,12 @@ exports.getMyBookings = async (req, res) => {
         );
 
         const [vehicleBookings] = await db.query(
-            `SELECT vb.*, vb.vb_trip_start as pickup_date, vb.vb_trip_end as return_date, vb.vb_pickup_point as pickup_location, vb.vb_drop_point as dropoff_location, v.vehicle_type, v.vehicle_number 
+            `SELECT vb.*, vb.vb_date as booking_date, v.vehicle_type, v.vehicle_number, v.vehicle_price_per_day 
              FROM vehiclebooking vb 
              JOIN vehicle v ON vb.vehicle_id = v.vehicle_id 
              JOIN Guest g ON vb.guest_id = g.guest_id
              WHERE g.user_id = ?
-             ORDER BY vb.vb_trip_start DESC`,
+             ORDER BY vb.vb_date DESC`,
             [req.user.id]
         );
 
@@ -201,17 +201,54 @@ exports.getOrders = async (req, res) => {
 
 // exports.placeOrder moved to orderController.js
 
-exports.submitFeedback = async (req, res) => {
+
+
+exports.payVehicleBooking = async (req, res) => {
     try {
-        const { rating, feedback_text } = req.body;
-        // Insert using subquery to get guest_id
-        await db.query(
-            'INSERT INTO feedback (guest_id, rating, feedback_text) SELECT guest_id, ?, ? FROM Guest WHERE user_id = ?',
-            [rating, feedback_text, req.user.id]
-        );
-        res.status(201).json({ message: 'Feedback submitted' });
+        const { id } = req.params; // vb_id
+        const { payment_method, total_amount } = req.body;
+        const userId = req.user.id;
+
+        const connection = await db.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            // Verify booking
+            const [booking] = await connection.query(
+                `SELECT vb.* FROM vehiclebooking vb 
+                 JOIN Guest g ON vb.guest_id = g.guest_id 
+                 WHERE vb.vb_id = ? AND g.user_id = ? AND vb.vb_status = 'Pending Payment'`,
+                [id, userId]
+            );
+
+            if (booking.length === 0) {
+                await connection.rollback();
+                return res.status(404).json({ error: 'Booking not found or not ready for payment' });
+            }
+
+            // Create Payment
+            const [paymentResult] = await connection.query(
+                'INSERT INTO payment (payment_amount, payment_method, service_type, service_id, payment_status) VALUES (?, ?, ?, ?, ?)',
+                [total_amount, payment_method, 'Vehicle', id, 'Success']
+            );
+            const paymentId = paymentResult.insertId;
+
+            // Update Booking
+            await connection.query(
+                "UPDATE vehiclebooking SET vb_payment_id = ?, vb_status = 'Confirmed' WHERE vb_id = ?",
+                [paymentId, id]
+            );
+
+            await connection.commit();
+            res.json({ message: 'Payment successful! Booking confirmed.' });
+        } catch (err) {
+            await connection.rollback();
+            throw err;
+        } finally {
+            connection.release();
+        }
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Failed to submit feedback' });
+        console.error('Error paying for booking:', error);
+        res.status(500).json({ error: 'Payment failed' });
     }
 };

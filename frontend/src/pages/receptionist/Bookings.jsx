@@ -209,7 +209,7 @@ const ReceptionistBookings = () => {
                                     </div>
                                     <div className="mt-3 flex gap-2">
                                         {booking.rb_status === 'Booked' && (
-                                            <button onClick={() => handleStatusUpdate('room', booking.rb_id, 'Checked-in')} className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700">Check-In</button>
+                                            <button onClick={() => handleStatusUpdate('room', booking.rb_id, 'Checked-in')} className="px-3 py-1 bg-gold-600 text-white text-xs rounded hover:bg-gold-700">Check-In</button>
                                         )}
                                         {booking.rb_status === 'Checked-in' && (
                                             <button onClick={() => handleStatusUpdate('room', booking.rb_id, 'Checked-out')} className="px-3 py-1 bg-slate-600 text-white text-xs rounded hover:bg-slate-700">Check-Out</button>
@@ -275,7 +275,7 @@ const ReceptionistBookings = () => {
                                         </span>
                                     </div>
                                     <div className="text-sm text-slate-500 mt-2">
-                                        From: {vb.vb_pickup_point} To: {vb.vb_drop_point}
+                                        Date: {formatDate(vb.vb_date)}
                                     </div>
                                 </div>
                             ))}

@@ -135,7 +135,7 @@ exports.getAllVehicleBookings = async (req, res) => {
              FROM vehiclebooking vb 
              JOIN Guest g ON vb.guest_id = g.guest_id
              JOIN Users u ON g.user_id = u.user_id
-             ORDER BY vb.vb_trip_start DESC`
+             ORDER BY vb.vb_date DESC`
         );
         res.json(bookings);
     } catch (error) {
@@ -157,3 +157,84 @@ exports.getAllFoodOrders = async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch food orders' });
     }
 }
+
+// --- Vehicle Management ---
+
+exports.getAllVehicles = async (req, res) => {
+    try {
+        const [vehicles] = await db.query('SELECT * FROM vehicle');
+        res.json(vehicles);
+    } catch (error) {
+        console.error('Error fetching vehicles:', error);
+        res.status(500).json({ error: 'Failed to fetch vehicles' });
+    }
+};
+
+exports.updateVehicleStatus = async (req, res) => {
+    const connection = await db.getConnection();
+    try {
+        const { id } = req.params; // vehicle_id
+        const { status, reason } = req.body; // 'Available', 'Maintenance', 'Unavailable'
+
+        await connection.beginTransaction();
+
+        // If status is NOT 'Available', we must check for future bookings
+        if (status !== 'Available') {
+            const today = new Date().toISOString().split('T')[0];
+
+            // Find active bookings
+            const [activeBookings] = await connection.query(
+                `SELECT vb_id, vb_payment_id FROM vehiclebooking 
+                 WHERE vehicle_id = ? 
+                 AND vb_date >= ?
+                 AND vb_status IN ('Confirmed', 'Booked', 'Pending Payment', 'Pending Approval')`,
+                [id, today]
+            );
+
+            if (activeBookings.length > 0) {
+                if (!reason) {
+                    await connection.rollback();
+                    return res.status(400).json({
+                        error: 'Cancellation reason is required because there are active bookings.',
+                        requiresConfirmation: true,
+                        activeBookingsCount: activeBookings.length
+                    });
+                }
+
+                // Process Cancellations & Refunds
+                for (const booking of activeBookings) {
+                    // Update Booking
+                    await connection.query(
+                        'UPDATE vehiclebooking SET vb_status = "Cancelled", cancel_reason = ? WHERE vb_id = ?',
+                        [reason, booking.vb_id]
+                    );
+
+                    // Create Refund if needed
+                    if (booking.vb_payment_id) {
+                        const [payment] = await connection.query('SELECT payment_amount FROM payment WHERE payment_id = ?', [booking.vb_payment_id]);
+
+                        if (payment.length > 0) {
+                            await connection.query(
+                                'INSERT INTO refund (payment_id, refund_amount, refund_reason, refund_status) VALUES (?, ?, ?, "Pending")',
+                                [booking.vb_payment_id, payment[0].payment_amount, `Vehicle Unavailable: ${reason}`]
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        // Update Vehicle Status
+        await connection.query('UPDATE vehicle SET vehicle_status = ? WHERE vehicle_id = ?', [status, id]);
+
+        await connection.commit();
+        res.json({ message: 'Vehicle status updated successfully' });
+
+    } catch (error) {
+        await connection.rollback();
+        console.error('Error updating vehicle status:', error);
+        res.status(500).json({ error: 'Failed to update vehicle status' });
+    } finally {
+        connection.release();
+    }
+};

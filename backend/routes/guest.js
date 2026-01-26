@@ -19,5 +19,6 @@ router.get('/menu', guestController.getMenu);
 router.get('/orders', guestController.getOrders);
 router.post('/orders', orderController.placeOrder);
 router.post('/feedback', guestController.submitFeedback);
+router.post('/bookings/vehicles/:id/pay', guestController.payVehicleBooking);
 
 module.exports = router;

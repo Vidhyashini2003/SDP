@@ -64,9 +64,9 @@ const Register = () => {
             {/* Registration Form */}
             <div className="max-w-md w-full bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-slate-100 relative z-10">
                 <div className="text-center mb-8">
-                    <h1 className="text-2xl font-bold text-blue-600 mb-4">Janas Blue Water Corner</h1>
-                    <h2 className="text-3xl font-bold text-slate-900">Create Guest Account</h2>
-                    <p className="text-slate-500 mt-2">Join us for a premium experience</p>
+                    <h1 className="text-3xl font-serif font-bold text-gold-600 mb-4 uppercase tracking-wider">Janas Blue Water Corner</h1>
+                    <h2 className="text-2xl font-sans font-light text-slate-600 uppercase tracking-widest">Create Account</h2>
+                    <p className="text-slate-400 mt-2 font-serif italic">Join our exclusive members club</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -77,7 +77,7 @@ const Register = () => {
                             required
                             value={formData.guest_name}
                             onChange={handleChange}
-                            className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary-500 outline-none"
+                            className="w-full px-4 py-2 rounded-none border-b-2 border-slate-200 focus:border-gold-500 bg-slate-50 focus:bg-white outline-none transition-all placeholder:text-slate-400"
                             placeholder="John Doe"
                         />
                     </div>
@@ -90,7 +90,7 @@ const Register = () => {
                             required
                             value={formData.guest_email}
                             onChange={handleChange}
-                            className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary-500 outline-none"
+                            className="w-full px-4 py-2 rounded-none border-b-2 border-slate-200 focus:border-gold-500 bg-slate-50 focus:bg-white outline-none transition-all placeholder:text-slate-400"
                             placeholder="john@example.com"
                         />
                     </div>
@@ -102,7 +102,7 @@ const Register = () => {
                             required
                             value={formData.guest_phone}
                             onChange={handleChange}
-                            className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary-500 outline-none"
+                            className="w-full px-4 py-2 rounded-none border-b-2 border-slate-200 focus:border-gold-500 bg-slate-50 focus:bg-white outline-none transition-all placeholder:text-slate-400"
                             placeholder="+1 234 567 890"
                         />
                     </div>
@@ -114,7 +114,7 @@ const Register = () => {
                             required
                             value={formData.guest_address}
                             onChange={handleChange}
-                            className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary-500 outline-none"
+                            className="w-full px-4 py-2 rounded-none border-b-2 border-slate-200 focus:border-gold-500 bg-slate-50 focus:bg-white outline-none transition-all placeholder:text-slate-400"
                             placeholder="123 Main St, City"
                         />
                     </div>
@@ -126,7 +126,7 @@ const Register = () => {
                             required
                             value={formData.nationality}
                             onChange={handleChange}
-                            className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary-500 outline-none"
+                            className="w-full px-4 py-2 rounded-none border-b-2 border-slate-200 focus:border-gold-500 bg-slate-50 focus:bg-white outline-none transition-all placeholder:text-slate-400"
                             placeholder="e.g., American, Indian, British"
                         />
                     </div>
@@ -140,7 +140,7 @@ const Register = () => {
                                 required
                                 value={formData.guest_password}
                                 onChange={handleChange}
-                                className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary-500 outline-none pr-10"
+                                className="w-full px-4 py-2 rounded-none border-b-2 border-slate-200 focus:border-gold-500 bg-slate-50 focus:bg-white outline-none transition-all pr-10 placeholder:text-slate-400"
                                 placeholder="••••••••"
                                 minLength={6}
                             />
@@ -173,7 +173,7 @@ const Register = () => {
                                 required
                                 value={formData.confirmPassword}
                                 onChange={handleChange}
-                                className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary-500 outline-none pr-10"
+                                className="w-full px-4 py-2 rounded-none border-b-2 border-slate-200 focus:border-gold-500 bg-slate-50 focus:bg-white outline-none transition-all pr-10 placeholder:text-slate-400"
                                 placeholder="••••••••"
                                 minLength={6}
                             />
@@ -198,16 +198,17 @@ const Register = () => {
 
                     <button
                         type="submit"
-                        className="w-full py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg shadow-lg transition-all mt-6"
+                        className="w-full py-4 bg-black hover:bg-slate-800 text-white font-serif font-bold text-lg uppercase tracking-widest shadow-lg hover:shadow-gold-500/20 transition-all mt-6"
                     >
                         Create Account
                     </button>
                 </form>
 
                 <div className="mt-6 text-center text-sm text-slate-500">
-                    Already have an account? <Link to="/login" className="text-primary-600 font-semibold hover:text-primary-700">Sign In</Link>
+                    Already have an account? <Link to="/login" className="text-gold-600 font-semibold hover:text-gold-700 uppercase tracking-wide text-xs">Sign In</Link>
                 </div>
             </div>
+
         </div>
     );
 };

@@ -246,7 +246,7 @@ const Profile = () => {
                         <>
                             <button
                                 onClick={handleSave}
-                                className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition-colors"
+                                className="px-6 py-2 bg-gold-500 hover:bg-gold-600 text-white font-semibold rounded-lg transition-colors"
                             >
                                 Save Changes
                             </button>
@@ -260,7 +260,7 @@ const Profile = () => {
                     ) : (
                         <button
                             onClick={handleEdit}
-                            className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition-colors"
+                            className="px-6 py-2 bg-gold-500 hover:bg-gold-600 text-white font-semibold rounded-lg transition-colors"
                         >
                             Edit Profile
                         </button>

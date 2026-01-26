@@ -22,6 +22,7 @@ INSERT INTO Activity (activity_name, activity_description, activity_price_per_ho
 ('Cultural Tour', 'Visit ancient temples, local markets, and traditional Sri Lankan villages', 4000.00, '4 hours', '9:00 AM - 2:00 PM', 'Available'),
 ('Elephant Safari', 'Guided safari to see elephants in their natural habitat at nearby national park', 7000.00, '3 hours', '6:00 AM - 10:00 AM', 'Available'),
 ('Spice Garden Tour', 'Explore aromatic spice gardens and learn about Sri Lankan cuisine', 2500.00, '2 hours', '10:00 AM - 3:00 PM', 'Available'),
+('Swami Rock Visit & View Point Visit', 'Cultural tour to historic temple and scenic rock', 250.00, '1 hour', '', 'Available'),
 
 -- Wellness & Relaxation
 ('Ayurvedic Spa', 'Traditional Ayurvedic massage and spa treatments for relaxation', 4500.00, '1.5 hours', '9:00 AM - 8:00 PM', 'Available'),

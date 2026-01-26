@@ -172,27 +172,29 @@ const RoomBooking = () => {
                         <div className="flex-1 w-full">
                             <label className="block text-sm font-medium text-slate-700 mb-2">Check-in Date</label>
                             <input
-                                type="datetime-local"
+                                type="date"
                                 required
+                                min={new Date().toISOString().split('T')[0]}
                                 value={searchParams.checkIn}
                                 onChange={(e) => setSearchParams({ ...searchParams, checkIn: e.target.value })}
-                                className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-gold-500 outline-none"
                             />
                         </div>
                         <div className="flex-1 w-full">
                             <label className="block text-sm font-medium text-slate-700 mb-2">Check-out Date</label>
                             <input
-                                type="datetime-local"
+                                type="date"
                                 required
+                                min={searchParams.checkIn ? new Date(new Date(searchParams.checkIn).getTime() + 86400000).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
                                 value={searchParams.checkOut}
                                 onChange={(e) => setSearchParams({ ...searchParams, checkOut: e.target.value })}
-                                className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-gold-500 outline-none"
                             />
                         </div>
                         <button
                             type="submit"
                             disabled={isSearching}
-                            className="w-full md:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-all disabled:opacity-50"
+                            className="w-full md:w-auto px-8 py-3 bg-gold-500 hover:bg-gold-600 text-white font-bold rounded-lg shadow-md transition-all disabled:opacity-50"
                         >
                             {isSearching ? 'Searching...' : 'Check Availability'}
                         </button>
@@ -238,12 +240,12 @@ const RoomBooking = () => {
 
                                 <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                                     <div>
-                                        <p className="text-2xl font-bold text-blue-600">Rs. {roomType.room_price_per_day?.toLocaleString()}</p>
+                                        <p className="text-2xl font-bold text-gold-600">Rs. {roomType.room_price_per_day?.toLocaleString()}</p>
                                         <p className="text-xs text-slate-500">per night</p>
                                     </div>
                                     <button
                                         onClick={() => handleBookNow(roomType)}
-                                        className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-sm"
+                                        className="px-6 py-2 bg-gold-500 hover:bg-gold-600 text-white font-semibold rounded-lg transition-colors shadow-sm"
                                     >
                                         Book Now
                                     </button>
@@ -264,9 +266,9 @@ const RoomBooking = () => {
                         </div>
 
                         <div className="space-y-4 mb-6">
-                            <div className="bg-blue-50 p-4 rounded-lg">
-                                <p className="font-semibold text-blue-900">{selectedRoomType.room_type}</p>
-                                <p className="text-sm text-blue-700 mt-1">
+                            <div className="bg-gold-50 p-4 rounded-lg">
+                                <p className="font-semibold text-gold-900">{selectedRoomType.room_type}</p>
+                                <p className="text-sm text-gold-700 mt-1">
                                     {new Date(searchParams.checkIn).toLocaleDateString()} - {new Date(searchParams.checkOut).toLocaleDateString()}
                                 </p>
                             </div>
@@ -276,7 +278,7 @@ const RoomBooking = () => {
                                 <select
                                     value={selectedRoomId}
                                     onChange={(e) => setSelectedRoomId(e.target.value)}
-                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
                                 >
                                     {availableRoomsForType.map((room) => (
                                         <option key={room.room_id} value={room.room_id}>Room {room.room_number}</option>
@@ -289,7 +291,7 @@ const RoomBooking = () => {
                                 <select
                                     value={paymentMethod}
                                     onChange={(e) => setPaymentMethod(e.target.value)}
-                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
                                 >
                                     <option value="Card">Card</option>
                                     <option value="Online">Online Banking</option>
@@ -309,7 +311,7 @@ const RoomBooking = () => {
                             <button
                                 onClick={handleConfirmBooking}
                                 disabled={isBooking}
-                                className="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg transition-all disabled:opacity-70 flex justify-center"
+                                className="flex-1 py-3 px-4 bg-gold-500 hover:bg-gold-600 text-white font-bold rounded-lg shadow-lg transition-all disabled:opacity-70 flex justify-center"
                             >
                                 {isBooking ? 'Processing...' : 'Pay & Book'}
                             </button>

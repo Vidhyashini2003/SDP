@@ -13,6 +13,7 @@ router.post('/rooms', authorizeRole('guest', 'receptionist'), bookingController.
 
 // Activities
 router.get('/activities/available', bookingController.getAvailableActivities);
+router.get('/activities/slots', bookingController.getActivitySlots);
 router.post('/activities', authorizeRole('guest', 'receptionist'), bookingController.createActivityBooking);
 
 // Vehicles

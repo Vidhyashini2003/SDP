@@ -64,7 +64,7 @@ const KitchenMenu = () => {
                 <h1 className="text-2xl font-bold text-slate-900">Menu Management</h1>
                 <button
                     onClick={() => setIsAdding(!isAdding)}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors"
+                    className="px-4 py-2 bg-gold-600 hover:bg-gold-700 text-white rounded-lg font-semibold transition-colors"
                 >
                     {isAdding ? 'Cancel' : '+ Add Item'}
                 </button>
@@ -133,8 +133,8 @@ const KitchenMenu = () => {
                                 <td className="px-6 py-4 text-slate-600">Rs. {Number(item.item_price).toLocaleString()}</td>
                                 <td className="px-6 py-4">
                                     <span className={`px-2 py-1 rounded-full text-xs font-bold ${item.item_availability === 'Available'
-                                            ? 'bg-green-100 text-green-700'
-                                            : 'bg-slate-100 text-slate-500'
+                                        ? 'bg-green-100 text-green-700'
+                                        : 'bg-slate-100 text-slate-500'
                                         }`}>
                                         {item.item_availability}
                                     </span>
@@ -143,8 +143,8 @@ const KitchenMenu = () => {
                                     <button
                                         onClick={() => handleToggleAvailability(item)}
                                         className={`text-sm font-medium ${item.item_availability === 'Available'
-                                                ? 'text-red-600 hover:text-red-700'
-                                                : 'text-green-600 hover:text-green-700'
+                                            ? 'text-red-600 hover:text-red-700'
+                                            : 'text-green-600 hover:text-green-700'
                                             }`}
                                     >
                                         {item.item_availability === 'Available' ? 'Mark Unavailable' : 'Mark Available'}

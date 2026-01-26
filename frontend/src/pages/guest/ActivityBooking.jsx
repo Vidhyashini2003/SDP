@@ -10,6 +10,10 @@ const ActivityBooking = () => {
         ab_time: ''
     });
 
+    const [availableSlots, setAvailableSlots] = useState([]);
+    const [selectedSlot, setSelectedSlot] = useState(null);
+    const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+
     useEffect(() => {
         fetchActivities();
     }, []);
@@ -23,26 +27,47 @@ const ActivityBooking = () => {
         }
     };
 
+    const fetchSlots = async (date) => {
+        if (!selectedActivity || !date) return;
+        setIsLoadingSlots(true);
+        try {
+            const response = await axios.get('/api/bookings/activities/slots', {
+                params: { activity_id: selectedActivity.activity_id, date }
+            });
+            setAvailableSlots(response.data);
+        } catch (error) {
+            console.error('Error fetching slots:', error);
+        } finally {
+            setIsLoadingSlots(false);
+        }
+    };
+
+    const handleDateChange = (e) => {
+        const date = e.target.value;
+        setBookingData({ ...bookingData, ab_date: date });
+        setSelectedSlot(null);
+        fetchSlots(date);
+    };
+
     const handleBookNow = (activity) => {
         setSelectedActivity(activity);
+        setBookingData({ ab_date: '', ab_time: '' });
+        setAvailableSlots([]);
+        setSelectedSlot(null);
         setShowBookingModal(true);
     };
 
-    const handleBookingChange = (e) => {
-        setBookingData({ ...bookingData, [e.target.name]: e.target.value });
-    };
-
     const handleConfirmBooking = async () => {
-        if (!bookingData.ab_date || !bookingData.ab_time) {
-            alert('Please select date and time');
+        if (!bookingData.ab_date || !selectedSlot) {
+            alert('Please select date and a time slot');
             return;
         }
 
         try {
             await axios.post('/api/bookings/activities', {
                 activity_id: selectedActivity.activity_id,
-                start_time: `${bookingData.ab_date} ${bookingData.ab_time}`,
-                end_time: `${bookingData.ab_date} ${bookingData.ab_time}`,
+                start_time: `${bookingData.ab_date} ${selectedSlot}`,
+                end_time: `${bookingData.ab_date} ${parseInt(selectedSlot.split(':')[0]) + 1}:00:00`,
                 total_amount: selectedActivity.activity_price_per_hour,
                 payment_method: 'Cash'
             });
@@ -93,7 +118,7 @@ const ActivityBooking = () => {
                             </div>
                             <button
                                 onClick={() => handleBookNow(activity)}
-                                className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg transition-colors"
+                                className="px-6 py-2 bg-gold-500 hover:bg-gold-600 text-white font-semibold rounded-lg transition-colors"
                             >
                                 Book Now
                             </button>
@@ -111,56 +136,80 @@ const ActivityBooking = () => {
             {/* Booking Modal */}
             {showBookingModal && selectedActivity && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-bold text-slate-900">Book Activity</h2>
-                            <button
-                                onClick={() => setShowBookingModal(false)}
-                                className="text-slate-400 hover:text-slate-600 text-2xl"
-                            >
-                                ×
-                            </button>
-                        </div>
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 relative">
+                        <button
+                            onClick={() => setShowBookingModal(false)}
+                            className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-2xl"
+                        >
+                            ×
+                        </button>
 
-                        <div className="mb-6">
-                            <p className="text-lg font-semibold text-slate-900">{selectedActivity.activity_name}</p>
+                        <div className="mb-6 border-b border-slate-100 pb-4">
+                            <h2 className="text-2xl font-bold text-slate-900 mb-1">Book Activity</h2>
+                            <p className="text-lg text-blue-600 font-medium">{selectedActivity.activity_name}</p>
                             <p className="text-sm text-slate-500">Rs. {selectedActivity.activity_price_per_hour?.toLocaleString()} per hour</p>
                         </div>
 
-                        <div className="space-y-4">
+                        <div className="space-y-6">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Date</label>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">Select Date</label>
                                 <input
                                     type="date"
                                     name="ab_date"
                                     value={bookingData.ab_date}
-                                    onChange={handleBookingChange}
-                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                    min={new Date().toISOString().split('T')[0]}
+                                    onChange={handleDateChange}
+                                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                                 />
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-2">Time</label>
-                                <input
-                                    type="time"
-                                    name="ab_time"
-                                    value={bookingData.ab_time}
-                                    onChange={handleBookingChange}
-                                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                />
-                            </div>
+                            {bookingData.ab_date && (
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-3">Select Time Slot</label>
+                                    {isLoadingSlots ? (
+                                        <div className="text-center py-4 text-slate-500">Loading slots...</div>
+                                    ) : (
+                                        <div className="grid grid-cols-3 gap-3">
+                                            {availableSlots.map((slot) => {
+                                                const startHour = parseInt(slot.time.split(':')[0]);
+                                                const endHour = startHour + 1;
+                                                const timeLabel = `${String(startHour).padStart(2, '0')}:00 - ${String(endHour).padStart(2, '0')}:00`;
+
+                                                return (
+                                                    <button
+                                                        key={slot.time}
+                                                        onClick={() => !slot.isBooked && setSelectedSlot(slot.time)}
+                                                        disabled={slot.isBooked}
+                                                        className={`py-2 px-3 rounded-lg text-xs font-medium transition-all
+                                                            ${slot.isBooked
+                                                                ? 'bg-red-50 text-red-400 cursor-not-allowed border border-red-100'
+                                                                : selectedSlot === slot.time
+                                                                    ? 'bg-gold-500 text-white shadow-md'
+                                                                    : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
+                                                            }
+                                                        `}
+                                                    >
+                                                        {timeLabel}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
-                        <div className="flex gap-3 mt-8">
+                        <div className="flex gap-3 mt-8 pt-4 border-t border-slate-100">
                             <button
                                 onClick={() => setShowBookingModal(false)}
-                                className="flex-1 py-2 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition-colors"
+                                className="flex-1 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleConfirmBooking}
-                                className="flex-1 py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg shadow-lg transition-all"
+                                disabled={!selectedSlot}
+                                className="flex-1 py-3 px-4 bg-gold-500 hover:bg-gold-600 text-white font-semibold rounded-lg shadow-lg transition-all disabled:opacity-50 disabled:shadow-none"
                             >
                                 Confirm Booking
                             </button>

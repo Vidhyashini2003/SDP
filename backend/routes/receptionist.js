@@ -21,6 +21,10 @@ router.put('/bookings/activities/:id/status', receptionistController.updateActiv
 router.get('/bookings/vehicles', receptionistController.getAllVehicleBookings);
 router.get('/bookings/orders', receptionistController.getAllFoodOrders);
 
+// Vehicle Availability Management
+router.get('/vehicles', receptionistController.getAllVehicles);
+router.put('/vehicles/:id/status', receptionistController.updateVehicleStatus);
+
 router.get('/refunds', receptionistController.getRefundRequests);
 router.put('/refunds/:id', receptionistController.processRefund);
 

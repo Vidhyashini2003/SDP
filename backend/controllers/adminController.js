@@ -83,9 +83,13 @@ exports.getAllStaff = async (req, res) => {
 
 exports.getAllGuests = async (req, res) => {
     try {
-        const [guests] = await db.query(
-            "SELECT role, user_id as id, name, email, phone, account_status, created_at FROM Users WHERE role = 'guest' ORDER BY created_at DESC"
-        );
+        const [guests] = await db.query(`
+            SELECT u.user_id as id, u.name, u.email, u.phone, u.account_status, u.created_at, 
+                   g.guest_address, g.nationality 
+            FROM Users u 
+            JOIN Guest g ON u.user_id = g.user_id 
+            WHERE u.role = 'guest'
+        `);
         res.json(guests);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch guests' });
@@ -96,7 +100,11 @@ exports.inviteStaff = async (req, res) => {
     const connection = await db.getConnection();
     try {
         await connection.beginTransaction();
-        const { role, name, email, phone, address, vehicle_id } = req.body; // No password
+        const { role, name, email } = req.body;
+        // Optional fields - default to null or empty if not provided
+        const phone = req.body.phone || null;
+        const address = req.body.address || null;
+        const vehicle_id = req.body.vehicle_id || null;
 
         // 1. Check if user exists
         const [existing] = await connection.query('SELECT * FROM Users WHERE email = ?', [email]);
@@ -105,14 +113,14 @@ exports.inviteStaff = async (req, res) => {
             return res.status(400).json({ error: 'Email already registered' });
         }
 
-        // 2. Insert into Users (Inactive, No Password)
+        // 2. Insert into Users (Inactive, No Password, Phone might be null)
         const [userRes] = await connection.query(
             "INSERT INTO Users (name, email, phone, role, account_status) VALUES (?, ?, ?, ?, 'Inactive')",
             [name, email, phone, role]
         );
         const userId = userRes.insertId;
 
-        // 3. Insert into Role Table
+        // 3. Insert into Role Table (Only if specific fields are provided, or insert nulls if table exists)
         if (role === 'receptionist') {
             await connection.query(
                 "INSERT INTO Receptionist (user_id, receptionist_address) VALUES (?, ?)",
@@ -125,8 +133,8 @@ exports.inviteStaff = async (req, res) => {
             );
         } else if (role === 'driver') {
             await connection.query(
-                "INSERT INTO Driver (user_id, vehicle_id) VALUES (?, ?)",
-                [userId, vehicle_id]
+                "INSERT INTO Driver (user_id) VALUES (?)",
+                [userId]
             );
         } else {
             await connection.rollback();
@@ -174,6 +182,40 @@ exports.deleteStaff = async (req, res) => {
     }
 };
 
+exports.updateStaffStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status } = req.body; // 'Active' or 'Inactive'
+        await db.query('UPDATE Users SET account_status = ? WHERE user_id = ?', [status, id]);
+        res.json({ message: `Staff status updated to ${status}` });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update status' });
+    }
+};
+
+exports.updateStaff = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, email, phone, address, nationality } = req.body;
+
+        // Update basic User info
+        await db.query('UPDATE Users SET name = ?, email = ?, phone = ? WHERE user_id = ?', [name, email, phone, id]);
+
+        // If address/nationality provided, try updating Guest table (safely ignored if user is not a guest)
+        if (address !== undefined || nationality !== undefined) {
+            // Check if user is a guest first to avoid errors if we were to strictly separate logic, 
+            // but here we can just attempt update if it exists in Guest table.
+            // A cleaner way is to check role, but for now we'll assumes this endpoint handles the "Edit Customer" request which includes these fields.
+            await db.query('UPDATE Guest SET guest_address = ?, nationality = ? WHERE user_id = ?', [address, nationality, id]);
+        }
+
+        res.json({ message: 'User updated successfully' });
+    } catch (error) {
+        console.error('Update failed:', error);
+        res.status(500).json({ error: 'Failed to update user' });
+    }
+};
+
 // --- Resource Management (Rooms, Activities, Vehicles) ---
 
 exports.addRoom = async (req, res) => {
@@ -206,8 +248,8 @@ exports.addActivity = async (req, res) => {
 
 exports.addVehicle = async (req, res) => {
     try {
-        const { vehicle_type, vehicle_number, vehicle_price_per_day, vehicle_price_per_hour, vehicle_status } = req.body;
-        await db.query('INSERT INTO vehicle (vehicle_type, vehicle_number, vehicle_price_per_day, vehicle_price_per_hour, vehicle_status) VALUES (?, ?, ?, ?, ?)', [vehicle_type, vehicle_number, vehicle_price_per_day, vehicle_price_per_hour, vehicle_status]);
+        const { vehicle_type, vehicle_number, vehicle_price_per_day, vehicle_status } = req.body;
+        await db.query('INSERT INTO vehicle (vehicle_type, vehicle_number, vehicle_price_per_day, vehicle_status) VALUES (?, ?, ?, ?)', [vehicle_type, vehicle_number, vehicle_price_per_day, vehicle_status]);
         res.status(201).json({ message: 'Vehicle added' });
     } catch (error) { res.status(500).json({ error: 'Error adding vehicle' }); }
 }

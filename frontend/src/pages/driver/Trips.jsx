@@ -50,8 +50,9 @@ const DriverTrips = () => {
                             <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-2">
                                     <span className={`px-3 py-1 rounded-full text-xs font-bold ${trip.vb_status === 'Booked' ? 'bg-blue-100 text-blue-700' :
-                                            trip.vb_status === 'In Progress' ? 'bg-orange-100 text-orange-700' :
-                                                trip.vb_status === 'Completed' ? 'bg-green-100 text-green-700' :
+                                        trip.vb_status === 'In Progress' ? 'bg-orange-100 text-orange-700' :
+                                            trip.vb_status === 'Completed' ? 'bg-green-100 text-green-700' :
+                                                trip.vb_status === 'Cancelled' ? 'bg-red-100 text-red-700' :
                                                     'bg-gray-100 text-gray-700'
                                         }`}>
                                         {trip.vb_status}
@@ -59,17 +60,15 @@ const DriverTrips = () => {
                                     <span className="text-sm text-slate-500 font-mono">#{trip.vb_id}</span>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 mb-2">
-                                    <div>
-                                        <p className="text-xs text-slate-500 uppercase font-semibold">Pickup</p>
-                                        <p className="font-medium text-slate-900">{trip.vb_pickup_point}</p>
-                                        <p className="text-xs text-slate-500">{new Date(trip.vb_trip_start).toLocaleString()}</p>
+                                {trip.vb_status === 'Cancelled' && trip.cancel_reason && (
+                                    <div className="mb-3 bg-red-50 text-red-800 text-sm p-2 rounded border border-red-200">
+                                        <span className="font-semibold">Cancellation Reason:</span> {trip.cancel_reason}
                                     </div>
-                                    <div>
-                                        <p className="text-xs text-slate-500 uppercase font-semibold">Drop-off</p>
-                                        <p className="font-medium text-slate-900">{trip.vb_drop_point}</p>
-                                        <p className="text-xs text-slate-500">{new Date(trip.vb_trip_end).toLocaleString()}</p>
-                                    </div>
+                                )}
+
+                                <div className="mb-2">
+                                    <p className="text-xs text-slate-500 uppercase font-semibold">Booking Date</p>
+                                    <p className="font-medium text-slate-900">{new Date(trip.vb_date).toLocaleDateString()}</p>
                                 </div>
 
                                 <div className="mt-3 pt-3 border-t border-slate-100 flex gap-6 text-sm">
@@ -92,7 +91,7 @@ const DriverTrips = () => {
                                 {trip.vb_status === 'Booked' && (
                                     <button
                                         onClick={() => handleStatusUpdate(trip.vb_id, 'In Progress')}
-                                        className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors"
+                                        className="w-full py-2 px-4 bg-gold-500 hover:bg-gold-600 text-white font-bold rounded-lg transition-colors"
                                     >
                                         Start Trip
                                     </button>

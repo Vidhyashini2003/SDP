@@ -1,3 +1,4 @@
+
 const db = require('../config/db');
 
 exports.getAssignedTrips = async (req, res) => {
@@ -10,14 +11,72 @@ exports.getAssignedTrips = async (req, res) => {
          JOIN Guest g ON vb.guest_id = g.guest_id
          JOIN Users u ON g.user_id = u.user_id
          JOIN vehicle v ON vb.vehicle_id = v.vehicle_id
-         WHERE d.user_id = ? AND vb.vb_status != 'Cancelled'
-         ORDER BY vb.vb_trip_start ASC`,
+         WHERE d.user_id = ? AND vb.vb_status IN ('Confirmed', 'In Progress', 'Completed')
+         ORDER BY vb.vb_date ASC`,
             [driverId]
         );
         res.json(trips);
     } catch (error) {
         console.error('Error fetching trips:', error);
         res.status(500).json({ error: 'Failed to fetch trips' });
+    }
+};
+
+exports.getHireRequests = async (req, res) => {
+    try {
+        // Fetch all pending requests (driver_id is null)
+        const [requests] = await db.query(
+            `SELECT vb.*, u.name as guest_name, v.vehicle_type, v.vehicle_number, v.vehicle_price_per_day
+             FROM vehiclebooking vb
+             JOIN Guest g ON vb.guest_id = g.guest_id
+             JOIN Users u ON g.user_id = u.user_id
+             JOIN vehicle v ON vb.vehicle_id = v.vehicle_id
+             WHERE vb.vb_status = 'Pending Approval' AND vb.driver_id IS NULL
+             ORDER BY vb.vb_date ASC`
+        );
+        res.json(requests);
+    } catch (error) {
+        console.error('Error fetching requests:', error);
+        res.status(500).json({ error: 'Failed to fetch hire requests' });
+    }
+};
+
+exports.acceptHireRequest = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const driverId = req.user.id;
+
+        const connection = await db.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            const [driver] = await connection.query("SELECT driver_id FROM Driver WHERE user_id = ?", [driverId]);
+            if (driver.length === 0) return res.status(403).json({ error: 'Not a driver' });
+            const realDriverId = driver[0].driver_id;
+
+            // Check if still available
+            const [booking] = await connection.query("SELECT vb_status FROM vehiclebooking WHERE vb_id = ? FOR UPDATE", [id]);
+            if (booking.length === 0 || booking[0].vb_status !== 'Pending Approval') {
+                await connection.rollback();
+                return res.status(400).json({ error: 'Request no longer available' });
+            }
+
+            await connection.query(
+                "UPDATE vehiclebooking SET driver_id = ?, vb_status = 'Pending Payment' WHERE vb_id = ?",
+                [realDriverId, id]
+            );
+
+            await connection.commit();
+            res.json({ message: 'Request accepted. Waiting for guest payment.' });
+        } catch (err) {
+            await connection.rollback();
+            throw err;
+        } finally {
+            connection.release();
+        }
+    } catch (error) {
+        console.error('Error accepting request:', error);
+        res.status(500).json({ error: 'Failed to accept request' });
     }
 };
 
@@ -75,11 +134,7 @@ exports.updateTripStatus = async (req, res) => {
 
 exports.updateVehicleStatus = async (req, res) => {
     try {
-        // Driver can update status of their assigned vehicle?
-        // Or any vehicle? Let's assume they update the vehicle they are driving in the trip or assigned vehicle
-        // Simple: Update ANY vehicle status if valid driver
-        const { vehicle_id, status } = req.body; // 'Available', 'In Use', 'Maintenance'
-
+        const { vehicle_id, status } = req.body;
         await db.query('UPDATE vehicle SET vehicle_status = ? WHERE vehicle_id = ?', [status, vehicle_id]);
         res.json({ message: 'Vehicle status updated' });
     } catch (error) {

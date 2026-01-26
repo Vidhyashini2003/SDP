@@ -14,10 +14,7 @@ const StaffManagement = () => {
     const [formData, setFormData] = useState({
         name: '',
         email: '',
-        phone: '',
-        address: '',
-        role: 'receptionist',
-        vehicle_id: ''
+        role: 'receptionist'
     });
 
     useEffect(() => {
@@ -45,28 +42,48 @@ const StaffManagement = () => {
         }
     };
 
+    const [editingStaff, setEditingStaff] = useState(null);
+
     // --- Actions ---
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
+    const handleEdit = (staff) => {
+        setEditingStaff(staff);
+        setFormData({
+            name: staff.name,
+            email: staff.email,
+            phone: staff.phone,
+            address: staff.address || '', // Address might not be present for all roles or in initial fetch
+            role: staff.role,
+            vehicle_id: staff.vehicle_id || '' // Vehicle ID might not be present for all roles
+        });
+        setShowAddModal(true);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            await axios.post('/api/admin/staff/invite', formData);
-            toast.success('Staff invitation sent successfully!');
+            if (editingStaff) {
+                // Update mode
+                await axios.put(`/api/admin/staff/${editingStaff.id}`, formData);
+                toast.success('Staff updated successfully!');
+            } else {
+                // Create mode
+                await axios.post('/api/admin/staff/invite', formData);
+                toast.success('Staff invitation sent successfully!');
+            }
             setShowAddModal(false);
+            setEditingStaff(null);
             setFormData({
                 name: '',
                 email: '',
-                phone: '',
-                address: '',
-                role: 'receptionist',
-                vehicle_id: ''
+                role: 'receptionist'
             });
             fetchStaff();
         } catch (err) {
-            toast.error(err.response?.data?.error || 'Failed to invite staff member');
+            toast.error(err.response?.data?.error || 'Failed to process request');
         }
     };
 
@@ -79,6 +96,16 @@ const StaffManagement = () => {
             } catch (err) {
                 toast.error('Failed to delete staff member');
             }
+        }
+    };
+
+    const handleStatusChange = async (id, status) => {
+        try {
+            await axios.put(`/api/admin/staff/${id}/status`, { status });
+            toast.success(`Staff status updated to ${status}`);
+            fetchStaff();
+        } catch (err) {
+            toast.error('Failed to update status');
         }
     };
 
@@ -115,8 +142,16 @@ const StaffManagement = () => {
                     <p className="text-slate-500 mt-1">Manage all system staff members</p>
                 </div>
                 <button
-                    onClick={() => setShowAddModal(true)}
-                    className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-sm transition-all"
+                    onClick={() => {
+                        setEditingStaff(null);
+                        setFormData({
+                            name: '',
+                            email: '',
+                            role: 'receptionist'
+                        });
+                        setShowAddModal(true);
+                    }}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-gold-500 hover:bg-gold-600 text-white font-semibold rounded-lg shadow-sm transition-all"
                 >
                     <UserPlusIcon className="w-5 h-5" />
                     Invite Staff
@@ -130,8 +165,8 @@ const StaffManagement = () => {
                         key={tab.name}
                         onClick={() => setActiveTab(tab.name)}
                         className={`pb-3 px-1 flex items-center gap-2 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.name
-                                ? 'border-blue-600 text-blue-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                            ? 'border-blue-600 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700'
                             }`}
                     >
                         {tab.name}
@@ -152,8 +187,8 @@ const StaffManagement = () => {
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Role</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Created</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Actions</th>
                         </tr>
                     </thead>
@@ -171,33 +206,47 @@ const StaffManagement = () => {
                                             {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
                                         </span>
                                     </td>
+                                    <td className="px-6 py-4 text-sm text-gray-500">
+                                        {new Date(member.created_at).toLocaleDateString()}
+                                    </td>
                                     <td className="px-6 py-4">
                                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(member.account_status)}`}>
                                             {member.account_status}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-gray-500">
-                                        {new Date(member.created_at).toLocaleDateString()}
-                                    </td>
                                     <td className="px-6 py-4 text-right">
-                                        <div className="flex justify-end gap-3">
-                                            {/* Edit Button (Placeholder) */}
-                                            <button className="text-blue-500 hover:text-blue-700">
+                                        <div className="flex justify-end gap-2 items-center">
+                                            {/* Edit Button */}
+                                            <button
+                                                onClick={() => handleEdit(member)}
+                                                className="p-2 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                                            >
                                                 <PencilIcon className="w-5 h-5" />
                                             </button>
-                                            <button
-                                                onClick={() => handleDelete(member.id, member.role)}
-                                                className="text-red-400 hover:text-red-600"
-                                            >
-                                                <TrashIcon className="w-5 h-5" />
-                                            </button>
+
+                                            {/* Status Buttons */}
+                                            {member.account_status === 'Active' ? (
+                                                <button
+                                                    onClick={() => handleStatusChange(member.id, 'Inactive')}
+                                                    className="px-3 py-1.5 text-xs font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors shadow-sm"
+                                                >
+                                                    Inactive
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleStatusChange(member.id, 'Active')}
+                                                    className="px-3 py-1.5 text-xs font-medium text-white bg-green-500 hover:bg-green-600 rounded-lg transition-colors shadow-sm"
+                                                >
+                                                    Active
+                                                </button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
                             ))
                         ) : (
                             <tr>
-                                <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
+                                <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
                                     No staff members found in this category.
                                 </td>
                             </tr>
@@ -206,12 +255,14 @@ const StaffManagement = () => {
                 </table>
             </div>
 
-            {/* Invite Modal */}
+            {/* Invite/Edit Modal */}
             {showAddModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
                     <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 animate-in fade-in zoom-in duration-200">
                         <div className="flex justify-between items-center mb-6 border-b pb-4">
-                            <h2 className="text-xl font-bold text-slate-800">Invite Staff Member</h2>
+                            <h2 className="text-xl font-bold text-slate-800">
+                                {editingStaff ? 'Edit Staff Member' : 'Invite Staff Member'}
+                            </h2>
                             <button
                                 onClick={() => setShowAddModal(false)}
                                 className="text-slate-400 hover:text-slate-600 transition-colors"
@@ -247,38 +298,14 @@ const StaffManagement = () => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
-                                <input
-                                    name="phone"
-                                    required
-                                    value={formData.phone}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                                    placeholder="+1 234 567 890"
-                                />
-                            </div>
-
-                            {formData.role !== 'driver' && (
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Address</label>
-                                    <input
-                                        name="address"
-                                        value={formData.address}
-                                        onChange={handleChange}
-                                        className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                                        placeholder="123 Staff St"
-                                    />
-                                </div>
-                            )}
-
-                            <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Role</label>
                                 <select
                                     name="role"
                                     required
                                     value={formData.role}
                                     onChange={handleChange}
-                                    className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                    disabled={!!editingStaff} // Disable role change during edit for simplicity
+                                    className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-gold-500 outline-none transition-all disabled:bg-gray-100 disabled:text-gray-500"
                                 >
                                     <option value="receptionist">Receptionist</option>
                                     <option value="kitchen">Kitchen Staff</option>
@@ -286,19 +313,7 @@ const StaffManagement = () => {
                                 </select>
                             </div>
 
-                            {formData.role === 'driver' && (
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle ID</label>
-                                    <input
-                                        name="vehicle_id"
-                                        required
-                                        value={formData.vehicle_id}
-                                        onChange={handleChange}
-                                        className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                                        placeholder="Enter Vehicle ID"
-                                    />
-                                </div>
-                            )}
+
 
                             <div className="flex gap-3 pt-4">
                                 <button
@@ -310,9 +325,9 @@ const StaffManagement = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition-all"
+                                    className="flex-1 py-2.5 px-4 bg-gold-500 hover:bg-gold-600 text-white font-semibold rounded-lg shadow-md transition-all"
                                 >
-                                    Send Invite
+                                    {editingStaff ? 'Update Staff' : 'Send Invite'}
                                 </button>
                             </div>
                         </form>

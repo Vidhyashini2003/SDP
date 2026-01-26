@@ -18,18 +18,16 @@ const GuestDashboard = () => {
 
     const fetchAllBookings = async () => {
         try {
-            const [bookingsRes, actRes, ordersRes, vehiclesRes] = await Promise.all([
+            const [bookingsRes, ordersRes] = await Promise.all([
                 axios.get('/api/guest/bookings'),
-                axios.get('/api/guest/activities'),
-                axios.get('/api/guest/orders'),
-                axios.get('/api/guest/vehicles')
+                axios.get('/api/guest/orders')
             ]);
 
             setBookings({
                 rooms: bookingsRes.data?.rooms || [],
-                activities: actRes.data || [],
+                activities: bookingsRes.data?.activities || [],
                 foodOrders: ordersRes.data || [],
-                vehicles: vehiclesRes.data || []
+                vehicles: bookingsRes.data?.vehicles || []
             });
             setLoading(false);
         } catch (error) {
@@ -133,7 +131,7 @@ const GuestDashboard = () => {
                             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Rooms</p>
                             <h3 className="text-2xl font-bold text-slate-900">{bookings.rooms.length}</h3>
                         </div>
-                        <div className="p-2 bg-blue-50 rounded-lg text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors duration-300">
+                        <div className="p-2 bg-gold-50 rounded-lg text-gold-600 group-hover:bg-gold-600 group-hover:text-white transition-colors duration-300">
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
                         </div>
                     </div>

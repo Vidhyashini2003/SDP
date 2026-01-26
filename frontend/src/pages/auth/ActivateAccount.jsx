@@ -122,7 +122,7 @@ const ActivateAccount = () => {
 
                         <button
                             type="submit"
-                            className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition"
+                            className="w-full bg-gold-600 text-white py-2 rounded-md hover:bg-gold-700 transition"
                         >
                             {hasPassword ? 'Verify Email & Activate' : 'Activate Account'}
                         </button>

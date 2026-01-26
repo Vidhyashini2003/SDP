@@ -138,8 +138,8 @@ const ReceptionistDashboard = () => {
             <div className="mt-8 bg-blue-50 border border-blue-100 rounded-xl p-6">
                 <h3 className="font-semibold text-blue-900 mb-2">Quick Access</h3>
                 <div className="flex gap-4">
-                    <a href="/receptionist/bookings" className="px-4 py-2 bg-white text-blue-600 rounded-lg shadow-sm font-medium hover:bg-blue-600 hover:text-white transition-colors">Manage Bookings</a>
-                    <a href="/receptionist/guests" className="px-4 py-2 bg-white text-blue-600 rounded-lg shadow-sm font-medium hover:bg-blue-600 hover:text-white transition-colors">View Guests</a>
+                    <a href="/receptionist/bookings" className="px-4 py-2 bg-white text-gold-600 rounded-lg shadow-sm font-medium hover:bg-gold-600 hover:text-white transition-colors">Manage Bookings</a>
+                    <a href="/receptionist/guests" className="px-4 py-2 bg-white text-gold-600 rounded-lg shadow-sm font-medium hover:bg-gold-600 hover:text-white transition-colors">View Guests</a>
                 </div>
             </div>
         </div>

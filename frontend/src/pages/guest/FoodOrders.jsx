@@ -171,7 +171,7 @@ const FoodOrders = () => {
                                             </div>
                                             <button
                                                 onClick={() => addToCart(item)}
-                                                className="ml-4 px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium text-sm"
+                                                className="ml-4 px-6 py-2 bg-gold-500 text-white rounded-lg hover:bg-gold-600 transition-colors font-medium text-sm"
                                             >
                                                 Add
                                             </button>
@@ -320,7 +320,7 @@ const FoodOrders = () => {
                             onClick={handlePlaceOrder}
                             disabled={!paymentMethod}
                             className={`w-full py-3 rounded-lg font-semibold transition-all ${paymentMethod
-                                ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                                ? 'bg-gold-500 hover:bg-gold-600 text-white'
                                 : 'bg-slate-300 text-slate-500 cursor-not-allowed'
                                 }`}
                         >

@@ -10,6 +10,8 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ActivateAccount from './pages/auth/ActivateAccount';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 
 // Guest Pages
 import GuestDashboard from './pages/guest/Dashboard';
@@ -30,9 +32,11 @@ import ReceptionistBookings from './pages/receptionist/Bookings';
 import ReceptionistActivities from './pages/receptionist/Activities';
 import ReceptionistRefunds from './pages/receptionist/Refunds';
 import ReceptionistDamages from './pages/receptionist/Damages';
+import VehicleAvailability from './pages/receptionist/VehicleAvailability';
 import DriverDashboard from './pages/driver/Dashboard';
 import DriverTrips from './pages/driver/Trips';
 import DriverRefunds from './pages/driver/Refunds';
+import DriverHireRequests from './pages/driver/HireRequests';
 
 import KitchenDashboard from './pages/kitchen/Dashboard';
 import KitchenOrders from './pages/kitchen/Orders';
@@ -77,12 +81,14 @@ const receptionistItems = [
     { name: 'Dashboard', path: '/receptionist/dashboard', icon: HomeIcon },
     { name: 'Manage Bookings', path: '/receptionist/bookings', icon: BuildingOfficeIcon },
     { name: 'Activity Bookings', path: '/receptionist/activities', icon: TicketIcon },
+    { name: 'Vehicle Availability', path: '/receptionist/vehicles', icon: TruckIcon },
     { name: 'Refund Requests', path: '/receptionist/refunds', icon: CurrencyDollarIcon },
     { name: 'Damages', path: '/receptionist/damages', icon: ExclamationCircleIcon },
 ];
 
 const driverItems = [
     { name: 'Dashboard', path: '/driver/dashboard', icon: HomeIcon },
+    { name: 'Hire Requests', path: '/driver/requests', icon: ClipboardDocumentListIcon },
     { name: 'My Trips', path: '/driver/trips', icon: TruckIcon },
     { name: 'Refund Requests', path: '/driver/refunds', icon: CurrencyDollarIcon },
 ];
@@ -105,6 +111,8 @@ function App() {
                         <Route path="/login" element={<Login />} />
                         <Route path="/register" element={<Register />} />
                         <Route path="/activate-account" element={<ActivateAccount />} />
+                        <Route path="/forgot-password" element={<ForgotPassword />} />
+                        <Route path="/reset-password/:token" element={<ResetPassword />} />
                     </Route>
 
                     {/* Guest Routes */}
@@ -149,6 +157,7 @@ function App() {
                         <Route path="dashboard" element={<ReceptionistDashboard />} />
                         <Route path="bookings" element={<ReceptionistBookings />} />
                         <Route path="activities" element={<ReceptionistActivities />} />
+                        <Route path="vehicles" element={<VehicleAvailability />} />
                         <Route path="refunds" element={<ReceptionistRefunds />} />
                         <Route path="damages" element={<ReceptionistDamages />} />
                         <Route path="profile" element={<StaffProfile />} />
@@ -163,6 +172,7 @@ function App() {
                         </ProtectedRoute>
                     }>
                         <Route path="dashboard" element={<DriverDashboard />} />
+                        <Route path="requests" element={<DriverHireRequests />} />
                         <Route path="trips" element={<DriverTrips />} />
                         <Route path="refunds" element={<DriverRefunds />} />
                         <Route path="profile" element={<StaffProfile />} />

@@ -7,6 +7,8 @@ router.use(verifyToken);
 router.use(authorizeRole('driver'));
 
 router.get('/trips', driverController.getAssignedTrips);
+router.get('/requests', driverController.getHireRequests);
+router.post('/requests/:id/accept', driverController.acceptHireRequest);
 router.put('/trips/:id/status', driverController.updateTripStatus);
 router.put('/vehicle/status', driverController.updateVehicleStatus);
 
