@@ -25,7 +25,7 @@ const Home = () => {
                         <h2 className="text-white text-lg md:text-xl uppercase tracking-[0.3em] mb-4 font-semibold drop-shadow-md">
                             Welcome to
                         </h2>
-                        <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-bold text-white mb-8 tracking-wide drop-shadow-2xl">
+                        <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-bold text-gold-500 mb-8 tracking-wide drop-shadow-2xl">
                             Janas Blue Water Corner
                         </h1>
                         <div className="w-24 h-1 bg-gold-500 mx-auto mb-8 shadow-lg"></div>

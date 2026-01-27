@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 
+import royalHotelBg from '../assets/royal_hotel_interior.jpg';
+
 const ForgotPassword = () => {
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
@@ -38,11 +40,11 @@ const ForgotPassword = () => {
             {/* Background Image */}
             <div className="absolute inset-0 z-0 overflow-hidden">
                 <img
-                    src="https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80"
+                    src={royalHotelBg}
                     alt="Luxury Hotel"
-                    className="h-full w-full object-cover opacity-30 grayscale"
+                    className="h-full w-full object-cover opacity-100"
                 />
-                <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-black/60 to-black/80" />
+                <div className="absolute inset-0 bg-gradient-to-br from-black/60 via-black/20 to-black/40" />
             </div>
 
             <div className="max-w-md w-full bg-slate-900/90 backdrop-blur-xl rounded-2xl shadow-2xl p-8 border border-gold-500/30 relative z-10">

@@ -84,6 +84,10 @@ const DriverTrips = () => {
                                         <span className="text-slate-500">Vehicle: </span>
                                         <span className="font-medium text-slate-900">{trip.vehicle_number} ({trip.vehicle_type})</span>
                                     </div>
+                                    <div>
+                                        <span className="text-slate-500">Duration: </span>
+                                        <span className="font-medium text-slate-900">{trip.vb_days} Days</span>
+                                    </div>
                                 </div>
                             </div>
 

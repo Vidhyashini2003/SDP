@@ -52,10 +52,10 @@ exports.createRoomBooking = async (req, res) => {
 
             await connection.beginTransaction();
 
-            // 1. Create Payment Record (Without method)
+            // 1. Create Payment Record
             const [paymentResult] = await connection.query(
-                'INSERT INTO payment (payment_amount, service_type, payment_status) VALUES (?, ?, ?)',
-                [totalAmount, 'Room', 'Success'] // Assuming instant success for now
+                'INSERT INTO payment (payment_amount, payment_status) VALUES (?, ?)',
+                [totalAmount, 'Success'] // Assuming instant success for now
             );
             const payment_id = paymentResult.insertId;
 
@@ -65,9 +65,6 @@ exports.createRoomBooking = async (req, res) => {
                 [guest_id, room_id, checkIn, checkOut, totalAmount, payment_id, 'Booked'] // Status 'Booked'
             );
             const booking_id = bookingResult.insertId;
-
-            // 3. Update Payment with Service ID (if circular link needed/supported by schema logic or for easier tracking)
-            await connection.query('UPDATE payment SET service_id = ? WHERE payment_id = ?', [booking_id, payment_id]);
 
             // 4. Update Room Status? 
             // If room availability is simply status-based:
@@ -184,8 +181,8 @@ exports.createActivityBooking = async (req, res) => {
             }
 
             const [paymentResult] = await connection.query(
-                'INSERT INTO payment (payment_amount, service_type, payment_status) VALUES (?, ?, ?)',
-                [total_amount, 'Activity', 'Success']
+                'INSERT INTO payment (payment_amount, payment_status) VALUES (?, ?)',
+                [total_amount, 'Success']
             );
             const payment_id = paymentResult.insertId;
 
@@ -193,8 +190,6 @@ exports.createActivityBooking = async (req, res) => {
                 'INSERT INTO activitybooking (guest_id, activity_id, ab_start_time, ab_end_time, ab_total_amount, ab_payment_id, ab_status) VALUES (?, ?, ?, ?, ?, ?, ?)',
                 [guest_id, activity_id, start_time, end_time, total_amount, payment_id, 'Reserved']
             );
-
-            await connection.query('UPDATE payment SET service_id = ? WHERE payment_id = ?', [bookingResult.insertId, payment_id]);
 
             await connection.commit();
             res.status(201).json({ message: 'Activity booked successfully' });

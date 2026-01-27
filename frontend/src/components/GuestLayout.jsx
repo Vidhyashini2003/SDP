@@ -110,10 +110,9 @@ const GuestLayout = ({ children }) => {
 
                         <button
                             onClick={handleLogout}
-                            className="w-full px-4 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform active:scale-95 mt-4"
+                            className="w-full px-4 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold rounded-xl transition-all shadow-md hover:shadow-lg transform active:scale-95 text-center tracking-wide mt-4"
                         >
-                            <span className="text-lg">🚪</span>
-                            <span className="font-medium text-sm">Logout</span>
+                            Logout
                         </button>
                     </div>
                 </div>

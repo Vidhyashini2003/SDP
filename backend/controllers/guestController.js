@@ -123,7 +123,10 @@ exports.cancelRoomBooking = async (req, res) => {
 
         // 4. Handle Refund
         const [payments] = await db.query(
-            'SELECT payment_id, payment_amount FROM payment WHERE service_id = ? AND service_type = "Room" AND payment_status = "Success"',
+            `SELECT p.payment_id, p.payment_amount 
+             FROM payment p
+             JOIN roombooking rb ON p.payment_id = rb.rb_payment_id
+             WHERE rb.rb_id = ? AND p.payment_status = "Success"`,
             [id]
         );
 
@@ -256,8 +259,8 @@ exports.payVehicleBooking = async (req, res) => {
 
             // Create Payment
             const [paymentResult] = await connection.query(
-                'INSERT INTO payment (payment_amount, service_type, service_id, payment_status) VALUES (?, ?, ?, ?)',
-                [total_amount, 'Vehicle', id, 'Success']
+                'INSERT INTO payment (payment_amount, payment_status) VALUES (?, ?)',
+                [total_amount, 'Success']
             );
             const paymentId = paymentResult.insertId;
 

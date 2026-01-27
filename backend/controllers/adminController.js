@@ -3,62 +3,95 @@ const crypto = require('crypto');
 const emailService = require('../utils/emailService');
 
 // Dashboard Stats
+// Dashboard Stats
 exports.getDashboardStats = async (req, res) => {
     try {
-        // Use Promise.all to run independent queries in parallel
-        const [
-            [roomRes],
-            [userCounts],
-            [revenueRes],
-            [activeVehiclesRes],
-            [bookingsRes],
-            [revenueByType]
-        ] = await Promise.all([
-            db.query("SELECT COUNT(*) as total FROM room"), // 0: Rooms
-            db.query("SELECT role, COUNT(*) as count FROM Users GROUP BY role"), // 1: Users
-            db.query("SELECT SUM(payment_amount) as total FROM payment WHERE payment_status = 'Success'"), // 2: Revenue
-            db.query("SELECT COUNT(*) as active FROM vehicle WHERE vehicle_status = 'Booked'"), // 3: Active Vehicles
-            // 4: Total Bookings (Sum of all tables)
-            Promise.all([
-                db.query("SELECT COUNT(*) as c FROM RoomBooking"),
-                db.query("SELECT COUNT(*) as c FROM ActivityBooking"),
-                db.query("SELECT COUNT(*) as c FROM VehicleBooking")
-            ]),
-            // 5: Revenue by Type
-            db.query(`
-                SELECT service_type, COUNT(*) as count, SUM(payment_amount) as total 
-                FROM payment 
-                WHERE payment_status = 'Success' 
-                GROUP BY service_type
-            `)
-        ]);
+        const connection = await db.getConnection();
 
-        // Process Results
-        const totalRooms = roomRes[0].total;
+        try {
+            // 1. Basic Counts
+            const [[{ total_rooms }]] = await connection.query("SELECT COUNT(*) as total_rooms FROM room");
+            const [[{ active_vehicles }]] = await connection.query("SELECT COUNT(*) as active_vehicles FROM vehicle WHERE vehicle_status = 'Booked'"); // 'Active' implies booked/in-use
 
-        const guests = userCounts.find(r => r.role === 'guest')?.count || 0;
-        const staff = userCounts.filter(r => ['receptionist', 'kitchen', 'driver'].includes(r.role))
-            .reduce((acc, curr) => acc + curr.count, 0);
+            // 2. User Stats
+            const [userRows] = await connection.query("SELECT role, COUNT(*) as count FROM Users GROUP BY role");
+            const guests = userRows.find(r => r.role === 'guest')?.count || 0;
+            const staff = userRows
+                .filter(r => ['receptionist', 'kitchen', 'driver'].includes(r.role))
+                .reduce((sum, r) => sum + r.count, 0);
 
-        const totalRevenue = revenueRes[0].total || 0;
-        const activeVehicles = activeVehiclesRes[0].active;
+            // 3. Booking Counts
+            const [[{ rb_count }]] = await connection.query("SELECT COUNT(*) as rb_count FROM RoomBooking");
+            const [[{ ab_count }]] = await connection.query("SELECT COUNT(*) as ab_count FROM ActivityBooking");
+            const [[{ vb_count }]] = await connection.query("SELECT COUNT(*) as vb_count FROM VehicleBooking");
+            const total_bookings = rb_count + ab_count + vb_count;
 
-        const totalBookings = bookingsRes[0][0][0].c + bookingsRes[1][0][0].c + bookingsRes[2][0][0].c;
+            // 4. Financials (Revenue by Service Type) using 3NF Joins
 
-        res.json({
-            success: true,
-            counts: {
-                guests,
-                staff,
-                rooms: totalRooms,
-                activeVehicles,
-                bookings: totalBookings
-            },
-            financials: {
-                totalRevenue,
-                revenueByType: revenueByType[0] // db.query returns [rows, fields]
-            }
-        });
+            // Room Revenue
+            const [[roomRev]] = await connection.query(`
+                SELECT COUNT(p.payment_id) as txn_count, COALESCE(SUM(p.payment_amount), 0) as total_amount
+                FROM payment p
+                JOIN roombooking rb ON p.payment_id = rb.rb_payment_id
+                WHERE p.payment_status = 'Success'
+            `);
+
+            // Activity Revenue
+            const [[activityRev]] = await connection.query(`
+                SELECT COUNT(p.payment_id) as txn_count, COALESCE(SUM(p.payment_amount), 0) as total_amount
+                FROM payment p
+                JOIN activitybooking ab ON p.payment_id = ab.ab_payment_id
+                WHERE p.payment_status = 'Success'
+            `);
+
+            // Vehicle Revenue
+            const [[vehicleRev]] = await connection.query(`
+                SELECT COUNT(p.payment_id) as txn_count, COALESCE(SUM(p.payment_amount), 0) as total_amount
+                FROM payment p
+                JOIN vehiclebooking vb ON p.payment_id = vb.vb_payment_id
+                WHERE p.payment_status = 'Success'
+            `);
+
+            // Food Revenue
+            const [[foodRev]] = await connection.query(`
+                SELECT COUNT(p.payment_id) as txn_count, COALESCE(SUM(p.payment_amount), 0) as total_amount
+                FROM payment p
+                JOIN foodorder fo ON p.payment_id = fo.payment_id
+                WHERE p.payment_status = 'Success'
+            `);
+
+            const total_revenue =
+                parseFloat(roomRev.total_amount) +
+                parseFloat(activityRev.total_amount) +
+                parseFloat(vehicleRev.total_amount) +
+                parseFloat(foodRev.total_amount);
+
+            // 5. Construct Response
+            const responseData = {
+                success: true,
+                summary: {
+                    guests,
+                    staff,
+                    rooms: total_rooms,
+                    active_vehicles,
+                    bookings: total_bookings
+                },
+                revenue: {
+                    total: total_revenue,
+                    breakdown: [
+                        { type: 'Room Booking', count: roomRev.txn_count, amount: parseFloat(roomRev.total_amount) },
+                        { type: 'Activity', count: activityRev.txn_count, amount: parseFloat(activityRev.total_amount) },
+                        { type: 'Vehicle Hire', count: vehicleRev.txn_count, amount: parseFloat(vehicleRev.total_amount) },
+                        { type: 'Dining', count: foodRev.txn_count, amount: parseFloat(foodRev.total_amount) }
+                    ]
+                }
+            };
+
+            res.json(responseData);
+
+        } finally {
+            connection.release();
+        }
 
     } catch (error) {
         console.error('Dashboard Stats Error:', error);
@@ -325,4 +358,3 @@ exports.updateMenuItemStatus = async (req, res) => {
         res.status(500).json({ error: 'Failed to update menu item status' });
     }
 };
-

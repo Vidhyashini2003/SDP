@@ -123,67 +123,90 @@ const ReceptionistBookings = () => {
                     {activeTab === 'all' && (
                         <div className="space-y-6">
                             {bookings.rooms.map((booking, idx) => (
-                                <div key={idx} className="flex justify-between items-center p-4 bg-slate-50 rounded-lg">
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-bold text-slate-900">Room: {booking.room_type}</span>
-                                            <span className="text-xs text-slate-500">({booking.guest_name})</span>
+                                <div key={'room' + idx} className="p-5 border border-slate-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-4">
+                                        <div>
+                                            <div className="flex items-center gap-3 mb-1">
+                                                <h4 className="font-bold text-lg text-slate-900 border-l-4 border-blue-500 pl-3">{booking.room_type}</h4>
+                                                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getStatusColor(booking.rb_status)}`}>
+                                                    {booking.rb_status}
+                                                </span>
+                                            </div>
+                                            <div className="text-sm text-slate-600 space-y-1 pl-4">
+                                                <p><span className="font-medium">Guest:</span> {booking.guest_name}</p>
+                                                <p><span className="font-medium">Dates:</span> {formatDate(booking.rb_checkin)} - {formatDate(booking.rb_checkout)}</p>
+                                            </div>
                                         </div>
-                                        <div className="text-sm text-slate-500">
-                                            {formatDate(booking.check_in_date)} - {formatDate(booking.check_out_date)}
+                                        <div className="text-right">
+                                            <p className="text-sm text-slate-500">ID:  <span className="font-mono">#{booking.rb_id}</span></p>
                                         </div>
                                     </div>
-                                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(booking.rb_status)}`}>
-                                        {booking.rb_status}
-                                    </span>
                                 </div>
                             ))}
                             {bookings.activities.map((booking, idx) => (
-                                <div key={'act' + idx} className="flex justify-between items-center p-4 bg-slate-50 rounded-lg">
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-bold text-slate-900">Activity: {booking.activity_name}</span>
-                                            <span className="text-xs text-slate-500">({booking.guest_name})</span>
+                                <div key={'act' + idx} className="p-5 border border-slate-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-4">
+                                        <div>
+                                            <div className="flex items-center gap-3 mb-1">
+                                                <h4 className="font-bold text-lg text-slate-900 border-l-4 border-purple-500 pl-3">{booking.activity_name}</h4>
+                                                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getStatusColor(booking.ab_status)}`}>
+                                                    {booking.ab_status}
+                                                </span>
+                                            </div>
+                                            <div className="text-sm text-slate-600 space-y-1 pl-4">
+                                                <p><span className="font-medium">Guest:</span> {booking.guest_name}</p>
+                                                <p><span className="font-medium">Schedule:</span> {formatDate(booking.ab_start_time)}</p>
+                                            </div>
                                         </div>
-                                        <div className="text-sm text-slate-500">
-                                            {formatDate(booking.booking_date)}
+                                        <div className="text-right">
+                                            <p className="text-sm text-slate-500">ID: <span className="font-mono">#{booking.ab_id}</span></p>
                                         </div>
                                     </div>
-                                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(booking.ab_status)}`}>
-                                        {booking.ab_status}
-                                    </span>
                                 </div>
                             ))}
                             {bookings.foodOrders.map((order, idx) => (
-                                <div key={'food' + idx} className="flex justify-between items-center p-4 bg-slate-50 rounded-lg">
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-bold text-slate-900">Order: {order.item_name} (x{order.order_quantity})</span>
-                                            <span className="text-xs text-slate-500">({order.guest_name})</span>
+                                <div key={'food' + idx} className="p-5 border border-slate-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-4">
+                                        <div>
+                                            <div className="flex items-center gap-3 mb-1">
+                                                <h4 className="font-bold text-lg text-slate-900 border-l-4 border-emerald-500 pl-3">
+                                                    {order.item_details || `Order #${order.order_id}`}
+                                                </h4>
+                                                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getStatusColor(order.order_status)}`}>
+                                                    {order.order_status}
+                                                </span>
+                                            </div>
+                                            <div className="text-sm text-slate-600 space-y-1 pl-4">
+                                                <p><span className="font-medium">Guest:</span> {order.guest_name}</p>
+                                                <p><span className="font-medium">Date:</span> {new Date(order.order_date).toLocaleString()}</p>
+                                            </div>
                                         </div>
-                                        <div className="text-sm text-slate-500">
-                                            {formatDate(order.order_date)}
+                                        <div className="text-right">
+                                            <p className="text-sm text-slate-500">ID: <span className="font-mono">#{order.order_id}</span></p>
+                                            <p className="text-sm font-bold text-slate-900 mt-1">Rs. {order.order_total_amount || '0.00'}</p>
                                         </div>
                                     </div>
-                                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.item_status)}`}>
-                                        {order.item_status}
-                                    </span>
                                 </div>
                             ))}
                             {bookings.vehicles.map((vb, idx) => (
-                                <div key={'veh' + idx} className="flex justify-between items-center p-4 bg-slate-50 rounded-lg">
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-bold text-slate-900">Vehicle: {vb.vehicle_type}</span>
-                                            <span className="text-xs text-slate-500">({vb.guest_name})</span>
+                                <div key={'veh' + idx} className="p-5 border border-slate-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-4">
+                                        <div>
+                                            <div className="flex items-center gap-3 mb-1">
+                                                <h4 className="font-bold text-lg text-slate-900 border-l-4 border-orange-500 pl-3">{vb.vehicle_type}</h4>
+                                                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getStatusColor(vb.vb_status)}`}>
+                                                    {vb.vb_status}
+                                                </span>
+                                            </div>
+                                            <div className="text-sm text-slate-600 space-y-1 pl-4">
+                                                <p><span className="font-medium">Guest:</span> {vb.guest_name}</p>
+                                                <p><span className="font-medium">Journey Date:</span> {formatDate(vb.vb_date)}</p>
+                                            </div>
                                         </div>
-                                        <div className="text-sm text-slate-500">
-                                            {formatDate(vb.vb_date)}
+                                        <div className="text-right">
+                                            <p className="text-sm text-slate-500">ID: <span className="font-mono">#{vb.vb_id}</span></p>
                                         </div>
                                     </div>
-                                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(vb.vb_status)}`}>
-                                        {vb.vb_status}
-                                    </span>
                                 </div>
                             ))}
                         </div>
@@ -193,26 +216,55 @@ const ReceptionistBookings = () => {
                     {activeTab === 'rooms' && (
                         <div className="space-y-4">
                             {bookings.rooms.map((booking, idx) => (
-                                <div key={idx} className="p-4 border border-slate-200 rounded-lg">
-                                    <div className="flex justify-between items-start mb-2">
+                                <div key={idx} className="p-5 border border-slate-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-4">
                                         <div>
-                                            <h4 className="font-bold text-slate-900">{booking.room_type}</h4>
-                                            <p className="text-sm text-slate-500">Guest: {booking.guest_name} ({booking.guest_phone})</p>
+                                            <div className="flex items-center gap-3 mb-1">
+                                                <h4 className="font-bold text-lg text-slate-900">{booking.room_type}</h4>
+                                                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getStatusColor(booking.rb_status)}`}>
+                                                    {booking.rb_status}
+                                                </span>
+                                            </div>
+                                            <div className="text-sm text-slate-600 space-y-1">
+                                                <p><span className="font-medium">Guest:</span> {booking.guest_name}</p>
+                                                <p><span className="font-medium">Phone:</span> {booking.guest_phone}</p>
+                                                <p><span className="font-medium">From:</span> {booking.nationality}, {booking.guest_address}</p>
+                                            </div>
                                         </div>
-                                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(booking.rb_status)}`}>
-                                            {booking.rb_status}
-                                        </span>
+                                        <div className="text-right">
+                                            <p className="text-sm text-slate-500">Booking ID: <span className="font-mono">#{booking.rb_id}</span></p>
+                                            <p className="text-xs text-slate-400 mt-1">
+                                                Booked on: {new Date(booking.rb_date || booking.created_at || Date.now()).toLocaleDateString()}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4 text-sm mt-2">
-                                        <div><span className="text-slate-500">Check-in:</span> {formatDate(booking.check_in_date)}</div>
-                                        <div><span className="text-slate-500">Check-out:</span> {formatDate(booking.check_out_date)}</div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-3 border-t border-slate-100 bg-slate-50 rounded-lg px-4">
+                                        <div>
+                                            <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Dates</p>
+                                            <p className="text-sm font-medium text-slate-900">
+                                                {formatDate(booking.rb_checkin)} — {formatDate(booking.rb_checkout)}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Financials</p>
+                                            <p className="text-sm font-medium text-slate-900">
+                                                Total: Rs. {booking.rb_total_amount}
+                                                <span className="ml-2 text-xs font-normal text-slate-500">(Payment ID: {booking.rb_payment_id || 'Pending'})</span>
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div className="mt-3 flex gap-2">
+
+                                    <div className="mt-4 flex gap-3 justify-end">
                                         {booking.rb_status === 'Booked' && (
-                                            <button onClick={() => handleStatusUpdate('room', booking.rb_id, 'Checked-in')} className="px-3 py-1 bg-gold-600 text-white text-xs rounded hover:bg-gold-700">Check-In</button>
+                                            <button onClick={() => handleStatusUpdate('room', booking.rb_id, 'Checked-in')} className="px-4 py-2 bg-gold-600 text-white text-sm font-medium rounded-lg hover:bg-gold-700 transition-colors shadow-sm">
+                                                Check-In Guest
+                                            </button>
                                         )}
                                         {booking.rb_status === 'Checked-in' && (
-                                            <button onClick={() => handleStatusUpdate('room', booking.rb_id, 'Checked-out')} className="px-3 py-1 bg-slate-600 text-white text-xs rounded hover:bg-slate-700">Check-Out</button>
+                                            <button onClick={() => handleStatusUpdate('room', booking.rb_id, 'Checked-out')} className="px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors shadow-sm">
+                                                Check-Out Guest
+                                            </button>
                                         )}
                                     </div>
                                 </div>
@@ -224,17 +276,42 @@ const ReceptionistBookings = () => {
                     {activeTab === 'activities' && (
                         <div className="space-y-4">
                             {bookings.activities.map((booking, idx) => (
-                                <div key={idx} className="p-4 border border-slate-200 rounded-lg">
-                                    <div className="flex justify-between items-start mb-2">
+                                <div key={idx} className="p-5 border border-slate-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-4">
                                         <div>
-                                            <h4 className="font-bold text-slate-900">{booking.activity_name}</h4>
-                                            <p className="text-sm text-slate-500">Guest: {booking.guest_name} ({booking.guest_phone})</p>
+                                            <div className="flex items-center gap-3 mb-1">
+                                                <h4 className="font-bold text-lg text-slate-900">{booking.activity_name}</h4>
+                                                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getStatusColor(booking.ab_status)}`}>
+                                                    {booking.ab_status}
+                                                </span>
+                                            </div>
+                                            <div className="text-sm text-slate-600 space-y-1">
+                                                <p><span className="font-medium">Guest:</span> {booking.guest_name}</p>
+                                                <p><span className="font-medium">Phone:</span> {booking.guest_phone}</p>
+                                                <p><span className="font-medium">From:</span> {booking.nationality}</p>
+                                            </div>
                                         </div>
-                                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(booking.ab_status)}`}>
-                                            {booking.ab_status}
-                                        </span>
+                                        <div className="text-right">
+                                            <p className="text-sm text-slate-500">Booking ID: <span className="font-mono">#{booking.ab_id}</span></p>
+                                        </div>
                                     </div>
-                                    <div className="text-sm text-slate-500 mt-2">Date: {formatDate(booking.booking_date)}</div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-3 border-t border-slate-100 bg-slate-50 rounded-lg px-4">
+                                        <div>
+                                            <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Schedule</p>
+                                            <p className="text-sm font-medium text-slate-900">
+                                                {formatDate(booking.ab_start_time)}
+                                            </p>
+                                            <p className="text-xs text-slate-500 mt-1">Price/Hr: Rs. {booking.activity_price_per_hour}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Financials</p>
+                                            <p className="text-sm font-medium text-slate-900">
+                                                Total: Rs. {booking.ab_total_amount}
+                                                <span className="ml-2 text-xs font-normal text-slate-500">(Payment ID: {booking.ab_payment_id || 'Pending'})</span>
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -244,17 +321,40 @@ const ReceptionistBookings = () => {
                     {activeTab === 'food' && (
                         <div className="space-y-4">
                             {bookings.foodOrders.map((order, idx) => (
-                                <div key={idx} className="p-4 border border-slate-200 rounded-lg">
-                                    <div className="flex justify-between items-start mb-2">
+                                <div key={idx} className="p-5 border border-slate-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-4">
                                         <div>
-                                            <h4 className="font-bold text-slate-900">{order.item_name} (x{order.order_quantity})</h4>
-                                            <p className="text-sm text-slate-500">Guest: {order.guest_name}</p>
+                                            <div className="flex items-center gap-3 mb-1">
+                                                <h4 className="font-bold text-lg text-slate-900">
+                                                    {order.item_details || `Order #${order.order_id}`}
+                                                </h4>
+                                                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getStatusColor(order.order_status)}`}>
+                                                    {order.order_status}
+                                                </span>
+                                            </div>
+                                            <div className="text-sm text-slate-600 space-y-1">
+                                                <p><span className="font-medium">Dining Option:</span> {order.dining_option}</p>
+                                                <p><span className="font-medium">Guest:</span> {order.guest_name} ({order.guest_phone})</p>
+                                            </div>
                                         </div>
-                                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.item_status)}`}>
-                                            {order.item_status}
-                                        </span>
+                                        <div className="text-right">
+                                            <p className="text-sm text-slate-500 font-mono">{new Date(order.order_date).toLocaleString()}</p>
+                                        </div>
                                     </div>
-                                    <div className="text-sm text-slate-500 mt-2">Total: Rs. {order.order_total_amount}</div>
+
+                                    <div className="py-3 border-t border-slate-100 bg-slate-50 rounded-lg px-4">
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Payment</p>
+                                                <p className="text-sm font-medium text-slate-900">
+                                                    Payment ID: {order.payment_id || 'Pending'}
+                                                </p>
+                                            </div>
+                                            <p className="text-lg font-bold text-gold-600">
+                                                Total: Rs. {order.order_total_amount || '0.00'}
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -264,18 +364,40 @@ const ReceptionistBookings = () => {
                     {activeTab === 'vehicles' && (
                         <div className="space-y-4">
                             {bookings.vehicles.map((vb, idx) => (
-                                <div key={idx} className="p-4 border border-slate-200 rounded-lg">
-                                    <div className="flex justify-between items-start mb-2">
+                                <div key={idx} className="p-5 border border-slate-200 rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-4">
                                         <div>
-                                            <h4 className="font-bold text-slate-900">{vb.vehicle_type}</h4>
-                                            <p className="text-sm text-slate-500">Guest: {vb.guest_name}</p>
+                                            <div className="flex items-center gap-3 mb-1">
+                                                <h4 className="font-bold text-lg text-slate-900">{vb.vehicle_type}</h4>
+                                                <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getStatusColor(vb.vb_status)}`}>
+                                                    {vb.vb_status}
+                                                </span>
+                                            </div>
+                                            <div className="text-sm text-slate-600 space-y-1">
+                                                <p><span className="font-medium">Guest:</span> {vb.guest_name}</p>
+                                                <p><span className="font-medium">Phone:</span> {vb.guest_phone}</p>
+                                                <p><span className="font-medium">From:</span> {vb.nationality}</p>
+                                            </div>
                                         </div>
-                                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(vb.vb_status)}`}>
-                                            {vb.vb_status}
-                                        </span>
+                                        <div className="text-right">
+                                            <p className="text-sm text-slate-500">Booking ID: <span className="font-mono">#{vb.vb_id}</span></p>
+                                        </div>
                                     </div>
-                                    <div className="text-sm text-slate-500 mt-2">
-                                        Date: {formatDate(vb.vb_date)}
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-3 border-t border-slate-100 bg-slate-50 rounded-lg px-4">
+                                        <div>
+                                            <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Journey Date</p>
+                                            <p className="text-sm font-medium text-slate-900">
+                                                {formatDate(vb.vb_date)}
+                                            </p>
+                                            <p className="text-xs text-slate-500 mt-1">Duration: {vb.vb_days} Days</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Financials</p>
+                                            <p className="text-sm font-medium text-slate-900">
+                                                Payment ID: {vb.vb_payment_id || 'Pending'}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             ))}

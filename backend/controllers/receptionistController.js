@@ -52,7 +52,13 @@ exports.getAllGuests = async (req, res) => {
 exports.getAllRoomBookings = async (req, res) => {
     try {
         const [bookings] = await db.query(
-            `SELECT rb.*, u.name as guest_name, u.phone as guest_phone, r.room_type, r.room_price_per_day
+            `SELECT rb.*, 
+                    u.name as guest_name, 
+                    u.phone as guest_phone, 
+                    g.guest_address,
+                    g.nationality,
+                    r.room_type, 
+                    r.room_price_per_day
              FROM roombooking rb 
              JOIN Guest g ON rb.guest_id = g.guest_id
              JOIN Users u ON g.user_id = u.user_id
@@ -70,7 +76,13 @@ exports.getAllRoomBookings = async (req, res) => {
 exports.getAllActivityBookings = async (req, res) => {
     try {
         const [bookings] = await db.query(
-            `SELECT ab.*, u.name as guest_name, u.phone as guest_phone, a.activity_name, a.activity_price_per_hour
+            `SELECT ab.*, 
+                    u.name as guest_name, 
+                    u.phone as guest_phone, 
+                    g.guest_address,
+                    g.nationality,
+                    a.activity_name, 
+                    a.activity_price_per_hour
              FROM activitybooking ab 
              JOIN Guest g ON ab.guest_id = g.guest_id 
              JOIN Users u ON g.user_id = u.user_id
@@ -95,19 +107,38 @@ exports.updateActivityBookingStatus = async (req, res) => {
 }
 
 // Refunds Management
+// Refunds Management
 exports.getRefundRequests = async (req, res) => {
     try {
+        const { status } = req.query;
+        let whereClause = "";
+
+        if (status === 'Pending') {
+            whereClause = "WHERE r.refund_status = 'Pending'";
+        } else if (status === 'History') {
+            whereClause = "WHERE r.refund_status IN ('Approved', 'Rejected')";
+        }
+
         const [refunds] = await db.query(
-            `SELECT r.*, p.service_type, u.name as guest_name, u.email as guest_email 
+            `SELECT r.*, 
+                    CASE 
+                        WHEN rb.rb_id IS NOT NULL THEN 'Room'
+                        WHEN ab.ab_id IS NOT NULL THEN 'Activity'
+                        WHEN vb.vb_id IS NOT NULL THEN 'Vehicle'
+                        WHEN fo.order_id IS NOT NULL THEN 'Food'
+                        ELSE 'Unknown'
+                    END as service_type,
+                    u.name as guest_name, 
+                    u.email as guest_email 
              FROM refund r
              JOIN payment p ON r.payment_id = p.payment_id
-             LEFT JOIN roombooking rb ON p.service_type = 'Room' AND p.service_id = rb.rb_id
-             LEFT JOIN activitybooking ab ON p.service_type = 'Activity' AND p.service_id = ab.ab_id
-             LEFT JOIN vehiclebooking vb ON p.service_type = 'Vehicle' AND p.service_id = vb.vb_id
-             LEFT JOIN foodorder fo ON p.service_type = 'Food' AND p.service_id = fo.order_id
+             LEFT JOIN roombooking rb ON p.payment_id = rb.rb_payment_id
+             LEFT JOIN activitybooking ab ON p.payment_id = ab.ab_payment_id
+             LEFT JOIN vehiclebooking vb ON p.payment_id = vb.vb_payment_id
+             LEFT JOIN foodorder fo ON p.payment_id = fo.payment_id
              LEFT JOIN Guest g ON COALESCE(rb.guest_id, ab.guest_id, vb.guest_id, fo.guest_id) = g.guest_id
              LEFT JOIN Users u ON g.user_id = u.user_id
-             WHERE r.refund_status = "Pending"
+             ${whereClause}
              ORDER BY r.refund_date DESC`
         );
         res.json(refunds);
@@ -131,10 +162,16 @@ exports.processRefund = async (req, res) => {
 exports.getAllVehicleBookings = async (req, res) => {
     try {
         const [bookings] = await db.query(
-            `SELECT vb.*, u.name as guest_name, u.phone as guest_phone 
+            `SELECT vb.*, 
+                    u.name as guest_name, 
+                    u.phone as guest_phone,
+                    g.guest_address,
+                    g.nationality,
+                    v.vehicle_type
              FROM vehiclebooking vb 
              JOIN Guest g ON vb.guest_id = g.guest_id
              JOIN Users u ON g.user_id = u.user_id
+             LEFT JOIN vehicle v ON vb.vehicle_id = v.vehicle_id
              ORDER BY vb.vb_date DESC`
         );
         res.json(bookings);
@@ -146,10 +183,21 @@ exports.getAllVehicleBookings = async (req, res) => {
 exports.getAllFoodOrders = async (req, res) => {
     try {
         const [orders] = await db.query(
-            `SELECT fo.*, u.name as guest_name, u.phone as guest_phone 
+            `SELECT fo.*, 
+                    u.name as guest_name, 
+                    u.phone as guest_phone,
+                    g.guest_address,
+                    g.nationality,
+                    p.payment_amount,
+                    COALESCE(p.payment_amount, SUM(oi.subtotal), 0) as order_total_amount,
+                    GROUP_CONCAT(CONCAT(mi.item_name, ' (x', oi.quantity, ')') SEPARATOR ', ') as item_details
              FROM foodorder fo 
              JOIN Guest g ON fo.guest_id = g.guest_id
              JOIN Users u ON g.user_id = u.user_id
+             LEFT JOIN payment p ON fo.payment_id = p.payment_id
+             LEFT JOIN orderitem oi ON fo.order_id = oi.order_id
+             LEFT JOIN menuitem mi ON oi.item_id = mi.item_id
+             GROUP BY fo.order_id
              ORDER BY fo.order_date DESC`
         );
         res.json(orders);
@@ -265,10 +313,9 @@ exports.updateRoomStatus = async (req, res) => {
 
             // Find active bookings (using DISTINCT to avoid duplicates from JOIN)
             const [activeBookings] = await connection.query(
-                `SELECT DISTINCT rb.rb_id, 
-                        (SELECT p2.payment_id FROM payment p2 WHERE p2.service_type = 'Room' AND p2.service_id = rb.rb_id LIMIT 1) as payment_id,
-                        (SELECT p2.payment_amount FROM payment p2 WHERE p2.service_type = 'Room' AND p2.service_id = rb.rb_id LIMIT 1) as payment_amount
+                `SELECT DISTINCT rb.rb_id, rb.rb_payment_id, p.payment_amount
                  FROM roombooking rb
+                 LEFT JOIN payment p ON rb.rb_payment_id = p.payment_id
                  WHERE rb.room_id = ? 
                  AND rb.rb_checkout >= ?
                  AND rb.rb_status IN ('Pending', 'Confirmed', 'Checked-in', 'Booked')`,
@@ -294,10 +341,10 @@ exports.updateRoomStatus = async (req, res) => {
                     );
 
                     // Create Refund if payment exists
-                    if (booking.payment_id && booking.payment_amount) {
+                    if (booking.rb_payment_id && booking.payment_amount) {
                         await connection.query(
                             'INSERT INTO refund (payment_id, refund_amount, refund_reason, refund_status) VALUES (?, ?, ?, "Pending")',
-                            [booking.payment_id, booking.payment_amount, `Room Unavailable: ${reason}`]
+                            [booking.rb_payment_id, booking.payment_amount, `Room Unavailable: ${reason}`]
                         );
                     }
                 }
@@ -345,10 +392,9 @@ exports.updateActivityStatus = async (req, res) => {
 
             // Find active bookings (using DISTINCT to avoid duplicates)
             const [activeBookings] = await connection.query(
-                `SELECT DISTINCT ab.ab_id, ab.ab_payment_id,
-                        (SELECT p2.payment_id FROM payment p2 WHERE p2.service_type = 'Activity' AND p2.service_id = ab.ab_id LIMIT 1) as payment_id,
-                        (SELECT p2.payment_amount FROM payment p2 WHERE p2.service_type = 'Activity' AND p2.service_id = ab.ab_id LIMIT 1) as payment_amount
+                `SELECT DISTINCT ab.ab_id, ab.ab_payment_id, p.payment_amount
                  FROM activitybooking ab
+                 LEFT JOIN payment p ON ab.ab_payment_id = p.payment_id
                  WHERE ab.activity_id = ? 
                  AND ab.ab_end_time >= ?
                  AND ab.ab_status IN ('Pending', 'Reserved', 'Confirmed')`,
@@ -373,12 +419,11 @@ exports.updateActivityStatus = async (req, res) => {
                         [reason, booking.ab_id]
                     );
 
-                    // Create Refund if payment exists (use ab_payment_id from ActivityBooking or payment join)
-                    const paymentId = booking.ab_payment_id || booking.payment_id;
-                    if (paymentId && booking.payment_amount) {
+                    // Create Refund if payment exists
+                    if (booking.ab_payment_id && booking.payment_amount) {
                         await connection.query(
                             'INSERT INTO refund (payment_id, refund_amount, refund_reason, refund_status) VALUES (?, ?, ?, "Pending")',
-                            [paymentId, booking.payment_amount, `Activity Unavailable: ${reason}`]
+                            [booking.ab_payment_id, booking.payment_amount, `Activity Unavailable: ${reason}`]
                         );
                     }
                 }

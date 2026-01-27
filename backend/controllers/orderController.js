@@ -49,10 +49,10 @@ exports.placeOrder = async (req, res) => {
                 );
             }
 
-            // 3. Create Payment record (Without method)
+            // 3. Create Payment record
             const [paymentResult] = await connection.query(
-                'INSERT INTO payment (payment_amount, service_type, service_id, payment_status) VALUES (?, ?, ?, ?)',
-                [total_amount, 'Food', order_id, 'Success']
+                'INSERT INTO payment (payment_amount, payment_status) VALUES (?, ?)',
+                [total_amount, 'Success']
             );
             const payment_id = paymentResult.insertId;
 

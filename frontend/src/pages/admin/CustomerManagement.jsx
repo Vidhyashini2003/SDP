@@ -55,9 +55,7 @@ const CustomerManagement = () => {
                     <h1 className="text-3xl font-bold text-slate-900">Customer Management</h1>
                     <p className="text-slate-500 mt-1">View and manage registered guests</p>
                 </div>
-                <div className="bg-white p-2 rounded-lg shadow-sm border border-gray-200">
-                    <UserGroupIcon className="w-6 h-6 text-gold-600" />
-                </div>
+
             </div>
 
             {/* Search */}

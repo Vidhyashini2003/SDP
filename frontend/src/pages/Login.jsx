@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
 
+import royalHotelBg from '../assets/royal_hotel_interior.jpg';
+
 const Login = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -38,11 +40,11 @@ const Login = () => {
             {/* Background Image with Overlay */}
             <div className="absolute inset-0 z-0 overflow-hidden">
                 <img
-                    src="https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80"
+                    src={royalHotelBg}
                     alt="Luxury Hotel"
-                    className="h-full w-full object-cover opacity-40 grayscale"
+                    className="h-full w-full object-cover opacity-100"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
             </div>
 
             {/* Login Form */}

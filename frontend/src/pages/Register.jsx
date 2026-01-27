@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
 
+import royalHotelBg from '../assets/royal_hotel_interior.jpg';
+
 const Register = () => {
     const navigate = useNavigate();
     const { registerGuest } = useAuth();
@@ -54,11 +56,11 @@ const Register = () => {
             {/* Background Image */}
             <div className="absolute inset-0 z-0 overflow-hidden">
                 <img
-                    src="https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80"
-                    alt="Resort Pool"
-                    className="h-full w-full object-cover opacity-30 grayscale"
+                    src={royalHotelBg}
+                    alt="Luxury Hotel"
+                    className="h-full w-full object-cover opacity-100"
                 />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-black/90" />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/20 to-black/40" />
             </div>
 
             {/* Registration Form */}
