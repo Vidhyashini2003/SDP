@@ -26,10 +26,10 @@ exports.getDashboardStats = async (req, res) => {
             ]),
             // 5: Revenue by Type
             db.query(`
-                SELECT booking_type, COUNT(*) as count, SUM(payment_amount) as total 
+                SELECT service_type, COUNT(*) as count, SUM(payment_amount) as total 
                 FROM payment 
                 WHERE payment_status = 'Success' 
-                GROUP BY booking_type
+                GROUP BY service_type
             `)
         ]);
 
@@ -299,3 +299,30 @@ exports.getAllReports = async (req, res) => {
         res.json(reports);
     } catch (error) { res.status(500).json({ error: 'Error fetching reports' }); }
 }
+
+// --- Menu Item Management ---
+
+exports.getAllMenuItems = async (req, res) => {
+    try {
+        const [items] = await db.query('SELECT * FROM menuitem ORDER BY item_id');
+        res.json(items);
+    } catch (error) {
+        console.error('Error fetching menu items:', error);
+        res.status(500).json({ error: 'Failed to fetch menu items' });
+    }
+};
+
+exports.updateMenuItemStatus = async (req, res) => {
+    try {
+        const { id } = req.params; // item_id
+        const { status } = req.body; // 'Available' or 'Unavailable'
+
+        await db.query('UPDATE menuitem SET item_availability = ? WHERE item_id = ?', [status, id]);
+
+        res.json({ message: 'Menu item status updated successfully' });
+    } catch (error) {
+        console.error('Error updating menu item status:', error);
+        res.status(500).json({ error: 'Failed to update menu item status' });
+    }
+};
+

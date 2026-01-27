@@ -25,6 +25,14 @@ router.get('/bookings/orders', receptionistController.getAllFoodOrders);
 router.get('/vehicles', receptionistController.getAllVehicles);
 router.put('/vehicles/:id/status', receptionistController.updateVehicleStatus);
 
+// Room Availability Management
+router.get('/rooms', receptionistController.getAllRooms);
+router.put('/rooms/:id/status', receptionistController.updateRoomStatus);
+
+// Activity Availability Management
+router.get('/activities', receptionistController.getAllActivities);
+router.put('/activities/:id/status', receptionistController.updateActivityStatus);
+
 router.get('/refunds', receptionistController.getRefundRequests);
 router.put('/refunds/:id', receptionistController.processRefund);
 

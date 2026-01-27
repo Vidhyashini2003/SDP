@@ -36,4 +36,8 @@ router.post('/vehicles', adminController.addVehicle);
 router.get('/reports', adminController.getAllReports);
 router.post('/reports', adminController.generateReport);
 
+// Menu Items
+router.get('/menu-items', adminController.getAllMenuItems);
+router.put('/menu-items/:id/status', adminController.updateMenuItemStatus);
+
 module.exports = router;

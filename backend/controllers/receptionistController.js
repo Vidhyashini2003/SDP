@@ -238,3 +238,165 @@ exports.updateVehicleStatus = async (req, res) => {
         connection.release();
     }
 };
+
+// --- Room Availability Management ---
+
+exports.getAllRooms = async (req, res) => {
+    try {
+        const [rooms] = await db.query('SELECT * FROM room ORDER BY room_id');
+        res.json(rooms);
+    } catch (error) {
+        console.error('Error fetching rooms:', error);
+        res.status(500).json({ error: 'Failed to fetch rooms' });
+    }
+};
+
+exports.updateRoomStatus = async (req, res) => {
+    const connection = await db.getConnection();
+    try {
+        const { id } = req.params; // room_id
+        const { status, reason } = req.body; // 'Available', 'Maintenance'
+
+        await connection.beginTransaction();
+
+        // If status is NOT 'Available', we must check for future bookings
+        if (status !== 'Available') {
+            const today = new Date().toISOString().split('T')[0];
+
+            // Find active bookings (using DISTINCT to avoid duplicates from JOIN)
+            const [activeBookings] = await connection.query(
+                `SELECT DISTINCT rb.rb_id, 
+                        (SELECT p2.payment_id FROM payment p2 WHERE p2.service_type = 'Room' AND p2.service_id = rb.rb_id LIMIT 1) as payment_id,
+                        (SELECT p2.payment_amount FROM payment p2 WHERE p2.service_type = 'Room' AND p2.service_id = rb.rb_id LIMIT 1) as payment_amount
+                 FROM roombooking rb
+                 WHERE rb.room_id = ? 
+                 AND rb.rb_checkout >= ?
+                 AND rb.rb_status IN ('Pending', 'Confirmed', 'Checked-in', 'Booked')`,
+                [id, today]
+            );
+
+            if (activeBookings.length > 0) {
+                if (!reason) {
+                    await connection.rollback();
+                    return res.status(400).json({
+                        error: 'Cancellation reason is required because there are active bookings.',
+                        requiresConfirmation: true,
+                        activeBookingsCount: activeBookings.length
+                    });
+                }
+
+                // Process Cancellations & Refunds
+                for (const booking of activeBookings) {
+                    // Update Booking
+                    await connection.query(
+                        'UPDATE roombooking SET rb_status = "Cancelled", cancel_reason = ? WHERE rb_id = ?',
+                        [reason, booking.rb_id]
+                    );
+
+                    // Create Refund if payment exists
+                    if (booking.payment_id && booking.payment_amount) {
+                        await connection.query(
+                            'INSERT INTO refund (payment_id, refund_amount, refund_reason, refund_status) VALUES (?, ?, ?, "Pending")',
+                            [booking.payment_id, booking.payment_amount, `Room Unavailable: ${reason}`]
+                        );
+                    }
+                }
+            }
+        }
+
+        // Update Room Status
+        await connection.query('UPDATE room SET room_status = ? WHERE room_id = ?', [status, id]);
+
+        await connection.commit();
+        res.json({ message: 'Room status updated successfully' });
+
+    } catch (error) {
+        await connection.rollback();
+        console.error('Error updating room status:', error);
+        res.status(500).json({ error: 'Failed to update room status' });
+    } finally {
+        connection.release();
+    }
+};
+
+// --- Activity Availability Management ---
+
+exports.getAllActivities = async (req, res) => {
+    try {
+        const [activities] = await db.query('SELECT * FROM activity ORDER BY activity_id');
+        res.json(activities);
+    } catch (error) {
+        console.error('Error fetching activities:', error);
+        res.status(500).json({ error: 'Failed to fetch activities' });
+    }
+};
+
+exports.updateActivityStatus = async (req, res) => {
+    const connection = await db.getConnection();
+    try {
+        const { id } = req.params; // activity_id
+        const { status, reason } = req.body; // 'Available', 'Unavailable'
+
+        await connection.beginTransaction();
+
+        // If status is NOT 'Available', we must check for future bookings
+        if (status !== 'Available') {
+            const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+            // Find active bookings (using DISTINCT to avoid duplicates)
+            const [activeBookings] = await connection.query(
+                `SELECT DISTINCT ab.ab_id, ab.ab_payment_id,
+                        (SELECT p2.payment_id FROM payment p2 WHERE p2.service_type = 'Activity' AND p2.service_id = ab.ab_id LIMIT 1) as payment_id,
+                        (SELECT p2.payment_amount FROM payment p2 WHERE p2.service_type = 'Activity' AND p2.service_id = ab.ab_id LIMIT 1) as payment_amount
+                 FROM activitybooking ab
+                 WHERE ab.activity_id = ? 
+                 AND ab.ab_end_time >= ?
+                 AND ab.ab_status IN ('Pending', 'Reserved', 'Confirmed')`,
+                [id, now]
+            );
+
+            if (activeBookings.length > 0) {
+                if (!reason) {
+                    await connection.rollback();
+                    return res.status(400).json({
+                        error: 'Cancellation reason is required because there are active bookings.',
+                        requiresConfirmation: true,
+                        activeBookingsCount: activeBookings.length
+                    });
+                }
+
+                // Process Cancellations & Refunds
+                for (const booking of activeBookings) {
+                    // Update Booking
+                    await connection.query(
+                        'UPDATE activitybooking SET ab_status = "Cancelled", cancel_reason = ? WHERE ab_id = ?',
+                        [reason, booking.ab_id]
+                    );
+
+                    // Create Refund if payment exists (use ab_payment_id from ActivityBooking or payment join)
+                    const paymentId = booking.ab_payment_id || booking.payment_id;
+                    if (paymentId && booking.payment_amount) {
+                        await connection.query(
+                            'INSERT INTO refund (payment_id, refund_amount, refund_reason, refund_status) VALUES (?, ?, ?, "Pending")',
+                            [paymentId, booking.payment_amount, `Activity Unavailable: ${reason}`]
+                        );
+                    }
+                }
+            }
+        }
+
+        // Update Activity Status
+        await connection.query('UPDATE activity SET activity_status = ? WHERE activity_id = ?', [status, id]);
+
+        await connection.commit();
+        res.json({ message: 'Activity status updated successfully' });
+
+    } catch (error) {
+        await connection.rollback();
+        console.error('Error updating activity status:', error);
+        res.status(500).json({ error: 'Failed to update activity status' });
+    } finally {
+        connection.release();
+    }
+};
+

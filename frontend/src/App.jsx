@@ -33,7 +33,7 @@ import ReceptionistBookings from './pages/receptionist/Bookings';
 import ReceptionistActivities from './pages/receptionist/Activities';
 import ReceptionistRefunds from './pages/receptionist/Refunds';
 import ReceptionistDamages from './pages/receptionist/Damages';
-import VehicleAvailability from './pages/receptionist/VehicleAvailability';
+import ManageAvailability from './pages/receptionist/ManageAvailability';
 import DriverDashboard from './pages/driver/Dashboard';
 import DriverTrips from './pages/driver/Trips';
 import DriverRefunds from './pages/driver/Refunds';
@@ -75,6 +75,7 @@ const adminItems = [
     { name: 'Dashboard', path: '/admin/dashboard', icon: HomeIcon },
     { name: 'Staff Management', path: '/admin/staff', icon: ClipboardDocumentListIcon },
     { name: 'Customer Management', path: '/admin/customers', icon: UserIcon },
+    { name: 'Manage Availability', path: '/admin/availability', icon: TruckIcon },
     { name: 'Reports', path: '/admin/reports', icon: ClipboardDocumentListIcon },
     { name: 'Notifications', path: '/admin/notifications', icon: BellIcon }, // Added
 ];
@@ -83,7 +84,7 @@ const receptionistItems = [
     { name: 'Dashboard', path: '/receptionist/dashboard', icon: HomeIcon },
     { name: 'Manage Bookings', path: '/receptionist/bookings', icon: BuildingOfficeIcon },
     { name: 'Activity Bookings', path: '/receptionist/activities', icon: TicketIcon },
-    { name: 'Vehicle Availability', path: '/receptionist/vehicles', icon: TruckIcon },
+    { name: 'Manage Availability', path: '/receptionist/availability', icon: TruckIcon },
     { name: 'Refund Requests', path: '/receptionist/refunds', icon: CurrencyDollarIcon },
     { name: 'Damages', path: '/receptionist/damages', icon: ExclamationCircleIcon },
     { name: 'Notifications', path: '/receptionist/notifications', icon: BellIcon }, // Added
@@ -150,6 +151,7 @@ function App() {
                         <Route path="dashboard" element={<AdminDashboard />} />
                         <Route path="staff" element={<StaffManagement />} />
                         <Route path="customers" element={<CustomerManagement />} />
+                        <Route path="availability" element={<ManageAvailability />} />
                         <Route path="reports" element={<AdminReports />} />
                         <Route path="notifications" element={<CommonNotifications />} /> {/* Added */}
                         <Route path="profile" element={<StaffProfile />} />
@@ -166,7 +168,7 @@ function App() {
                         <Route path="dashboard" element={<ReceptionistDashboard />} />
                         <Route path="bookings" element={<ReceptionistBookings />} />
                         <Route path="activities" element={<ReceptionistActivities />} />
-                        <Route path="vehicles" element={<VehicleAvailability />} />
+                        <Route path="availability" element={<ManageAvailability />} />
                         <Route path="refunds" element={<ReceptionistRefunds />} />
                         <Route path="damages" element={<ReceptionistDamages />} />
                         <Route path="notifications" element={<CommonNotifications />} /> {/* Added */}
