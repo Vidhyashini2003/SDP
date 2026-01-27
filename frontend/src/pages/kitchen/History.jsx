@@ -67,8 +67,8 @@ const KitchenHistory = () => {
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`px-2 py-1 rounded text-xs font-bold border ${order.dining_option === 'Dine-in'
-                                                    ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                                    : 'bg-blue-50 text-blue-700 border-blue-200'
+                                                ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                                : 'bg-slate-50 text-slate-700 border-slate-200'
                                                 }`}>
                                                 {order.dining_option || 'Delivery'}
                                             </span>
@@ -87,8 +87,8 @@ const KitchenHistory = () => {
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`px-2 py-1 rounded-full text-xs font-bold ${order.order_status === 'Delivered'
-                                                    ? 'bg-green-100 text-green-700'
-                                                    : 'bg-red-100 text-red-700'
+                                                ? 'bg-green-100 text-green-700'
+                                                : 'bg-red-100 text-red-700'
                                                 }`}>
                                                 {order.order_status}
                                             </span>

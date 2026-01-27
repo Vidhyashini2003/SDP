@@ -72,7 +72,7 @@ const KitchenMenu = () => {
 
             {/* Add Item Form */}
             {isAdding && (
-                <div className="mb-8 bg-white p-6 rounded-xl shadow-lg border border-blue-100 animate-in fade-in slide-in-from-top-4">
+                <div className="mb-8 bg-white p-6 rounded-xl shadow-lg border border-slate-200 animate-in fade-in slide-in-from-top-4">
                     <h3 className="text-lg font-semibold mb-4">Add New Menu Item</h3>
                     <form onSubmit={handleAddItem} className="flex flex-col md:flex-row gap-4 items-end">
                         <div className="flex-1 w-full">
@@ -82,7 +82,7 @@ const KitchenMenu = () => {
                                 required
                                 value={newItem.item_name}
                                 onChange={e => setNewItem({ ...newItem, item_name: e.target.value })}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-gold-500"
                                 placeholder="e.g. Grilled Chicken"
                             />
                         </div>
@@ -93,7 +93,7 @@ const KitchenMenu = () => {
                                 required
                                 value={newItem.item_price}
                                 onChange={e => setNewItem({ ...newItem, item_price: e.target.value })}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-gold-500"
                                 placeholder="0.00"
                             />
                         </div>
@@ -102,7 +102,7 @@ const KitchenMenu = () => {
                             <select
                                 value={newItem.item_availability}
                                 onChange={e => setNewItem({ ...newItem, item_availability: e.target.value })}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-gold-500"
                             >
                                 <option value="Available">Available</option>
                                 <option value="Unavailable">Unavailable</option>

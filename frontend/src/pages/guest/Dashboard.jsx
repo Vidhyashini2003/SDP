@@ -103,7 +103,7 @@ const GuestDashboard = () => {
         <div className="p-6 overflow-auto">
             {/* Header */}
             <div className="mb-6">
-                <h1 className="text-3xl font-bold text-slate-900">Guest <span className="bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">Dashboard</span></h1>
+                <h1 className="text-3xl font-bold text-slate-900">Guest <span className="bg-gradient-to-r from-gold-500 to-yellow-500 bg-clip-text text-transparent">Dashboard</span></h1>
                 <p className="text-slate-500 mt-1">Welcome back! Here's an overview of your activity.</p>
             </div>
 
@@ -135,7 +135,7 @@ const GuestDashboard = () => {
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
                         </div>
                     </div>
-                    <div className="absolute -bottom-4 -right-4 w-16 h-16 bg-blue-50 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-500 ease-out" />
+                    <div className="absolute -bottom-4 -right-4 w-16 h-16 bg-gold-50 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-500 ease-out" />
                 </div>
 
                 {/* Activities */}
@@ -185,7 +185,7 @@ const GuestDashboard = () => {
             <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
                 <h3 className="text-lg font-semibold text-slate-900 mb-4">Quick Actions</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <a href="/guest/rooms" className="flex flex-col items-center justify-center p-4 bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 transition-colors">
+                    <a href="/guest/rooms" className="flex flex-col items-center justify-center p-4 bg-gold-50 text-gold-700 rounded-xl hover:bg-gold-100 transition-colors">
                         <span className="text-2xl mb-2">🏨</span>
                         <span className="font-medium text-sm">Book a Room</span>
                     </a>

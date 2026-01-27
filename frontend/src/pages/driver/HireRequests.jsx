@@ -83,7 +83,7 @@ const DriverHireRequests = () => {
 
                             <button
                                 onClick={() => handleAccept(req.vb_id)}
-                                className="w-full md:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors shadow-sm"
+                                className="w-full md:w-auto px-6 py-3 bg-gold-600 hover:bg-gold-700 text-white font-bold rounded-lg transition-colors shadow-sm"
                             >
                                 Accept Request
                             </button>

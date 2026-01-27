@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const notificationController = require('./notificationController');
 
 // Report Damage (Receptionist / Staff)
 exports.reportDamage = async (req, res) => {
@@ -11,6 +12,17 @@ exports.reportDamage = async (req, res) => {
             'INSERT INTO damage (guest_id, reported_by, damage_type, description, charge_amount) VALUES (?, ?, ?, ?, ?)',
             [guest_id, reported_by, damage_type, description, charge_amount]
         );
+
+        // Notify Guest
+        const [guest] = await db.query('SELECT user_id FROM Guest WHERE guest_id = ?', [guest_id]);
+        if (guest.length > 0) {
+            await notificationController.createNotification(
+                guest[0].user_id,
+                'New Damage Report',
+                `A damage report for '${damage_type}' has been filed. Amount: Rs. ${charge_amount}. Please review details.`,
+                'Damage'
+            );
+        }
 
         res.status(201).json({ message: 'Damage reported successfully' });
     } catch (error) {
@@ -38,16 +50,21 @@ exports.getAllDamages = async (req, res) => {
 // Get Damages by Guest ID (Guest Notification)
 exports.getDamagesByGuest = async (req, res) => {
     try {
-        const { guestId } = req.params;
+        let { guestId } = req.params;
         const userId = req.user.id;
 
         // Verify user is accessing their own data or is admin/receptionist
         if (req.user.role === 'guest') {
             // Check if this guestId belongs to the user
             const [guest] = await db.query('SELECT guest_id FROM Guest WHERE user_id = ?', [userId]);
-            if (guest.length === 0 || guest[0].guest_id !== parseInt(guestId)) {
-                return res.status(403).json({ error: 'Unauthorized' });
+
+            if (guest.length === 0) {
+                return res.status(403).json({ error: 'No guest profile found' });
             }
+
+            // Always use the real guest_id from the database for the logged-in user
+            // This overrides whatever ID was passed in the URL (which is likely the user_id from frontend)
+            guestId = guest[0].guest_id;
         }
 
         const [damages] = await db.query(
@@ -56,6 +73,7 @@ exports.getDamagesByGuest = async (req, res) => {
         );
         res.json(damages);
     } catch (error) {
+        console.error('Fetch damages error:', error);
         res.status(500).json({ error: 'Failed to fetch your damage reports' });
     }
 };

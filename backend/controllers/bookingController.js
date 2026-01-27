@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const notificationController = require('./notificationController');
 
 // --- Room Bookings ---
 
@@ -31,11 +32,11 @@ exports.getAvailableRooms = async (req, res) => {
 
 exports.createRoomBooking = async (req, res) => {
     try {
-        const { room_id, checkIn, checkOut, totalAmount, paymentMethod } = req.body;
+        const { room_id, checkIn, checkOut, totalAmount } = req.body;
         const userId = req.user.id;
 
         // Basic Validation
-        if (!room_id || !checkIn || !checkOut || !totalAmount || !paymentMethod) {
+        if (!room_id || !checkIn || !checkOut || !totalAmount) {
             return res.status(400).json({ error: 'Missing required booking details' });
         }
 
@@ -51,10 +52,10 @@ exports.createRoomBooking = async (req, res) => {
 
             await connection.beginTransaction();
 
-            // 1. Create Payment Record
+            // 1. Create Payment Record (Without method)
             const [paymentResult] = await connection.query(
-                'INSERT INTO payment (payment_amount, payment_method, service_type, payment_status) VALUES (?, ?, ?, ?)',
-                [totalAmount, paymentMethod, 'Room', 'Success'] // Assuming instant success for now
+                'INSERT INTO payment (payment_amount, service_type, payment_status) VALUES (?, ?, ?)',
+                [totalAmount, 'Room', 'Success'] // Assuming instant success for now
             );
             const payment_id = paymentResult.insertId;
 
@@ -151,7 +152,7 @@ exports.getActivitySlots = async (req, res) => {
 
 exports.createActivityBooking = async (req, res) => {
     try {
-        const { activity_id, start_time, end_time, total_amount, payment_method } = req.body;
+        const { activity_id, start_time, end_time, total_amount } = req.body;
         const userId = req.user.id;
 
         const connection = await db.getConnection();
@@ -183,8 +184,8 @@ exports.createActivityBooking = async (req, res) => {
             }
 
             const [paymentResult] = await connection.query(
-                'INSERT INTO payment (payment_amount, payment_method, service_type, payment_status) VALUES (?, ?, ?, ?)',
-                [total_amount, payment_method, 'Activity', 'Success']
+                'INSERT INTO payment (payment_amount, service_type, payment_status) VALUES (?, ?, ?)',
+                [total_amount, 'Activity', 'Success']
             );
             const payment_id = paymentResult.insertId;
 
@@ -343,13 +344,53 @@ exports.cancelBooking = async (req, res) => {
                 return res.status(400).json({ error: 'Invalid booking type' });
         }
 
-        const [booking] = await db.query(`SELECT guest_id FROM ${table} WHERE ${idField} = ?`, [id]);
+        const [booking] = await db.query(`SELECT * FROM ${table} WHERE ${idField} = ?`, [id]);
         if (booking.length === 0) return res.status(404).json({ error: 'Booking not found' });
-        if (booking[0].guest_id !== req.user.id && req.user.role !== 'receptionist' && req.user.role !== 'admin') {
+
+        // Authorization Check
+        if (booking[0].guest_id !== req.user.guest_id && req.user.role !== 'receptionist' && req.user.role !== 'admin' && req.user.role !== 'guest') {
+            // Note: req.user.guest_id might not be populated by middleware heavily, so safer to check user_id link
+            // But existing code check was: booking[0].guest_id !== req.user.id (Wait, guest_id != user_id usually)
+            // Let's stick to the previous check logic but fix it if needed. 
+            // Previous: if (booking[0].guest_id !== req.user.id ... ) <- usage of user.id against guest_id is suspicious if they are different IDs.
+            // Typically we check: SELECT user_id FROM Guest WHERE guest_id = booking[0].guest_id
+            // For now, let's assume the previous auth logic was "working" or accepted, but improved slightly:
+        }
+
+        // Better Auth Check:
+        const [guestUser] = await db.query('SELECT user_id FROM Guest WHERE guest_id = ?', [booking[0].guest_id]);
+        const bookingOwnerUserId = guestUser.length > 0 ? guestUser[0].user_id : null;
+
+        if (bookingOwnerUserId !== req.user.id && req.user.role !== 'receptionist' && req.user.role !== 'admin') {
             return res.status(403).json({ error: 'Unauthorized' });
         }
 
         await db.query(`UPDATE ${table} SET ${statusField} = 'Cancelled' WHERE ${idField} = ?`, [id]);
+
+        // --- Notifications ---
+
+        // 1. Notify Guest (if cancelled by someone else)
+        if (req.user.id !== bookingOwnerUserId) {
+            await notificationController.createNotification(
+                bookingOwnerUserId,
+                'Booking Cancelled',
+                `Your ${type} booking (ID: ${id}) has been cancelled by ${req.user.role}.`,
+                'Booking'
+            );
+        }
+
+        // 2. Notify Driver (if Vehicle Booking)
+        if (type === 'vehicle' && booking[0].driver_id) {
+            const [driverUser] = await db.query('SELECT user_id FROM Driver WHERE driver_id = ?', [booking[0].driver_id]);
+            if (driverUser.length > 0) {
+                await notificationController.createNotification(
+                    driverUser[0].user_id,
+                    'Trip Cancelled',
+                    `Vehicle trip (ID: ${id}) has been cancelled.`,
+                    'Alert'
+                );
+            }
+        }
         res.json({ message: 'Booking cancelled successfully' });
 
     } catch (error) {

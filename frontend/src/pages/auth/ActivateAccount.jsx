@@ -65,7 +65,7 @@ const ActivateAccount = () => {
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-100">
             <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-                <h2 className="text-2xl font-bold mb-6 text-center text-blue-600">Activate Account</h2>
+                <h2 className="text-2xl font-bold mb-6 text-center text-gold-600">Activate Account</h2>
 
                 {status === 'verifying' && <p className="text-center text-gray-600">Verifying link...</p>}
 
@@ -74,7 +74,7 @@ const ActivateAccount = () => {
                         <p className="text-red-500 mb-4">{error}</p>
                         <button
                             onClick={() => navigate('/login')}
-                            className="text-blue-500 hover:underline"
+                            className="text-gold-500 hover:underline"
                         >
                             Go to Login
                         </button>
@@ -101,7 +101,7 @@ const ActivateAccount = () => {
                                         type="password"
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gold-500"
                                         required
                                     />
                                 </div>
@@ -111,7 +111,7 @@ const ActivateAccount = () => {
                                         type="password"
                                         value={confirmPassword}
                                         onChange={(e) => setConfirmPassword(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gold-500"
                                         required
                                     />
                                 </div>

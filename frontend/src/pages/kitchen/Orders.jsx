@@ -135,7 +135,7 @@ const OrderCard = ({ order, onUpdateStatus, onUpdateItemStatus }) => {
                         )}
                         <span className={`px-2 py-0.5 text-xs font-bold rounded border ${order.dining_option === 'Dine-in'
                             ? 'bg-purple-50 text-purple-700 border-purple-200'
-                            : 'bg-blue-50 text-blue-700 border-blue-200'
+                            : 'bg-gold-50 text-gold-700 border-gold-200'
                             }`}>
                             {order.dining_option === 'Dine-in' ? '🍽️ Dine-in' : '🛵 Delivery'}
                         </span>
@@ -173,7 +173,7 @@ const OrderCard = ({ order, onUpdateStatus, onUpdateItemStatus }) => {
                             {item.item_status === 'Pending' && (
                                 <button
                                     onClick={() => onUpdateItemStatus(item.order_item_id, 'Preparing')}
-                                    className="p-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded transition-colors text-xs"
+                                    className="p-1 bg-gold-100 hover:bg-gold-200 text-gold-700 rounded transition-colors text-xs"
                                     title="Start Preparing"
                                 >
                                     Cook
@@ -199,8 +199,8 @@ const OrderCard = ({ order, onUpdateStatus, onUpdateItemStatus }) => {
                     <button
                         onClick={() => onUpdateStatus(order.order_id, 'Delivered')}
                         className={`w-full py-2 text-white rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 ${order.dining_option === 'Dine-in'
-                                ? 'bg-purple-600 hover:bg-purple-700'
-                                : 'bg-green-600 hover:bg-green-700'
+                            ? 'bg-purple-600 hover:bg-purple-700'
+                            : 'bg-green-600 hover:bg-green-700'
                             }`}
                     >
                         {order.dining_option === 'Dine-in' ? (

@@ -7,25 +7,31 @@ import Card from '../../components/Card';
 const Notifications = () => {
     const { user } = useAuth();
     const [damages, setDamages] = useState([]);
+    const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (user) {
-            fetchDamages();
+            fetchData();
         }
     }, [user]);
 
-    const fetchDamages = async () => {
+    const fetchData = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.get(`http://localhost:5000/api/notifications/${user.id}/damages`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setDamages(response.data);
+            const [damagesRes, notificationsRes] = await Promise.all([
+                axios.get(`http://localhost:5000/api/notifications/${user.id}/damages`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                }),
+                axios.get(`http://localhost:5000/api/notifications`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                })
+            ]);
+            setDamages(damagesRes.data);
+            setNotifications(notificationsRes.data);
             setLoading(false);
         } catch (error) {
-            console.error('Error fetching notifications:', error);
-            // toast.error('Failed to load notifications'); 
+            console.error('Error fetching data:', error);
             setLoading(false);
         }
     };
@@ -39,143 +45,132 @@ const Notifications = () => {
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             toast.success('Payment successful');
-            fetchDamages(); // Refresh list
+            fetchData(); // Refresh list
         } catch (error) {
             console.error('Payment error:', error);
             toast.error('Payment failed');
         }
     };
 
+    const markAsRead = async (id) => {
+        try {
+            const token = localStorage.getItem('token');
+            await axios.put(`http://localhost:5000/api/notifications/${id}/read`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setNotifications(prev => prev.map(n => n.notification_id === id ? { ...n, is_read: 1 } : n));
+        } catch (error) {
+            console.error('Error marking as read', error);
+        }
+    };
+
+    const deleteNotification = async (id) => {
+        try {
+            const token = localStorage.getItem('token');
+            await axios.delete(`http://localhost:5000/api/notifications/${id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setNotifications(prev => prev.filter(n => n.notification_id !== id));
+            toast.success('Notification removed');
+        } catch (error) {
+            console.error('Error deleting notification', error);
+        }
+    };
+
     const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleDateString();
+        return new Date(dateString).toLocaleDateString() + ' ' + new Date(dateString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
     const pendingDamages = damages.filter(d => d.status === 'Pending');
-    const paidDamages = damages.filter(d => d.status === 'Paid');
-    const totalPendingAmount = pendingDamages.reduce((sum, d) => sum + Number(d.charge_amount), 0);
 
     if (loading) return <div className="p-8 text-center text-slate-600">Loading notifications...</div>;
 
     return (
-        <div className="p-8 max-w-6xl mx-auto">
-            <h1 className="text-2xl font-bold mb-2">Notifications</h1>
-            <p className="text-slate-600 mb-8">Damage payment requests from staff</p>
-
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <Card className="bg-white border-l-4 border-l-orange-500">
-                    <p className="text-sm font-medium text-slate-500 mb-1">Pending Requests</p>
-                    <p className="text-3xl font-bold text-slate-800">{pendingDamages.length}</p>
-                    <p className="text-xs text-slate-400 mt-2">Awaiting action</p>
-                </Card>
-                <Card className="bg-white border-l-4 border-l-blue-500">
-                    <p className="text-sm font-medium text-slate-500 mb-1">Total Amount Due</p>
-                    <p className="text-3xl font-bold text-slate-800">Rs. {totalPendingAmount.toLocaleString()}</p>
-                    <p className="text-xs text-slate-400 mt-2">Pending payments</p>
-                </Card>
-                <Card className="bg-white border-l-4 border-l-green-500">
-                    <p className="text-sm font-medium text-slate-500 mb-1">Paid Requests</p>
-                    <p className="text-3xl font-bold text-slate-800">{paidDamages.length}</p>
-                    <p className="text-xs text-slate-400 mt-2">Completed</p>
-                </Card>
+        <div className="p-8 max-w-6xl mx-auto space-y-8">
+            <div>
+                <h1 className="text-2xl font-bold mb-2">Notifications Center</h1>
+                <p className="text-slate-600">Stay updated with your bookings and alerts</p>
             </div>
 
-            {/* Pending Requests */}
+            {/* ACTIONABLE ALERTS (DAMAGES) */}
             {pendingDamages.length > 0 && (
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-8">
-                    <div className="p-6 border-b border-slate-100 flex items-center gap-3">
-                        <svg className="w-5 h-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                        </svg>
-                        <div>
-                            <h2 className="text-lg font-bold text-slate-800">Payment Requests</h2>
-                            <p className="text-sm text-slate-500">Damage payment requests from hotel staff</p>
-                        </div>
+                <div className="bg-red-50 border border-red-200 rounded-xl p-6 shadow-sm animate-pulse-slow">
+                    <div className="flex items-center gap-3 mb-4">
+                        <span className="text-2xl">⚠️</span>
+                        <h2 className="text-lg font-bold text-red-800">Action Required: Unpaid Damages</h2>
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead>
-                                <tr className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-100">
-                                    <th className="px-6 py-4">From</th>
-                                    <th className="px-6 py-4">Type</th>
-                                    <th className="px-6 py-4 w-1/3">Description</th>
-                                    <th className="px-6 py-4">Date</th>
-                                    <th className="px-6 py-4">Amount</th>
-                                    <th className="px-6 py-4">Status</th>
-                                    <th className="px-6 py-4">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {pendingDamages.map((damage) => (
-                                    <tr key={damage.damage_id} className="hover:bg-slate-50">
-                                        <td className="px-6 py-4 text-slate-600">{damage.reported_by || 'Staff'}</td>
-                                        <td className="px-6 py-4 text-slate-700 font-medium">{damage.damage_type}</td>
-                                        <td className="px-6 py-4 text-slate-600">{damage.description}</td>
-                                        <td className="px-6 py-4 text-slate-500">{formatDate(damage.report_date)}</td>
-                                        <td className="px-6 py-4 text-blue-600 font-semibold">Rs. {Number(damage.charge_amount).toLocaleString()}</td>
-                                        <td className="px-6 py-4">
-                                            <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-100 text-teal-700">
-                                                {damage.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
+                    <div className="space-y-4">
+                        {pendingDamages.map((damage) => (
+                            <div key={damage.damage_id} className="bg-white p-4 rounded-lg border border-red-100 flex justify-between items-center shadow-sm">
+                                <div>
+                                    <p className="font-semibold text-slate-900">{damage.damage_type}</p>
+                                    <p className="text-sm text-slate-600">{damage.description}</p>
+                                    <p className="text-xs text-slate-400 mt-1">{formatDate(damage.report_date)}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-lg font-bold text-red-600 mb-2">Rs. {Number(damage.charge_amount).toLocaleString()}</p>
+                                    <button
+                                        onClick={() => handlePay(damage.damage_id)}
+                                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                                    >
+                                        Pay Now
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* GENERAL NOTIFICATIONS */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-6 border-b border-slate-100 bg-slate-50">
+                    <h2 className="text-lg font-bold text-slate-800">Recent Updates</h2>
+                </div>
+                <div className="divide-y divide-slate-100">
+                    {notifications.length === 0 ? (
+                        <div className="p-8 text-center text-slate-500 italic">No new notifications</div>
+                    ) : (
+                        notifications.map((notification) => (
+                            <div
+                                key={notification.notification_id}
+                                className={`p-6 transition-colors hover:bg-slate-50 flex gap-4 ${!notification.is_read ? 'bg-blue-50/50' : 'bg-white'}`}
+                            >
+                                <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${!notification.is_read ? 'bg-blue-500' : 'bg-slate-300'}`} />
+                                <div className="flex-1">
+                                    <div className="flex justify-between items-start mb-1">
+                                        <h4 className={`text-base ${!notification.is_read ? 'font-bold text-slate-900' : 'font-semibold text-slate-700'}`}>
+                                            {notification.title}
+                                        </h4>
+                                        <span className="text-xs text-slate-400 whitespace-nowrap ml-4">
+                                            {formatDate(notification.created_at)}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-slate-600 leading-relaxed mb-3">
+                                        {notification.message}
+                                    </p>
+                                    <div className="flex gap-4">
+                                        {!notification.is_read && (
                                             <button
-                                                onClick={() => handlePay(damage.damage_id)}
-                                                className="bg-cyan-700 hover:bg-cyan-800 text-white px-4 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all"
+                                                onClick={() => markAsRead(notification.notification_id)}
+                                                className="text-xs font-semibold text-blue-600 hover:text-blue-800"
                                             >
-                                                Pay Now
+                                                Mark as read
                                             </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                        )}
+                                        <button
+                                            onClick={() => deleteNotification(notification.notification_id)}
+                                            className="text-xs font-semibold text-slate-400 hover:text-red-600"
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
                 </div>
-            )}
-
-            {/* Paid History (Optional, but good for completeness) */}
-            {paidDamages.length > 0 && (
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden opacity-75">
-                    <div className="p-6 border-b border-slate-100">
-                        <h2 className="text-lg font-bold text-slate-800">Payment History</h2>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead>
-                                <tr className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-100">
-                                    <th className="px-6 py-4">Type</th>
-                                    <th className="px-6 py-4">Description</th>
-                                    <th className="px-6 py-4">Date</th>
-                                    <th className="px-6 py-4">Amount</th>
-                                    <th className="px-6 py-4">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {paidDamages.map((damage) => (
-                                    <tr key={damage.damage_id} className="hover:bg-slate-50">
-                                        <td className="px-6 py-4 text-slate-700">{damage.damage_type}</td>
-                                        <td className="px-6 py-4 text-slate-600">{damage.description}</td>
-                                        <td className="px-6 py-4 text-slate-500">{formatDate(damage.report_date)}</td>
-                                        <td className="px-6 py-4 text-slate-600 font-medium">Rs. {Number(damage.charge_amount).toLocaleString()}</td>
-                                        <td className="px-6 py-4">
-                                            <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                                                Paid
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            )}
-
-            {damages.length === 0 && (
-                <div className="text-center py-12 bg-white rounded-xl border border-slate-200 border-dashed">
-                    <p className="text-slate-500">No damage requests found.</p>
-                </div>
-            )}
+            </div>
         </div>
     );
 };

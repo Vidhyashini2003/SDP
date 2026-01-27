@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const notificationController = require('./notificationController');
 
 // --- Guest/Public: Menu & Ordering ---
 
@@ -13,7 +14,7 @@ exports.getMenu = async (req, res) => {
 
 exports.placeOrder = async (req, res) => {
     try {
-        const { items, total_amount, payment_method, dining_option } = req.body;
+        const { items, total_amount, dining_option } = req.body;
         const userId = req.user.id; // user_id
 
         const connection = await db.getConnection();
@@ -28,10 +29,10 @@ exports.placeOrder = async (req, res) => {
             }
             const guest_id = guestRows[0].guest_id;
 
-            // 1. Create Order in foodorder table
+            // 1. Create Order in foodorder table (Removed total_amount)
             const [orderResult] = await connection.query(
-                'INSERT INTO foodorder (guest_id, total_amount, payment_method, order_status, dining_option) VALUES (?, ?, ?, ?, ?)',
-                [guest_id, total_amount, payment_method, 'Pending', dining_option || 'Delivery']
+                'INSERT INTO foodorder (guest_id, order_status, dining_option) VALUES (?, ?, ?)',
+                [guest_id, 'Pending', dining_option || 'Delivery']
             );
             const order_id = orderResult.insertId;
 
@@ -42,20 +43,39 @@ exports.placeOrder = async (req, res) => {
                 if (menuItem.length === 0) continue;
 
                 const itemPrice = menuItem[0].item_price;
-                // subtotal is generated always in schema, so we don't insert it. Schema: order_id, item_id, quantity, item_price
                 await connection.query(
                     'INSERT INTO orderitem (order_id, item_id, quantity, item_price) VALUES (?, ?, ?, ?)',
                     [order_id, item.item_id, item.quantity, itemPrice]
                 );
             }
 
-            // 3. Create Payment record
-            await connection.query(
-                'INSERT INTO payment (payment_amount, payment_method, service_type, service_id, payment_status) VALUES (?, ?, ?, ?, ?)',
-                [total_amount, payment_method, 'Food', order_id, 'Success']
+            // 3. Create Payment record (Without method)
+            const [paymentResult] = await connection.query(
+                'INSERT INTO payment (payment_amount, service_type, service_id, payment_status) VALUES (?, ?, ?, ?)',
+                [total_amount, 'Food', order_id, 'Success']
             );
+            const payment_id = paymentResult.insertId;
+
+            // 4. Update FoodOrder with Payment ID
+            await connection.query('UPDATE foodorder SET payment_id = ? WHERE order_id = ?', [payment_id, order_id]);
 
             await connection.commit();
+
+            // Notify Kitchen Staff
+            try {
+                const [kitchenStaff] = await db.query("SELECT user_id FROM Users WHERE role = 'kitchen'");
+                for (const staff of kitchenStaff) {
+                    await notificationController.createNotification(
+                        staff.user_id,
+                        'New Food Order',
+                        `New order #${order_id} received. Amount: Rs. ${total_amount}.`,
+                        'Order'
+                    );
+                }
+            } catch (notifyErr) {
+                console.error('Failed to notify kitchen:', notifyErr);
+            }
+
             res.status(201).json({ message: 'Order placed successfully', orderId: order_id });
 
         } catch (err) {
@@ -76,13 +96,16 @@ exports.placeOrder = async (req, res) => {
 exports.getAllOrders = async (req, res) => {
     try {
         // Fetch all active orders with their items
+        // Joined with payment table to get total_amount
         const [rows] = await db.query(
-            `SELECT fo.order_id, fo.guest_id, fo.order_status, fo.order_date, fo.total_amount, fo.dining_option,
+            `SELECT fo.order_id, fo.guest_id, fo.order_status, fo.order_date, fo.dining_option,
+                    p.payment_amount as total_amount,
                     oi.order_item_id, oi.quantity, oi.item_price, oi.item_status, oi.subtotal,
                     mi.item_name, 
                     u.name as guest_name, 
                     r.room_number 
              FROM foodorder fo
+             LEFT JOIN payment p ON fo.payment_id = p.payment_id
              JOIN orderitem oi ON fo.order_id = oi.order_id
              JOIN menuitem mi ON oi.item_id = mi.item_id 
              JOIN Guest g ON fo.guest_id = g.guest_id
@@ -99,13 +122,13 @@ exports.getAllOrders = async (req, res) => {
             if (!ordersMap.has(row.order_id)) {
                 ordersMap.set(row.order_id, {
                     order_id: row.order_id,
-                    guest_id: row.guest_id, // Added guest_id
+                    guest_id: row.guest_id,
                     order_status: row.order_status,
                     order_date: row.order_date,
-                    total_amount: row.total_amount,
+                    total_amount: row.total_amount, // Now from payment
                     dining_option: row.dining_option || 'Delivery',
                     guest_name: row.guest_name,
-                    room_number: row.room_number || 'N/A', // Handle guests without active room (e.g. checked out or lobby)
+                    room_number: row.room_number || 'N/A',
                     items: []
                 });
             }

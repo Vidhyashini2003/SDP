@@ -3,7 +3,7 @@ import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar'; // Import Sidebar
 import ProtectedRoute from './components/ProtectedRoute';
-import { HomeIcon, BuildingOfficeIcon, TicketIcon, CurrencyDollarIcon, ExclamationCircleIcon, TruckIcon, ClipboardDocumentListIcon, CakeIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { HomeIcon, BuildingOfficeIcon, TicketIcon, CurrencyDollarIcon, ExclamationCircleIcon, TruckIcon, ClipboardDocumentListIcon, CakeIcon, ClockIcon, BellIcon, UserIcon } from '@heroicons/react/24/outline';
 
 // Public Pages
 import Home from './pages/Home';
@@ -28,6 +28,7 @@ import ReceptionistDashboard from './pages/receptionist/Dashboard';
 import AdminDashboard from './pages/admin/Dashboard';
 import StaffManagement from './pages/admin/StaffManagement';
 import CustomerManagement from './pages/admin/CustomerManagement';
+import AdminReports from './pages/admin/Reports';
 import ReceptionistBookings from './pages/receptionist/Bookings';
 import ReceptionistActivities from './pages/receptionist/Activities';
 import ReceptionistRefunds from './pages/receptionist/Refunds';
@@ -45,6 +46,7 @@ import KitchenDamages from './pages/kitchen/Damages';
 import KitchenHistory from './pages/kitchen/History';
 import StaffProfile from './pages/common/StaffProfile';
 import ChangePassword from './pages/common/ChangePassword';
+import CommonNotifications from './pages/common/Notifications';
 
 // Layouts
 const PublicLayout = () => (
@@ -70,11 +72,11 @@ const DashboardLayout = ({ items }) => (
 );
 
 const adminItems = [
-    { name: 'Dashboard', path: '/admin/dashboard' },
-    { name: 'Staff Management', path: '/admin/staff' },
-    { name: 'Customer Management', path: '/admin/customers' },
-    { name: 'Reports', path: '/admin/reports' },
-    // more items...
+    { name: 'Dashboard', path: '/admin/dashboard', icon: HomeIcon },
+    { name: 'Staff Management', path: '/admin/staff', icon: ClipboardDocumentListIcon },
+    { name: 'Customer Management', path: '/admin/customers', icon: UserIcon },
+    { name: 'Reports', path: '/admin/reports', icon: ClipboardDocumentListIcon },
+    { name: 'Notifications', path: '/admin/notifications', icon: BellIcon }, // Added
 ];
 
 const receptionistItems = [
@@ -84,6 +86,7 @@ const receptionistItems = [
     { name: 'Vehicle Availability', path: '/receptionist/vehicles', icon: TruckIcon },
     { name: 'Refund Requests', path: '/receptionist/refunds', icon: CurrencyDollarIcon },
     { name: 'Damages', path: '/receptionist/damages', icon: ExclamationCircleIcon },
+    { name: 'Notifications', path: '/receptionist/notifications', icon: BellIcon }, // Added
 ];
 
 const driverItems = [
@@ -91,6 +94,7 @@ const driverItems = [
     { name: 'Hire Requests', path: '/driver/requests', icon: ClipboardDocumentListIcon },
     { name: 'My Trips', path: '/driver/trips', icon: TruckIcon },
     { name: 'Refund Requests', path: '/driver/refunds', icon: CurrencyDollarIcon },
+    { name: 'Notifications', path: '/driver/notifications', icon: BellIcon }, // Added
 ];
 
 const kitchenItems = [
@@ -99,7 +103,10 @@ const kitchenItems = [
     { name: 'Menu Management', path: '/kitchen/menu', icon: CakeIcon },
     { name: 'Damages', path: '/kitchen/damages', icon: ExclamationCircleIcon },
     { name: 'Order History', path: '/kitchen/history', icon: ClockIcon },
+    { name: 'Notifications', path: '/kitchen/notifications', icon: BellIcon }, // Added
 ];
+
+
 
 function App() {
     return (
@@ -142,7 +149,9 @@ function App() {
                     }>
                         <Route path="dashboard" element={<AdminDashboard />} />
                         <Route path="staff" element={<StaffManagement />} />
-                        <Route path="customers" element={<CustomerManagement />} /> {/* Added Route */}
+                        <Route path="customers" element={<CustomerManagement />} />
+                        <Route path="reports" element={<AdminReports />} />
+                        <Route path="notifications" element={<CommonNotifications />} /> {/* Added */}
                         <Route path="profile" element={<StaffProfile />} />
                         <Route path="change-password" element={<ChangePassword />} />
                         <Route index element={<Navigate to="dashboard" replace />} />
@@ -150,7 +159,7 @@ function App() {
 
                     {/* Receptionist Routes */}
                     <Route path="/receptionist" element={
-                        <ProtectedRoute allowedRoles={['receptionist', 'admin']}> {/* Admin often has access */}
+                        <ProtectedRoute allowedRoles={['receptionist', 'admin']}>
                             <DashboardLayout items={receptionistItems} />
                         </ProtectedRoute>
                     }>
@@ -160,6 +169,7 @@ function App() {
                         <Route path="vehicles" element={<VehicleAvailability />} />
                         <Route path="refunds" element={<ReceptionistRefunds />} />
                         <Route path="damages" element={<ReceptionistDamages />} />
+                        <Route path="notifications" element={<CommonNotifications />} /> {/* Added */}
                         <Route path="profile" element={<StaffProfile />} />
                         <Route path="change-password" element={<ChangePassword />} />
                         <Route index element={<Navigate to="dashboard" replace />} />
@@ -175,6 +185,7 @@ function App() {
                         <Route path="requests" element={<DriverHireRequests />} />
                         <Route path="trips" element={<DriverTrips />} />
                         <Route path="refunds" element={<DriverRefunds />} />
+                        <Route path="notifications" element={<CommonNotifications />} /> {/* Added */}
                         <Route path="profile" element={<StaffProfile />} />
                         <Route path="change-password" element={<ChangePassword />} />
                         <Route index element={<Navigate to="dashboard" replace />} />
@@ -191,6 +202,7 @@ function App() {
                         <Route path="menu" element={<KitchenMenu />} />
                         <Route path="damages" element={<KitchenDamages />} />
                         <Route path="history" element={<KitchenHistory />} />
+                        <Route path="notifications" element={<CommonNotifications />} /> {/* Added */}
                         <Route path="profile" element={<StaffProfile />} />
                         <Route path="change-password" element={<ChangePassword />} />
                         <Route index element={<Navigate to="dashboard" replace />} />

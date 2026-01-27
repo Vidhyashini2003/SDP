@@ -86,7 +86,7 @@ const VehicleHire = () => {
                             min={today}
                             value={searchParams.vb_date}
                             onChange={(e) => setSearchParams({ ...searchParams, vb_date: e.target.value })}
-                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gold-500"
                         />
                     </div>
                     <div className="w-full md:w-1/3">
@@ -98,14 +98,14 @@ const VehicleHire = () => {
                             max="30"
                             value={searchParams.vb_days}
                             onChange={(e) => setSearchParams({ ...searchParams, vb_days: e.target.value })}
-                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gold-500"
                         />
                     </div>
                     <div className="w-full md:w-1/3">
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors flex justify-center items-center gap-2"
+                            className="w-full py-2.5 bg-gold-500 hover:bg-gold-600 text-white font-bold rounded-lg transition-colors flex justify-center items-center gap-2"
                         >
                             {loading ? 'Searching...' : 'Search Vehicles'}
                         </button>
@@ -136,7 +136,7 @@ const VehicleHire = () => {
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span className="text-slate-500">💰</span>
-                                        <span>Per Day: <span className="font-semibold text-blue-600">Rs. {vehicle.vehicle_price_per_day}</span></span>
+                                        <span>Per Day: <span className="font-semibold text-gold-600">Rs. {vehicle.vehicle_price_per_day}</span></span>
                                     </div>
                                     <div className="flex items-center gap-2 pt-2 border-t border-slate-100 mt-2">
                                         <span className="font-bold text-slate-900">Total Est:</span>
@@ -147,7 +147,7 @@ const VehicleHire = () => {
                                 <button
                                     onClick={() => handleRequestHire(vehicle)}
                                     disabled={requesting === vehicle.vehicle_id}
-                                    className="w-full py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="w-full py-3 bg-gold-600 text-white rounded-lg hover:bg-gold-700 transition-colors font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {requesting === vehicle.vehicle_id ? 'Sending Request...' : 'Request Hire'}
                                 </button>

@@ -133,8 +133,8 @@ exports.inviteStaff = async (req, res) => {
             );
         } else if (role === 'driver') {
             await connection.query(
-                "INSERT INTO Driver (user_id) VALUES (?)",
-                [userId]
+                "INSERT INTO Driver (user_id, driver_address) VALUES (?, ?)",
+                [userId, address]
             );
         } else {
             await connection.rollback();
@@ -201,12 +201,29 @@ exports.updateStaff = async (req, res) => {
         // Update basic User info
         await db.query('UPDATE Users SET name = ?, email = ?, phone = ? WHERE user_id = ?', [name, email, phone, id]);
 
-        // If address/nationality provided, try updating Guest table (safely ignored if user is not a guest)
-        if (address !== undefined || nationality !== undefined) {
-            // Check if user is a guest first to avoid errors if we were to strictly separate logic, 
-            // but here we can just attempt update if it exists in Guest table.
-            // A cleaner way is to check role, but for now we'll assumes this endpoint handles the "Edit Customer" request which includes these fields.
-            await db.query('UPDATE Guest SET guest_address = ?, nationality = ? WHERE user_id = ?', [address, nationality, id]);
+        // Fetch User Role to know which table to update
+        const [users] = await db.query('SELECT role FROM Users WHERE user_id = ?', [id]);
+
+        if (users.length > 0) {
+            const role = users[0].role;
+
+            if (role === 'guest') {
+                if (address !== undefined || nationality !== undefined) {
+                    await db.query('UPDATE Guest SET guest_address = ?, nationality = ? WHERE user_id = ?', [address, nationality, id]);
+                }
+            } else if (role === 'driver') {
+                if (address !== undefined) {
+                    await db.query('UPDATE Driver SET driver_address = ? WHERE user_id = ?', [address, id]);
+                }
+            } else if (role === 'receptionist') {
+                if (address !== undefined) {
+                    await db.query('UPDATE Receptionist SET receptionist_address = ? WHERE user_id = ?', [address, id]);
+                }
+            } else if (role === 'kitchen') {
+                if (address !== undefined) {
+                    await db.query('UPDATE KitchenStaff SET staff_address = ? WHERE user_id = ?', [address, id]);
+                }
+            }
         }
 
         res.json({ message: 'User updated successfully' });

@@ -53,7 +53,7 @@ const ReceptionistBookings = () => {
             'checked-in': 'bg-blue-500',
             'confirmed': 'bg-green-500',
             'pending': 'bg-yellow-500',
-            'active': 'bg-blue-500',
+            'active': 'bg-gold-500',
             'booked': 'bg-green-500',
             'delivered': 'bg-green-500',
             'ordered': 'bg-yellow-500',
@@ -108,7 +108,7 @@ const ReceptionistBookings = () => {
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`px-4 py-4 text-sm font-medium transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === tab.id
-                                    ? 'text-blue-600 border-b-2 border-blue-600'
+                                    ? 'text-gold-600 border-b-2 border-gold-600'
                                     : 'text-slate-600 hover:text-slate-900 border-b-2 border-transparent'
                                     }`}
                             >

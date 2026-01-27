@@ -43,30 +43,31 @@ const ResetPassword = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center px-4 relative">
+        <div className="min-h-screen flex items-center justify-center px-4 relative bg-black">
             {/* Background Image */}
-            <div className="absolute inset-0 z-0">
+            <div className="absolute inset-0 z-0 overflow-hidden">
                 <img
-                    src="https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80"
-                    alt="Hotel Background"
-                    className="h-full w-full object-cover"
+                    src="https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80"
+                    alt="Luxury Hotel"
+                    className="h-full w-full object-cover opacity-30 grayscale"
                 />
-                <div className="absolute inset-0 bg-gradient-to-br from-slate-900/70 to-slate-900/50" />
+                <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-black/60 to-black/80" />
             </div>
 
-            <div className="max-w-md w-full bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-slate-100 relative z-10">
+            <div className="max-w-md w-full bg-slate-900/90 backdrop-blur-xl rounded-2xl shadow-2xl p-8 border border-gold-500/30 relative z-10">
                 <div className="text-center mb-8">
-                    <h1 className="text-2xl font-serif font-bold text-gold-600 mb-2 uppercase tracking-wider">Reset Password</h1>
-                    <p className="text-slate-500 text-sm">Enter your new password below.</p>
+                    <h1 className="text-2xl font-serif font-bold text-gold-500 mb-2 uppercase tracking-widest">Reset Password</h1>
+                    <div className="h-0.5 w-10 bg-gold-500/50 mx-auto mb-4 rounded-full"></div>
+                    <p className="text-slate-400 text-sm font-light">Secure your account with a new password.</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">New Password</label>
+                        <label className="block text-xs font-semibold text-gold-500/80 uppercase tracking-wider mb-2 ml-1">New Password</label>
                         <input
                             type="password"
                             required
-                            className="w-full px-4 py-3 rounded-none border-b-2 border-slate-200 focus:border-gold-500 bg-slate-50 focus:bg-white outline-none transition-all placeholder:text-slate-400"
+                            className="w-full px-4 py-3 rounded-lg border border-slate-700 bg-black/50 text-slate-200 focus:border-gold-500 focus:ring-1 focus:ring-gold-500/50 outline-none transition-all placeholder:text-slate-600"
                             placeholder="••••••••"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
@@ -75,11 +76,11 @@ const ResetPassword = () => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Confirm Password</label>
+                        <label className="block text-xs font-semibold text-gold-500/80 uppercase tracking-wider mb-2 ml-1">Confirm Password</label>
                         <input
                             type="password"
                             required
-                            className="w-full px-4 py-3 rounded-none border-b-2 border-slate-200 focus:border-gold-500 bg-slate-50 focus:bg-white outline-none transition-all placeholder:text-slate-400"
+                            className="w-full px-4 py-3 rounded-lg border border-slate-700 bg-black/50 text-slate-200 focus:border-gold-500 focus:ring-1 focus:ring-gold-500/50 outline-none transition-all placeholder:text-slate-600"
                             placeholder="••••••••"
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
@@ -90,7 +91,7 @@ const ResetPassword = () => {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full py-4 bg-black hover:bg-slate-800 text-white font-serif font-bold text-lg uppercase tracking-widest shadow-lg hover:shadow-gold-500/20 transition-all disabled:opacity-50"
+                        className="w-full py-4 bg-gradient-to-r from-gold-600 via-gold-500 to-gold-600 text-black font-serif font-bold text-lg uppercase tracking-widest hover:shadow-[0_0_20px_rgba(234,179,8,0.3)] transition-all transform hover:-translate-y-0.5 rounded-lg border border-gold-400/20 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {loading ? 'Resetting...' : 'Reset Password'}
                     </button>

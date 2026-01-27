@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import axios from '../../config/axios'; // Use configured axios
 import { toast } from 'react-hot-toast';
+import jsPDF from 'jspdf';
+import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import autoTable from 'jspdf-autotable';
 
 const GuestBookings = () => {
     const [activeTab, setActiveTab] = useState('all');
@@ -95,6 +98,165 @@ const GuestBookings = () => {
         });
     };
 
+    const downloadReceipt = (booking, type) => {
+        const doc = new jsPDF();
+        const pageWidth = doc.internal.pageSize.width;
+
+        // --- Colors ---
+        const primaryColor = [30, 41, 59]; // Slate 800 (Navy-ish)
+        const accentColor = [218, 165, 32]; // Gold
+        const grayColor = [100, 116, 139]; // Slate 500
+
+        // --- Header ---
+        // Company Info (Left)
+        doc.setFontSize(22);
+        doc.setTextColor(...primaryColor);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Janas Blue Water Corner', 14, 20);
+
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...grayColor);
+        doc.text('123 Beach Road, Trincomalee', 14, 26);
+        doc.text('Email: info@janasblue.com | Tel: +94 77 123 4567', 14, 31);
+
+        // Receipt Label (Right)
+        doc.setFontSize(24);
+        doc.setTextColor(...accentColor);
+        doc.text('RECEIPT', pageWidth - 14, 22, { align: 'right' });
+
+        // --- Meta Data (Right below label) ---
+        let id = '';
+        let amount = 0;
+        let date = '';
+        let status = '';
+        let items = [];
+
+        // Extract Data based on Type
+        if (type === 'Room') {
+            id = booking.rb_id;
+            amount = booking.total_price;
+            date = booking.created_at || new Date().toISOString();
+            status = booking.rb_status;
+            items = [
+                ['Room Booking', `Type: ${booking.room_type}\nCheck-in: ${formatDate(booking.check_in_date)}\nCheck-out: ${formatDate(booking.check_out_date)}`, '1', `Rs. ${amount}`]
+            ];
+        } else if (type === 'Activity') {
+            id = booking.ab_id;
+            amount = booking.total_price || 0;
+            date = booking.booking_date;
+            status = booking.ab_status;
+            items = [
+                ['Activity Booking', `${booking.activity_name}\nDate: ${formatDate(booking.booking_date)}\nDuration: ${booking.duration_hours} Hrs`, '1', `Rs. ${amount}`]
+            ];
+        } else if (type === 'Vehicle') {
+            id = booking.vb_id;
+            amount = booking.total_amount || (booking.vehicle_price_per_day * booking.vb_days);
+            date = booking.booking_date;
+            status = booking.vb_status;
+            items = [
+                ['Vehicle Rental', `${booking.vehicle_type} - ${booking.vehicle_number}\nDate: ${formatDate(booking.booking_date)}`, `${booking.vb_days} Days`, `Rs. ${amount}`]
+            ];
+        } else if (type === 'Food') {
+            id = booking.order_id;
+            amount = booking.order_total_amount;
+            date = booking.order_date;
+            status = booking.payment_status || booking.order_status;
+            items = booking.items.map(item => [
+                'Food Order',
+                item.item_name,
+                item.order_quantity,
+                `Rs. ${item.order_total_amount || (item.item_price * item.order_quantity)}`
+            ]);
+        }
+
+        const receiptNo = `${type.substring(0, 2).toUpperCase()}-${String(id).padStart(4, '0')}`;
+        const issueDate = new Date().toLocaleDateString();
+
+        doc.setFontSize(10);
+        doc.setTextColor(...primaryColor);
+        doc.text(`Receipt #: ${receiptNo}`, pageWidth - 14, 32, { align: 'right' });
+        doc.text(`Date: ${issueDate}`, pageWidth - 14, 37, { align: 'right' });
+
+        // --- Divider ---
+        doc.setDrawColor(226, 232, 240); // Light gray line
+        doc.setLineWidth(0.5);
+        doc.line(14, 45, pageWidth - 14, 45);
+
+        // --- Payment Status Badge ---
+        const isPaid = !['pending', 'pending payment', 'cancelled', 'rejected', 'pending approval'].includes(status?.toLowerCase());
+        const statusText = isPaid ? 'PAID' : 'NOT PAID';
+        const statusColor = isPaid ? [22, 163, 74] : [220, 38, 38]; // Green or Red
+
+        // Status Label & Box
+        doc.setFontSize(10);
+        doc.setTextColor(...grayColor);
+        doc.text('Payment Status', 14, 53);
+
+        doc.setFillColor(...(isPaid ? [220, 252, 231] : [254, 226, 226]));
+        doc.rect(14, 56, 30, 8, 'F');
+
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...statusColor);
+        doc.text(statusText, 29, 61, { align: 'center' });
+
+        // --- Table ---
+        autoTable(doc, {
+            startY: 70,
+            head: [['Item', 'Description', 'Quantity', 'Amount']],
+            body: items,
+            theme: 'plain', // Clean theme
+            headStyles: {
+                fillColor: primaryColor,
+                textColor: [255, 255, 255],
+                fontStyle: 'bold',
+                halign: 'left'
+            },
+            styles: {
+                fontSize: 10,
+                cellPadding: 6,
+                textColor: [51, 65, 85],
+                lineColor: [226, 232, 240],
+                lineWidth: 0.1
+            },
+            columnStyles: {
+                0: { cellWidth: 40, fontStyle: 'bold' },
+                1: { cellWidth: 'auto' },
+                2: { cellWidth: 30, halign: 'center' },
+                3: { cellWidth: 40, halign: 'right' }
+            }
+        });
+
+        // --- Total Section ---
+        const finalY = doc.lastAutoTable.finalY + 10;
+
+        doc.setFontSize(11);
+        doc.setTextColor(...primaryColor);
+        doc.text('Total Amount:', pageWidth - 80, finalY);
+
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...accentColor);
+        doc.text(`Rs. ${amount || 0}`, pageWidth - 14, finalY, { align: 'right' });
+
+        // --- Footer ---
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...grayColor);
+        const footerY = doc.internal.pageSize.height - 30;
+
+        doc.text('Thank you for your business!', 14, footerY);
+        doc.text('For questions concerning this receipt, please contact our front desk.', 14, footerY + 5);
+
+        // Brand Line at bottom
+        doc.setDrawColor(...accentColor);
+        doc.setLineWidth(1);
+        doc.line(14, footerY + 12, pageWidth - 14, footerY + 12);
+
+        doc.save(`Receipt_${receiptNo}.pdf`);
+    };
+
     const tabs = [
         { id: 'all', label: 'All Bookings', icon: '📋' },
         { id: 'rooms', label: 'Rooms', icon: '🏨' },
@@ -115,7 +277,7 @@ const GuestBookings = () => {
         <div className="p-6 overflow-auto">
             {/* Header */}
             <div className="mb-6">
-                <h1 className="text-3xl font-bold text-slate-900">My <span className="bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">Bookings</span></h1>
+                <h1 className="text-3xl font-bold text-slate-900">My <span className="bg-gradient-to-r from-gold-600 to-yellow-500 bg-clip-text text-transparent">Bookings</span></h1>
                 <p className="text-slate-500 mt-1">View and manage all your bookings in one place</p>
             </div>
 
@@ -128,7 +290,7 @@ const GuestBookings = () => {
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`px-4 py-3 text-sm font-medium transition-all whitespace-nowrap ${activeTab === tab.id
-                                    ? 'text-blue-600 border-b-2 border-blue-600'
+                                    ? 'text-gold-600 border-b-2 border-gold-600'
                                     : 'text-slate-600 hover:text-slate-900'
                                     }`}
                             >
@@ -249,9 +411,19 @@ const GuestBookings = () => {
                                                 <h4 className="font-semibold text-slate-900 text-lg">{booking.room_type}</h4>
                                                 <p className="text-sm text-slate-500">Booking ID: {booking.rb_id}</p>
                                             </div>
-                                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(booking.rb_status)}`}>
-                                                {booking.rb_status}
-                                            </span>
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    onClick={() => downloadReceipt(booking, 'Room')}
+                                                    className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:text-gold-600 hover:border-gold-200 hover:bg-gold-50 transition-all shadow-sm group"
+                                                    title="Download Receipt"
+                                                >
+                                                    <ArrowDownTrayIcon className="w-4 h-4 text-slate-400 group-hover:text-gold-600 transition-colors" />
+                                                    <span>Download Receipt</span>
+                                                </button>
+                                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(booking.rb_status)}`}>
+                                                    {booking.rb_status}
+                                                </span>
+                                            </div>
                                         </div>
                                         <div className="grid grid-cols-2 gap-4 text-sm">
                                             <div>
@@ -269,7 +441,7 @@ const GuestBookings = () => {
                                                 <div className="col-span-2 mt-2">
                                                     <button
                                                         onClick={() => handleCancel(booking.rb_id)}
-                                                        className="w-full text-center px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 text-sm font-medium transition-colors"
+                                                        className="w-full text-center px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-gold-50 hover:text-gold-600 hover:border-gold-200 text-sm font-medium transition-colors"
                                                     >
                                                         Cancel Booking
                                                     </button>
@@ -300,9 +472,19 @@ const GuestBookings = () => {
                                                     Duration: {activity.duration_hours} hours
                                                 </p>
                                             </div>
-                                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(activity.ab_status)}`}>
-                                                {activity.ab_status}
-                                            </span>
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    onClick={() => downloadReceipt(activity, 'Activity')}
+                                                    className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:text-gold-600 hover:border-gold-200 hover:bg-gold-50 transition-all shadow-sm group"
+                                                    title="Download Receipt"
+                                                >
+                                                    <ArrowDownTrayIcon className="w-4 h-4 text-slate-400 group-hover:text-gold-600 transition-colors" />
+                                                    <span>Download Receipt</span>
+                                                </button>
+                                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(activity.ab_status)}`}>
+                                                    {activity.ab_status}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 ))
@@ -314,28 +496,55 @@ const GuestBookings = () => {
 
                     {/* Food Orders Tab */}
                     {activeTab === 'food' && (
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                             {bookings.foodOrders.length > 0 ? (
                                 bookings.foodOrders.map((order, idx) => (
                                     <div key={idx} className="p-5 border border-slate-200 rounded-lg">
-                                        <div className="flex items-start justify-between mb-3">
+                                        <div className="flex items-start justify-between mb-4 pb-4 border-b border-slate-100">
                                             <div>
-                                                <h4 className="font-semibold text-slate-900 text-lg">{order.item_name}</h4>
-                                                <p className="text-sm text-slate-500">Order #{order.order_item_id}</p>
+                                                <h4 className="font-semibold text-slate-900 text-lg">Order #{order.order_id}</h4>
+                                                <p className="text-sm text-slate-500">
+                                                    {formatDate(order.order_date)} • {order.items.length} Items
+                                                </p>
+                                                <p className="text-xs text-slate-400 mt-1">
+                                                    Dining: {order.dining_option}
+                                                </p>
                                             </div>
-                                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.item_status || order.order_status)}`}>
-                                                {order.item_status || order.order_status}
-                                            </span>
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    onClick={() => downloadReceipt(order, 'Food')}
+                                                    className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:text-gold-600 hover:border-gold-200 hover:bg-gold-50 transition-all shadow-sm group"
+                                                    title="Download Receipt"
+                                                >
+                                                    <ArrowDownTrayIcon className="w-4 h-4 text-slate-400 group-hover:text-gold-600 transition-colors" />
+                                                    <span>Download Receipt</span>
+                                                </button>
+                                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.order_status)}`}>
+                                                    {order.order_status}
+                                                </span>
+                                            </div>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-4 text-sm">
-                                            <div>
-                                                <p className="text-slate-500">Quantity</p>
-                                                <p className="font-medium text-slate-900">{order.order_quantity}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-slate-500">Total</p>
-                                                <p className="font-medium text-slate-900">Rs. {order.order_total_amount}</p>
-                                            </div>
+
+                                        <div className="space-y-3">
+                                            {order.items.map((item, itemIdx) => (
+                                                <div key={itemIdx} className="flex justify-between items-center text-sm">
+                                                    <div>
+                                                        <p className="font-medium text-slate-900">{item.item_name}</p>
+                                                        <p className="text-slate-500 text-xs">Qty: {item.order_quantity}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="font-medium text-slate-900">Rs. {item.order_total_amount || (item.item_price * item.order_quantity)}</p>
+                                                        <span className={`text-[10px] uppercase font-bold ${item.item_status === 'Completed' ? 'text-green-600' : 'text-slate-400'}`}>
+                                                            {item.item_status}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center">
+                                            <span className="font-semibold text-slate-900">Total Amount</span>
+                                            <span className="font-bold text-lg text-gold-600">Rs. {order.order_total_amount}</span>
                                         </div>
                                     </div>
                                 ))
@@ -356,9 +565,19 @@ const GuestBookings = () => {
                                                 <h4 className="font-semibold text-slate-900 text-lg">{vehicle.vehicle_type}</h4>
                                                 <p className="text-sm text-slate-500">{vehicle.vehicle_number}</p>
                                             </div>
-                                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(vehicle.vb_status)}`}>
-                                                {vehicle.vb_status || 'Active'}
-                                            </span>
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    onClick={() => downloadReceipt(vehicle, 'Vehicle')}
+                                                    className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:text-gold-600 hover:border-gold-200 hover:bg-gold-50 transition-all shadow-sm group"
+                                                    title="Download Receipt"
+                                                >
+                                                    <ArrowDownTrayIcon className="w-4 h-4 text-slate-400 group-hover:text-gold-600 transition-colors" />
+                                                    <span>Download Receipt</span>
+                                                </button>
+                                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(vehicle.vb_status)}`}>
+                                                    {vehicle.vb_status || 'Active'}
+                                                </span>
+                                            </div>
                                         </div>
                                         <div className="mt-3 flex items-center justify-between">
                                             <div className="text-sm">
@@ -376,7 +595,7 @@ const GuestBookings = () => {
                                                         const amount = vehicle.total_amount || (vehicle.vehicle_price_per_day || 0) * (vehicle.vb_days || 1);
                                                         handleVehiclePayment(vehicle);
                                                     }}
-                                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg transition-colors"
+                                                    className="px-4 py-2 bg-gold-500 hover:bg-gold-600 text-white text-sm font-bold rounded-lg transition-colors"
                                                 >
                                                     Pay Now
                                                 </button>

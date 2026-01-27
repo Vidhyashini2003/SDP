@@ -38,7 +38,7 @@ const DriverDashboard = () => {
         <div className="p-8">
             <header className="mb-8">
                 <h1 className="text-3xl font-bold text-slate-900">
-                    Welcome Back, <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Driver</span>
+                    Welcome Back, <span className="bg-gradient-to-r from-gold-500 to-yellow-500 bg-clip-text text-transparent">Driver</span>
                 </h1>
                 <p className="text-slate-500 mt-2">Here is your trip summary for today.</p>
             </header>
@@ -55,7 +55,7 @@ const DriverDashboard = () => {
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                         </div>
                     </div>
-                    <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-blue-50 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-500 ease-out" />
+                    <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-gold-50 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-500 ease-out" />
                 </div>
 
                 {/* Active Trips */}
@@ -87,25 +87,25 @@ const DriverDashboard = () => {
                 </div>
             </div>
 
-            <div className="bg-indigo-600 rounded-2xl p-8 text-white relative overflow-hidden">
+            <div className="bg-slate-900 rounded-2xl p-8 text-white relative overflow-hidden border border-gold-500/30">
                 <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
                     <div>
-                        <h2 className="text-2xl font-bold mb-2">Ready to start driving?</h2>
-                        <p className="text-indigo-100 max-w-lg">
+                        <h2 className="text-2xl font-bold mb-2 text-gold-500">Ready to start driving?</h2>
+                        <p className="text-slate-300 max-w-lg">
                             Check your assigned trips and manage your schedule directly from the trips panel.
                         </p>
                     </div>
                     <button
                         onClick={() => navigate('/driver/trips')}
-                        className="px-6 py-3 bg-white text-indigo-600 font-bold rounded-lg hover:bg-indigo-50 transition-colors shadow-lg"
+                        className="px-6 py-3 bg-gradient-to-r from-gold-500 to-gold-600 text-white font-bold rounded-lg hover:from-gold-600 hover:to-gold-700 transition-all shadow-lg hover:shadow-gold-500/20"
                     >
                         Go to Trips
                     </button>
                 </div>
 
                 {/* Decorative background circles */}
-                <div className="absolute top-0 right-0 -mt-10 -mr-10 w-64 h-64 bg-indigo-500 rounded-full opacity-50 mix-blend-multiply filter blur-3xl"></div>
-                <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-64 h-64 bg-indigo-700 rounded-full opacity-50 mix-blend-multiply filter blur-3xl"></div>
+                <div className="absolute top-0 right-0 -mt-10 -mr-10 w-64 h-64 bg-gold-500 rounded-full opacity-10 mix-blend-screen filter blur-3xl"></div>
+                <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-64 h-64 bg-gold-700 rounded-full opacity-10 mix-blend-screen filter blur-3xl"></div>
             </div>
         </div>
     );

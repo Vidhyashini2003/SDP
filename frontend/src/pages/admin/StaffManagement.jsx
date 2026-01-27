@@ -120,7 +120,7 @@ const StaffManagement = () => {
     const getRoleBadgeColor = (role) => {
         switch (role) {
             case 'receptionist': return 'bg-orange-100 text-orange-600 border-orange-200';
-            case 'kitchen': return 'bg-blue-100 text-blue-600 border-blue-200'; // Assuming 'student' like color
+            case 'kitchen': return 'bg-slate-100 text-slate-600 border-slate-200'; // Neutral for kitchen to avoid blue
             case 'driver': return 'bg-purple-100 text-purple-600 border-purple-200';
             default: return 'bg-gray-100 text-gray-600 border-gray-200';
         }
@@ -165,12 +165,12 @@ const StaffManagement = () => {
                         key={tab.name}
                         onClick={() => setActiveTab(tab.name)}
                         className={`pb-3 px-1 flex items-center gap-2 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.name
-                            ? 'border-blue-600 text-blue-600'
+                            ? 'border-gold-600 text-gold-600'
                             : 'border-transparent text-gray-500 hover:text-gray-700'
                             }`}
                     >
                         {tab.name}
-                        <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === tab.name ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'
+                        <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === tab.name ? 'bg-gold-50 text-gold-600' : 'bg-gray-100 text-gray-500'
                             }`}>
                             {tab.count}
                         </span>
@@ -219,7 +219,7 @@ const StaffManagement = () => {
                                             {/* Edit Button */}
                                             <button
                                                 onClick={() => handleEdit(member)}
-                                                className="p-2 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                                                className="p-2 text-gold-500 hover:text-gold-700 hover:bg-gold-50 rounded-lg transition-colors"
                                             >
                                                 <PencilIcon className="w-5 h-5" />
                                             </button>
@@ -279,7 +279,7 @@ const StaffManagement = () => {
                                     required
                                     value={formData.name}
                                     onChange={handleChange}
-                                    className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                    className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-gold-500 outline-none transition-all"
                                     placeholder="John Doe"
                                 />
                             </div>
@@ -292,7 +292,7 @@ const StaffManagement = () => {
                                     required
                                     value={formData.email}
                                     onChange={handleChange}
-                                    className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                    className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-gold-500 outline-none transition-all"
                                     placeholder="john@example.com"
                                 />
                             </div>

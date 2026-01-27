@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const bcrypt = require('bcryptjs');
+const notificationController = require('./notificationController');
 
 exports.getProfile = async (req, res) => {
     try {
@@ -177,22 +178,48 @@ exports.getMenu = async (req, res) => {
 exports.getOrders = async (req, res) => {
     try {
         const [rows] = await db.query(
-            `SELECT fo.order_id, fo.order_status, fo.order_date,
+            `SELECT fo.order_id, fo.order_status, fo.order_date, fo.dining_option,
+                    p.payment_amount as order_total_amount, p.payment_status,
                     oi.order_item_id, oi.quantity as order_quantity, oi.item_price, oi.item_status,
-                    (oi.quantity * oi.item_price) as order_total_amount,
+                    (oi.quantity * oi.item_price) as item_subtotal,
                     mi.item_name
              FROM foodorder fo
              JOIN orderitem oi ON fo.order_id = oi.order_id
              JOIN menuitem mi ON oi.item_id = mi.item_id
              JOIN Guest g ON fo.guest_id = g.guest_id
+             LEFT JOIN payment p ON fo.payment_id = p.payment_id
              WHERE g.user_id = ?
              ORDER BY fo.order_date DESC`,
             [req.user.id]
         );
 
-        // ... comments ...
+        // Group by Order ID
+        const ordersMap = new Map();
 
-        res.json(rows);
+        rows.forEach(row => {
+            if (!ordersMap.has(row.order_id)) {
+                ordersMap.set(row.order_id, {
+                    order_id: row.order_id,
+                    order_status: row.order_status,
+                    order_date: row.order_date,
+                    dining_option: row.dining_option || 'Delivery',
+                    order_total_amount: row.order_total_amount,
+                    payment_status: row.payment_status || 'Pending', // Include payment_status
+                    items: []
+                });
+            }
+            ordersMap.get(row.order_id).items.push({
+                order_item_id: row.order_item_id,
+                item_name: row.item_name,
+                order_quantity: row.order_quantity,
+                item_price: row.item_price,
+                item_status: row.item_status,
+                order_total_amount: row.item_subtotal // Keep per-item subtotal available if needed
+            });
+        });
+
+        const orders = Array.from(ordersMap.values());
+        res.json(orders);
     } catch (error) {
         console.error("Get Orders Error:", error);
         res.status(500).json({ error: 'Failed to fetch orders' });
@@ -206,7 +233,7 @@ exports.getOrders = async (req, res) => {
 exports.payVehicleBooking = async (req, res) => {
     try {
         const { id } = req.params; // vb_id
-        const { payment_method, total_amount } = req.body;
+        const { total_amount } = req.body;
         const userId = req.user.id;
 
         const connection = await db.getConnection();
@@ -217,7 +244,8 @@ exports.payVehicleBooking = async (req, res) => {
             const [booking] = await connection.query(
                 `SELECT vb.* FROM vehiclebooking vb 
                  JOIN Guest g ON vb.guest_id = g.guest_id 
-                 WHERE vb.vb_id = ? AND g.user_id = ? AND vb.vb_status = 'Pending Payment'`,
+                 JOIN Users u ON g.user_id = u.user_id
+                 WHERE vb.vb_id = ? AND u.user_id = ? AND vb.vb_status = 'Pending Payment'`,
                 [id, userId]
             );
 
@@ -228,8 +256,8 @@ exports.payVehicleBooking = async (req, res) => {
 
             // Create Payment
             const [paymentResult] = await connection.query(
-                'INSERT INTO payment (payment_amount, payment_method, service_type, service_id, payment_status) VALUES (?, ?, ?, ?, ?)',
-                [total_amount, payment_method, 'Vehicle', id, 'Success']
+                'INSERT INTO payment (payment_amount, service_type, service_id, payment_status) VALUES (?, ?, ?, ?)',
+                [total_amount, 'Vehicle', id, 'Success']
             );
             const paymentId = paymentResult.insertId;
 
@@ -238,6 +266,25 @@ exports.payVehicleBooking = async (req, res) => {
                 "UPDATE vehiclebooking SET vb_payment_id = ?, vb_status = 'Confirmed' WHERE vb_id = ?",
                 [paymentId, id]
             );
+
+            // Notify Driver
+            const [driverUser] = await connection.query(
+                `SELECT u.user_id 
+                 FROM vehiclebooking vb 
+                 JOIN Driver d ON vb.driver_id = d.driver_id 
+                 JOIN Users u ON d.user_id = u.user_id 
+                 WHERE vb.vb_id = ?`,
+                [id]
+            );
+
+            if (driverUser.length > 0) {
+                await notificationController.createNotification(
+                    driverUser[0].user_id,
+                    'Trip Confirmed',
+                    `Payment received for trip #${id}. Please be ready for pickup.`,
+                    'Booking'
+                );
+            }
 
             await connection.commit();
             res.json({ message: 'Payment successful! Booking confirmed.' });

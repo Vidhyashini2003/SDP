@@ -3,6 +3,7 @@ import axios from '../../config/axios'; // Use configured axios
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'; // Import icons
 
 const ChangePassword = () => {
     const { user } = useAuth();
@@ -13,6 +14,10 @@ const ChangePassword = () => {
         confirmPassword: ''
     });
     const [loading, setLoading] = useState(false);
+    // Visibility state
+    const [showCurrent, setShowCurrent] = useState(false);
+    const [showNew, setShowNew] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -38,9 +43,6 @@ const ChangePassword = () => {
 
             toast.success('Password updated successfully');
             setFormData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-
-            // Optional: Redirect to dashboard or profile
-            // navigate(`/${user.role}/dashboard`);
         } catch (error) {
             console.error('Change password error:', error);
             toast.error(error.response?.data?.error || 'Failed to update password');
@@ -49,6 +51,20 @@ const ChangePassword = () => {
         }
     };
 
+    const toggleButton = (show, setShow) => (
+        <button
+            type="button"
+            onClick={() => setShow(!show)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+        >
+            {show ? (
+                <EyeSlashIcon className="h-5 w-5" />
+            ) : (
+                <EyeIcon className="h-5 w-5" />
+            )}
+        </button>
+    );
+
     return (
         <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-xl shadow-sm border border-slate-200">
             <h2 className="text-2xl font-bold text-slate-900 mb-6">Change Password</h2>
@@ -56,42 +72,51 @@ const ChangePassword = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Current Password</label>
-                    <input
-                        type="password"
-                        name="currentPassword"
-                        value={formData.currentPassword}
-                        onChange={handleChange}
-                        required
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                        placeholder="••••••••"
-                    />
+                    <div className="relative">
+                        <input
+                            type={showCurrent ? "text" : "password"}
+                            name="currentPassword"
+                            value={formData.currentPassword}
+                            onChange={handleChange}
+                            required
+                            className="w-full px-4 py-2 pr-10 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gold-500 focus:border-gold-500 transition-all"
+                            placeholder="••••••••"
+                        />
+                        {toggleButton(showCurrent, setShowCurrent)}
+                    </div>
                 </div>
 
                 <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">New Password</label>
-                    <input
-                        type="password"
-                        name="newPassword"
-                        value={formData.newPassword}
-                        onChange={handleChange}
-                        required
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                        placeholder="••••••••"
-                    />
+                    <div className="relative">
+                        <input
+                            type={showNew ? "text" : "password"}
+                            name="newPassword"
+                            value={formData.newPassword}
+                            onChange={handleChange}
+                            required
+                            className="w-full px-4 py-2 pr-10 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gold-500 focus:border-gold-500 transition-all"
+                            placeholder="••••••••"
+                        />
+                        {toggleButton(showNew, setShowNew)}
+                    </div>
                     <p className="text-xs text-slate-500 mt-1">Must be at least 6 characters</p>
                 </div>
 
                 <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Confirm New Password</label>
-                    <input
-                        type="password"
-                        name="confirmPassword"
-                        value={formData.confirmPassword}
-                        onChange={handleChange}
-                        required
-                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                        placeholder="••••••••"
-                    />
+                    <div className="relative">
+                        <input
+                            type={showConfirm ? "text" : "password"}
+                            name="confirmPassword"
+                            value={formData.confirmPassword}
+                            onChange={handleChange}
+                            required
+                            className="w-full px-4 py-2 pr-10 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gold-500 focus:border-gold-500 transition-all"
+                            placeholder="••••••••"
+                        />
+                        {toggleButton(showConfirm, setShowConfirm)}
+                    </div>
                 </div>
 
                 <div className="pt-4">

@@ -68,8 +68,7 @@ const ActivityBooking = () => {
                 activity_id: selectedActivity.activity_id,
                 start_time: `${bookingData.ab_date} ${selectedSlot}`,
                 end_time: `${bookingData.ab_date} ${parseInt(selectedSlot.split(':')[0]) + 1}:00:00`,
-                total_amount: selectedActivity.activity_price_per_hour,
-                payment_method: 'Cash'
+                total_amount: selectedActivity.activity_price_per_hour
             });
 
             alert('Activity booked successfully!');
@@ -111,7 +110,7 @@ const ActivityBooking = () => {
 
                         <div className="flex items-center justify-between pt-4 border-t border-slate-200">
                             <div>
-                                <p className="text-2xl font-bold text-blue-600">
+                                <p className="text-2xl font-bold text-gold-600">
                                     Rs. {activity.activity_price_per_hour?.toLocaleString()}
                                 </p>
                                 <p className="text-xs text-slate-500">per hour</p>
@@ -146,7 +145,7 @@ const ActivityBooking = () => {
 
                         <div className="mb-6 border-b border-slate-100 pb-4">
                             <h2 className="text-2xl font-bold text-slate-900 mb-1">Book Activity</h2>
-                            <p className="text-lg text-blue-600 font-medium">{selectedActivity.activity_name}</p>
+                            <p className="text-lg text-gold-600 font-medium">{selectedActivity.activity_name}</p>
                             <p className="text-sm text-slate-500">Rs. {selectedActivity.activity_price_per_hour?.toLocaleString()} per hour</p>
                         </div>
 
@@ -159,7 +158,7 @@ const ActivityBooking = () => {
                                     value={bookingData.ab_date}
                                     min={new Date().toISOString().split('T')[0]}
                                     onChange={handleDateChange}
-                                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
                                 />
                             </div>
 

@@ -22,8 +22,7 @@ exports.registerGuest = async (req, res) => {
     try {
         await connection.beginTransaction();
         const {
-            guest_name, guest_email, guest_phone, guest_password, guest_address, nationality,
-            card_number, card_holder_name, card_expiry, card_cvv
+            guest_name, guest_email, guest_phone, guest_password, guest_address, nationality
         } = req.body;
 
         // Check if user already exists
@@ -45,10 +44,9 @@ exports.registerGuest = async (req, res) => {
         // 2. Insert into Guest (linking to user_id)
         await connection.query(
             `INSERT INTO Guest (
-                user_id, guest_address, nationality, 
-                card_number, card_holder_name, card_expiry, card_cvv
-             ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [userId, guest_address, nationality, card_number, card_holder_name, card_expiry, card_cvv]
+                user_id, guest_address, nationality
+             ) VALUES (?, ?, ?)`,
+            [userId, guest_address, nationality]
         );
 
         // 3. Generate Activation Token
@@ -228,28 +226,40 @@ exports.updateProfile = async (req, res) => {
             [name, email, phone, userId]
         );
 
+        console.log(`Updating profile for UserID: ${userId}, Role: ${role}`);
+        console.log('Update Data:', { address, nationality });
+
         // 2. Update Role Specific Fields (e.g. Address, Nationality)
         // We need to find the role record by user_id
-        if (role === 'guest') {
+        const lowerRole = role.toLowerCase();
+
+        if (lowerRole === 'guest') {
             await connection.query(
                 'UPDATE Guest SET guest_address = ?, nationality = ? WHERE user_id = ?',
                 [address, nationality, userId]
             );
-        } else if (role === 'receptionist') {
+        } else if (lowerRole === 'receptionist') {
             await connection.query(
                 'UPDATE Receptionist SET receptionist_address = ? WHERE user_id = ?',
                 [address, userId]
             );
-        } else if (role === 'kitchen') {
+        } else if (lowerRole === 'kitchen') {
             await connection.query(
                 'UPDATE KitchenStaff SET staff_address = ? WHERE user_id = ?',
                 [address, userId]
             );
-        } else if (role === 'driver') {
-            await connection.query(
+        } else if (lowerRole === 'driver') {
+            const [res] = await connection.query(
                 'UPDATE Driver SET driver_address = ? WHERE user_id = ?',
                 [address, userId]
             );
+            if (res.affectedRows === 0) {
+                console.log('Driver profile missing, creating new record...');
+                await connection.query(
+                    'INSERT INTO Driver (user_id, driver_address) VALUES (?, ?)',
+                    [userId, address]
+                );
+            }
         }
 
         await connection.commit();

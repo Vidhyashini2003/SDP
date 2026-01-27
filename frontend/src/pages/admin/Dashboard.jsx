@@ -81,7 +81,7 @@ const AdminDashboard = () => {
             {/* Header */}
             <div className="mb-8">
                 <h1 className="text-3xl font-bold text-slate-900">
-                    Welcome, <span className="text-blue-600">{user?.name}</span>
+                    Welcome, <span className="text-gold-600">{user?.name}</span>
                 </h1>
                 <p className="text-slate-600 mt-1">{getGreeting()} - Overview</p>
             </div>
@@ -96,7 +96,7 @@ const AdminDashboard = () => {
                             <p className="text-sm font-medium text-slate-500 uppercase">Total Guests</p>
                             <h3 className="text-3xl font-bold text-slate-900 mt-2">{dashboardData.counts.guests}</h3>
                         </div>
-                        <div className="p-3 bg-blue-50 text-blue-600 rounded-lg">
+                        <div className="p-3 bg-gold-50 text-gold-600 rounded-lg">
                             <UsersIcon className="w-6 h-6" />
                         </div>
                     </div>
@@ -161,7 +161,7 @@ const AdminDashboard = () => {
                                         cursor={{ fill: '#f1f5f9' }}
                                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                     />
-                                    <Bar dataKey="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={40} />
+                                    <Bar dataKey="revenue" fill="#D4AF37" radius={[4, 4, 0, 0]} barSize={40} />
                                 </BarChart>
                             </ResponsiveContainer>
                         ) : (
@@ -180,7 +180,7 @@ const AdminDashboard = () => {
                             summaryList.map((item, index) => (
                                 <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-2 h-10 bg-blue-500 rounded-l-md"></div>
+                                        <div className="w-2 h-10 bg-gold-500 rounded-l-md"></div>
                                         <div>
                                             <p className="font-semibold text-slate-700">{item.type}</p>
                                             <p className="text-xs text-slate-500">{item.count} Transactions</p>

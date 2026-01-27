@@ -162,7 +162,7 @@ const VehicleAvailability = () => {
                             <button
                                 onClick={() => confirmStatusChange(requiresReason)}
                                 className={`px-4 py-2 text-white rounded-lg font-medium shadow-sm 
-                                    ${requiresReason ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                                    ${requiresReason ? 'bg-red-600 hover:bg-red-700' : 'bg-gold-600 hover:bg-gold-700'}`}
                             >
                                 {requiresReason ? 'Confirm Cancellation' : 'Update Status'}
                             </button>

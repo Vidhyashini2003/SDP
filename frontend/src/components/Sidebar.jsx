@@ -28,10 +28,10 @@ const Sidebar = ({ items }) => {
                         {user?.name?.charAt(0).toUpperCase() || 'U'}
                     </div>
                     <div className="min-w-0">
-                        <p className="text-[10px] text-slate-900 font-bold uppercase tracking-widest mb-1 font-serif opacity-90">
+                        <p className="text-xs text-slate-900 font-bold uppercase tracking-widest mb-0.5 font-sans opacity-80">
                             {user?.role === 'kitchen' ? 'Kitchen Portal' : (user?.role || 'Staff') + ' Portal'}
                         </p>
-                        <p className="font-serif font-bold text-lg truncate leading-tight text-slate-900 drop-shadow-sm" title={user?.name}>
+                        <p className="font-serif font-medium text-xl truncate text-slate-900" title={user?.name}>
                             {user?.name || 'User'}
                         </p>
                     </div>
@@ -56,28 +56,34 @@ const Sidebar = ({ items }) => {
 
             {/* Bottom Section: Profile & Logout */}
             <div className="p-4 border-t border-black/10 bg-black/20 space-y-2">
-                {bottomItems.map((item) => (
+                {/* Profile Links */}
+                <div className="space-y-1 mb-4">
                     <Link
-                        key={item.path}
-                        to={item.path}
-                        className={`group flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 ${location.pathname === item.path
+                        to={`/${role}/profile`}
+                        className={`group flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 ${location.pathname === `/${role}/profile`
                             ? 'bg-slate-900 text-[#D4AF37] shadow-lg'
                             : 'text-slate-900 hover:bg-slate-900/10'
                             }`}
                     >
-                        <item.icon className="w-5 h-5 transition-transform group-hover:scale-110" />
-                        <span className="tracking-wide">{item.name}</span>
+                        <UserIcon className="w-5 h-5 transition-transform group-hover:scale-110" />
+                        <span className="tracking-wide">My Profile</span>
                     </Link>
-                ))}
-
+                    <Link
+                        to={`/${role}/change-password`}
+                        className={`group flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 ${location.pathname === `/${role}/change-password`
+                            ? 'bg-slate-900 text-[#D4AF37] shadow-lg'
+                            : 'text-slate-900 hover:bg-slate-900/10'
+                            }`}
+                    >
+                        <LockClosedIcon className="w-5 h-5 transition-transform group-hover:scale-110" />
+                        <span className="tracking-wide">Change Password</span>
+                    </Link>
+                </div>
 
                 <button
                     onClick={handleLogout}
-                    className="w-full px-4 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform active:scale-95 mt-4"
+                    className="w-full px-4 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold rounded-xl transition-all shadow-md hover:shadow-lg transform active:scale-95 text-center tracking-wide mt-4"
                 >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
                     Logout
                 </button>
             </div>

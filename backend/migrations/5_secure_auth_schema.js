@@ -30,16 +30,16 @@ async function updateSchema() {
 
         // 3. Ensure Guest table has card columns (as per user "Existing Tables" definition)
         // guest(guest_id, guest_address, nationality, card_number, card_holder_name, card_expiry, card_cvv, user_id)
-        console.log('Verifying Guest table schema...');
-        const cardCols = ['card_number', 'card_holder_name', 'card_expiry', 'card_cvv'];
-        for (const col of cardCols) {
-            const [c] = await connection.query(`SHOW COLUMNS FROM Guest LIKE '${col}'`);
-            if (c.length === 0) {
-                console.log(`Adding ${col} to Guest table...`);
-                // Use safe types. VARCHAR(255) is fine for simplicity here.
-                await connection.query(`ALTER TABLE Guest ADD COLUMN ${col} VARCHAR(255)`);
-            }
-        }
+        // console.log('Verifying Guest table schema...');
+        // const cardCols = ['card_number', 'card_holder_name', 'card_expiry', 'card_cvv'];
+        // for (const col of cardCols) {
+        //     const [c] = await connection.query(`SHOW COLUMNS FROM Guest LIKE '${col}'`);
+        //     if (c.length === 0) {
+        //         console.log(`Adding ${col} to Guest table...`);
+        //         // Use safe types. VARCHAR(255) is fine for simplicity here.
+        //         await connection.query(`ALTER TABLE Guest ADD COLUMN ${col} VARCHAR(255)`);
+        //     }
+        // }
 
         await connection.commit();
         console.log('✅ Schema Update Successful!');

@@ -1,5 +1,6 @@
 
 const db = require('../config/db');
+const notificationController = require('./notificationController');
 
 exports.getAssignedTrips = async (req, res) => {
     try {
@@ -65,6 +66,28 @@ exports.acceptHireRequest = async (req, res) => {
                 "UPDATE vehiclebooking SET driver_id = ?, vb_status = 'Pending Payment' WHERE vb_id = ?",
                 [realDriverId, id]
             );
+
+            // Notify Guest
+            // Fetch guest user_id first
+            const [guestInfo] = await connection.query(
+                `SELECT g.user_id, v.vehicle_type 
+                 FROM vehiclebooking vb
+                 JOIN Guest g ON vb.guest_id = g.guest_id
+                 JOIN vehicle v ON vb.vehicle_id = v.vehicle_id
+                 WHERE vb.vb_id = ?`,
+                [id]
+            );
+
+            if (guestInfo.length > 0) {
+                const guestUserId = guestInfo[0].user_id;
+                const vehicleType = guestInfo[0].vehicle_type;
+                await notificationController.createNotification(
+                    guestUserId,
+                    'Hire Request Accepted',
+                    `Your ${vehicleType} hire request has been accepted by a driver. Please proceed to payment.`,
+                    'Booking'
+                );
+            }
 
             await connection.commit();
             res.json({ message: 'Request accepted. Waiting for guest payment.' });

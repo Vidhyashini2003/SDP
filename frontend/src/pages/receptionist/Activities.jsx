@@ -92,7 +92,7 @@ const ReceptionistActivities = () => {
                                         {(booking.ab_status === 'Reserved' || booking.ab_status === 'Pending' || booking.ab_status === 'Confirmed') && (
                                             <button
                                                 onClick={() => handleStatusUpdate(booking.ab_id, 'In Progress')}
-                                                className="px-4 py-1.5 bg-cyan-700 hover:bg-cyan-800 text-white text-xs font-semibold rounded-lg shadow-sm transition-all"
+                                                className="px-4 py-1.5 bg-gold-600 hover:bg-gold-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all"
                                             >
                                                 Start
                                             </button>

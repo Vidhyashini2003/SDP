@@ -56,7 +56,7 @@ const CustomerManagement = () => {
                     <p className="text-slate-500 mt-1">View and manage registered guests</p>
                 </div>
                 <div className="bg-white p-2 rounded-lg shadow-sm border border-gray-200">
-                    <UserGroupIcon className="w-6 h-6 text-blue-600" />
+                    <UserGroupIcon className="w-6 h-6 text-gold-600" />
                 </div>
             </div>
 
@@ -65,7 +65,7 @@ const CustomerManagement = () => {
                 <input
                     type="text"
                     placeholder="Search customers by name or email..."
-                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-gold-500 outline-none"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />

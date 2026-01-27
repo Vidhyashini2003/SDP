@@ -8,11 +8,7 @@ const Profile = () => {
         guest_email: '',
         guest_phone: '',
         guest_address: '',
-        nationality: '',
-        card_number: '',
-        card_holder_name: '',
-        card_expiry: '',
-        card_cvv: ''
+        nationality: ''
     });
     const [originalData, setOriginalData] = useState({});
 
@@ -75,7 +71,7 @@ const Profile = () => {
                                 name="guest_name"
                                 value={profileData.guest_name}
                                 onChange={handleChange}
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
                             />
                         ) : (
                             <p className="text-slate-900 font-medium">{profileData.guest_name}</p>
@@ -93,7 +89,7 @@ const Profile = () => {
                                 name="guest_email"
                                 value={profileData.guest_email}
                                 onChange={handleChange}
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
                             />
                         ) : (
                             <p className="text-slate-900 font-medium">{profileData.guest_email}</p>
@@ -111,7 +107,7 @@ const Profile = () => {
                                 name="guest_phone"
                                 value={profileData.guest_phone}
                                 onChange={handleChange}
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
                             />
                         ) : (
                             <p className="text-slate-900 font-medium">{profileData.guest_phone}</p>
@@ -129,7 +125,7 @@ const Profile = () => {
                                 name="nationality"
                                 value={profileData.nationality}
                                 onChange={handleChange}
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
                             />
                         ) : (
                             <p className="text-slate-900 font-medium">{profileData.nationality}</p>
@@ -147,7 +143,7 @@ const Profile = () => {
                                 value={profileData.guest_address}
                                 onChange={handleChange}
                                 rows="2"
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gold-500 outline-none resize-none"
                             />
                         ) : (
                             <p className="text-slate-900 font-medium">{profileData.guest_address}</p>
@@ -155,89 +151,6 @@ const Profile = () => {
                     </div>
 
                     {/* Payment Information Section */}
-                    <div className="md:col-span-2 pt-6 border-t border-slate-200">
-                        <h4 className="text-lg font-semibold text-slate-900 mb-4">Payment Information</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Card Number */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-600 mb-2">
-                                    Card Number
-                                </label>
-                                {isEditing ? (
-                                    <input
-                                        type="text"
-                                        name="card_number"
-                                        value={profileData.card_number || ''}
-                                        onChange={handleChange}
-                                        placeholder="1234 5678 9012 3456"
-                                        maxLength="19"
-                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                    />
-                                ) : (
-                                    <p className="text-slate-900 font-medium">{profileData.card_number || 'Not added'}</p>
-                                )}
-                            </div>
-
-                            {/* Card Holder Name */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-600 mb-2">
-                                    Card Holder Name
-                                </label>
-                                {isEditing ? (
-                                    <input
-                                        type="text"
-                                        name="card_holder_name"
-                                        value={profileData.card_holder_name || ''}
-                                        onChange={handleChange}
-                                        placeholder="John Doe"
-                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                    />
-                                ) : (
-                                    <p className="text-slate-900 font-medium">{profileData.card_holder_name || 'Not added'}</p>
-                                )}
-                            </div>
-
-                            {/* Expiry Date */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-600 mb-2">
-                                    Expiry Date
-                                </label>
-                                {isEditing ? (
-                                    <input
-                                        type="text"
-                                        name="card_expiry"
-                                        value={profileData.card_expiry || ''}
-                                        onChange={handleChange}
-                                        placeholder="MM/YY"
-                                        maxLength="5"
-                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                    />
-                                ) : (
-                                    <p className="text-slate-900 font-medium">{profileData.card_expiry || 'Not added'}</p>
-                                )}
-                            </div>
-
-                            {/* CVV */}
-                            <div>
-                                <label className="block text-sm font-medium text-slate-600 mb-2">
-                                    CVV
-                                </label>
-                                {isEditing ? (
-                                    <input
-                                        type="password"
-                                        name="card_cvv"
-                                        value={profileData.card_cvv || ''}
-                                        onChange={handleChange}
-                                        placeholder="123"
-                                        maxLength="3"
-                                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                    />
-                                ) : (
-                                    <p className="text-slate-900 font-medium">{profileData.card_cvv ? '•••' : 'Not added'}</p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 {/* Action Buttons */}

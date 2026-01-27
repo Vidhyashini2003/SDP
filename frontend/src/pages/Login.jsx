@@ -34,45 +34,47 @@ const Login = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center px-4 relative">
-            {/* Background Image */}
-            <div className="absolute inset-0 z-0">
+        <div className="min-h-screen flex items-center justify-center px-4 relative bg-black">
+            {/* Background Image with Overlay */}
+            <div className="absolute inset-0 z-0 overflow-hidden">
                 <img
-                    src="https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80"
-                    alt="Hotel Background"
-                    className="h-full w-full object-cover"
+                    src="https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80"
+                    alt="Luxury Hotel"
+                    className="h-full w-full object-cover opacity-40 grayscale"
                 />
-                <div className="absolute inset-0 bg-gradient-to-br from-slate-900/70 to-slate-900/50" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent" />
             </div>
 
             {/* Login Form */}
-            <div className="max-w-md w-full bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-slate-100 relative z-10">
+            <div className="max-w-md w-full bg-slate-900/80 backdrop-blur-xl rounded-2xl shadow-2xl p-8 border border-gold-500/30 relative z-10 transform transition-all hover:border-gold-500/50 duration-500">
                 <div className="text-center mb-8">
-                    <h1 className="text-3xl font-serif font-bold text-gold-600 mb-4 uppercase tracking-wider">Janas Blue Water Corner</h1>
-                    <h2 className="text-2xl font-sans font-light text-slate-600 uppercase tracking-widest">Sign In</h2>
-                    <p className="text-slate-400 mt-2 font-serif italic">Welcome back to luxury</p>
+                    <h1 className="text-3xl font-serif font-bold text-gold-500 mb-2 uppercase tracking-widest drop-shadow-sm">
+                        Janas Blue Water Corner
+                    </h1>
+                    <div className="h-0.5 w-16 bg-gold-500/50 mx-auto mb-4 rounded-full"></div>
+                    <h2 className="text-xl font-sans font-light text-slate-300 uppercase tracking-[0.2em]">Login</h2>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Email Address</label>
+                        <label className="block text-xs font-semibold text-gold-500/80 uppercase tracking-wider mb-2 ml-1">Email Address</label>
                         <input
                             type="email"
                             required
-                            className="w-full px-4 py-3 rounded-none border-b-2 border-slate-200 focus:border-gold-500 bg-slate-50 focus:bg-white outline-none transition-all placeholder:text-slate-400"
-                            placeholder="Enter your email"
+                            className="w-full px-4 py-3 rounded-lg border border-slate-700 bg-black/50 text-slate-200 focus:border-gold-500 focus:ring-1 focus:ring-gold-500/50 outline-none transition-all placeholder:text-slate-600"
+                            placeholder="Type your email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Password</label>
+                        <label className="block text-xs font-semibold text-gold-500/80 uppercase tracking-wider mb-2 ml-1">Password</label>
                         <div className="relative">
                             <input
                                 type={showPassword ? "text" : "password"}
                                 required
-                                className="w-full px-4 py-3 rounded-none border-b-2 border-slate-200 focus:border-gold-500 bg-slate-50 focus:bg-white outline-none transition-all pr-10 placeholder:text-slate-400"
+                                className="w-full px-4 py-3 rounded-lg border border-slate-700 bg-black/50 text-slate-200 focus:border-gold-500 focus:ring-1 focus:ring-gold-500/50 outline-none transition-all pr-10 placeholder:text-slate-600"
                                 placeholder="••••••••"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
@@ -80,7 +82,7 @@ const Login = () => {
                             <button
                                 type="button"
                                 onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-gold-500 transition-colors"
                             >
                                 {showPassword ? (
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -97,27 +99,26 @@ const Login = () => {
                     </div>
 
                     <div className="flex justify-end">
-                        <Link to="/forgot-password" className="text-sm font-semibold text-gold-600 hover:text-gold-500 mb-6">
+                        <Link to="/forgot-password" className="text-xs font-medium text-slate-400 hover:text-gold-400 transition-colors">
                             Forgot Password?
                         </Link>
                     </div>
 
                     <button
                         type="submit"
-                        className="w-full py-4 px-4 bg-black hover:bg-slate-800 text-white font-serif font-bold text-lg uppercase tracking-widest shadow-lg hover:shadow-gold-500/20 transition-all transform active:scale-95"
+                        className="w-full py-3.5 bg-gradient-to-r from-gold-600 via-gold-500 to-gold-600 text-black font-serif font-bold text-lg uppercase tracking-widest hover:shadow-[0_0_20px_rgba(234,179,8,0.3)] transition-all transform hover:-translate-y-0.5 rounded-lg border border-gold-400/20"
                     >
-                        Sign In
+                        Login
                     </button>
                 </form>
 
-                <div className="mt-6 text-center text-sm text-slate-500">
-                    Don't have an account? {' '}
-                    <Link to="/register" className="text-gold-600 font-semibold hover:text-gold-700 uppercase tracking-wide text-xs">
-                        Create Account
+                <div className="mt-8 text-center">
+                    <p className="text-slate-400 text-sm mb-2">New to Janas Blue Water?</p>
+                    <Link to="/register" className="inline-block px-6 py-2 border border-slate-700 rounded-full text-sm text-gold-500 hover:bg-gold-500 hover:text-black hover:border-gold-500 transition-all uppercase tracking-wider font-medium">
+                        Create Customer Account
                     </Link>
                 </div>
             </div>
-
         </div>
     );
 };

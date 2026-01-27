@@ -49,7 +49,7 @@ const DriverTrips = () => {
 
                             <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-2">
-                                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${trip.vb_status === 'Booked' ? 'bg-blue-100 text-blue-700' :
+                                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${trip.vb_status === 'Booked' ? 'bg-gold-100 text-gold-700' :
                                         trip.vb_status === 'In Progress' ? 'bg-orange-100 text-orange-700' :
                                             trip.vb_status === 'Completed' ? 'bg-green-100 text-green-700' :
                                                 trip.vb_status === 'Cancelled' ? 'bg-red-100 text-red-700' :

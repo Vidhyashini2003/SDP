@@ -108,7 +108,7 @@ const KitchenDamages = () => {
                                     name="selected_order_id"
                                     value={formData.selected_order_id}
                                     onChange={handleOrderChange}
-                                    className="w-full rounded-lg border-slate-300 focus:ring-blue-500 focus:border-blue-500"
+                                    className="w-full rounded-lg border-slate-300 focus:ring-gold-500 focus:border-gold-500"
                                     required
                                 >
                                     <option value="">-- Select Order --</option>
@@ -131,7 +131,7 @@ const KitchenDamages = () => {
                                     name="description"
                                     value={formData.description}
                                     onChange={handleInputChange}
-                                    className="w-full rounded-lg border-slate-300 focus:ring-blue-500 focus:border-blue-500"
+                                    className="w-full rounded-lg border-slate-300 focus:ring-gold-500 focus:border-gold-500"
                                     rows="3"
                                     placeholder="Plate broken, glass smashed, etc."
                                     required
@@ -145,7 +145,7 @@ const KitchenDamages = () => {
                                     name="charge_amount"
                                     value={formData.charge_amount}
                                     onChange={handleInputChange}
-                                    className="w-full rounded-lg border-slate-300 focus:ring-blue-500 focus:border-blue-500"
+                                    className="w-full rounded-lg border-slate-300 focus:ring-gold-500 focus:border-gold-500"
                                     min="0"
                                     required
                                 />
