@@ -16,6 +16,22 @@ const getRoleSchema = (role) => {
     }
 };
 
+const validatePassword = (password) => {
+    if (password.length < 8) {
+        return { valid: false, message: 'Password must be at least 8 characters long' };
+    }
+    if (!/[A-Z]/.test(password)) {
+        return { valid: false, message: 'Password must contain at least one uppercase letter' };
+    }
+    if (!/[a-z]/.test(password)) {
+        return { valid: false, message: 'Password must contain at least one lowercase letter' };
+    }
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+        return { valid: false, message: 'Password must contain at least one special character' };
+    }
+    return { valid: true };
+};
+
 // Guest Registration (Public)
 exports.registerGuest = async (req, res) => {
     const connection = await db.getConnection();
@@ -24,6 +40,12 @@ exports.registerGuest = async (req, res) => {
         const {
             guest_name, guest_email, guest_phone, guest_password, guest_address, nationality
         } = req.body;
+
+        const passwordValidation = validatePassword(guest_password);
+        if (!passwordValidation.valid) {
+            await connection.rollback();
+            return res.status(400).json({ error: passwordValidation.message });
+        }
 
         // Check if user already exists
         const [existing] = await connection.query('SELECT * FROM Users WHERE email = ?', [guest_email]);
@@ -181,6 +203,13 @@ exports.activateAccount = async (req, res) => {
                     await connection.rollback();
                     return res.status(400).json({ error: 'Passwords do not match or are missing' });
                 }
+
+                const passwordValidation = validatePassword(password);
+                if (!passwordValidation.valid) {
+                    await connection.rollback();
+                    return res.status(400).json({ error: passwordValidation.message });
+                }
+
                 const hashedPassword = await bcrypt.hash(password, 10);
 
                 await connection.query(
@@ -297,6 +326,10 @@ exports.changePassword = async (req, res) => {
         }
 
         // Update
+        const passwordValidation = validatePassword(newPassword);
+        if (!passwordValidation.valid) {
+            return res.status(400).json({ error: passwordValidation.message });
+        }
         const hashedPassword = await bcrypt.hash(newPassword, 10);
         await db.query('UPDATE Users SET password = ? WHERE user_id = ?', [hashedPassword, userId]);
 
@@ -356,6 +389,11 @@ exports.resetPassword = async (req, res) => {
 
     if (password !== confirmPassword) {
         return res.status(400).json({ error: 'Passwords do not match' });
+    }
+
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+        return res.status(400).json({ error: passwordValidation.message });
     }
 
     const connection = await db.getConnection();

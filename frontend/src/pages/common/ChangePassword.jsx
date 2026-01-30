@@ -30,8 +30,17 @@ const ChangePassword = () => {
             return toast.error('New passwords do not match');
         }
 
-        if (formData.newPassword.length < 6) {
-            return toast.error('Password must be at least 6 characters');
+        if (formData.newPassword.length < 8) {
+            return toast.error('Password must be at least 8 characters');
+        }
+        if (!/[A-Z]/.test(formData.newPassword)) {
+            return toast.error('Password must contain at least one uppercase letter');
+        }
+        if (!/[a-z]/.test(formData.newPassword)) {
+            return toast.error('Password must contain at least one lowercase letter');
+        }
+        if (!/[!@#$%^&*(),.?":{}|<>]/.test(formData.newPassword)) {
+            return toast.error('Password must contain at least one special character');
         }
 
         setLoading(true);
@@ -100,7 +109,7 @@ const ChangePassword = () => {
                         />
                         {toggleButton(showNew, setShowNew)}
                     </div>
-                    <p className="text-xs text-slate-500 mt-1">Must be at least 6 characters</p>
+                    <p className="text-xs text-slate-500 mt-1">Must be at least 8 characters</p>
                 </div>
 
                 <div>

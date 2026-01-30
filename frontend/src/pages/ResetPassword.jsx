@@ -19,6 +19,23 @@ const ResetPassword = () => {
             return;
         }
 
+        if (password.length < 8) {
+            toast.error('Password must be at least 8 characters long');
+            return;
+        }
+        if (!/[A-Z]/.test(password)) {
+            toast.error('Password must contain at least one uppercase letter');
+            return;
+        }
+        if (!/[a-z]/.test(password)) {
+            toast.error('Password must contain at least one lowercase letter');
+            return;
+        }
+        if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+            toast.error('Password must contain at least one special character');
+            return;
+        }
+
         setLoading(true);
 
         try {

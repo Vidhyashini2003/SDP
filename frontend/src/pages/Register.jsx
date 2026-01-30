@@ -34,8 +34,20 @@ const Register = () => {
         }
 
         // Validate password length
-        if (formData.guest_password.length < 6) {
-            toast.error('Password must be at least 6 characters long');
+        if (formData.guest_password.length < 8) {
+            toast.error('Password must be at least 8 characters long');
+            return;
+        }
+        if (!/[A-Z]/.test(formData.guest_password)) {
+            toast.error('Password must contain at least one uppercase letter');
+            return;
+        }
+        if (!/[a-z]/.test(formData.guest_password)) {
+            toast.error('Password must contain at least one lowercase letter');
+            return;
+        }
+        if (!/[!@#$%^&*(),.?":{}|<>]/.test(formData.guest_password)) {
+            toast.error('Password must contain at least one special character');
             return;
         }
 
@@ -151,7 +163,7 @@ const Register = () => {
                                     onChange={handleChange}
                                     className="w-full px-4 py-2.5 rounded-lg border border-slate-700 bg-black/50 text-slate-200 focus:border-gold-500 focus:ring-1 focus:ring-gold-500/50 outline-none transition-all pr-10 placeholder:text-slate-600"
                                     placeholder="••••••••"
-                                    minLength={6}
+                                    minLength={8}
                                 />
                                 <button
                                     type="button"
@@ -183,7 +195,7 @@ const Register = () => {
                                     onChange={handleChange}
                                     className="w-full px-4 py-2.5 rounded-lg border border-slate-700 bg-black/50 text-slate-200 focus:border-gold-500 focus:ring-1 focus:ring-gold-500/50 outline-none transition-all pr-10 placeholder:text-slate-600"
                                     placeholder="••••••••"
-                                    minLength={6}
+                                    minLength={8}
                                 />
                                 <button
                                     type="button"
