@@ -132,7 +132,7 @@ const Home = () => {
                             +94 77 765 4321
                         </p>
                         <p className="text-slate-400 leading-relaxed text-sm">
-                            akshaymukunthan@gmail.com
+                            hotelmanagement.services17@gmail.com
                         </p>
                     </div>
                 </div>

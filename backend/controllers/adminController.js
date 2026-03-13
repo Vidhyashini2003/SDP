@@ -17,7 +17,7 @@ exports.getDashboardStats = async (req, res) => {
             const [userRows] = await connection.query("SELECT role, COUNT(*) as count FROM Users GROUP BY role");
             const guests = userRows.find(r => r.role === 'guest')?.count || 0;
             const staff = userRows
-                .filter(r => ['receptionist', 'kitchen', 'driver'].includes(r.role))
+                .filter(r => ['receptionist', 'chef', 'driver'].includes(r.role))
                 .reduce((sum, r) => sum + r.count, 0);
 
             // 3. Booking Counts
@@ -106,7 +106,7 @@ exports.getDashboardStats = async (req, res) => {
 exports.getAllStaff = async (req, res) => {
     try {
         const [staff] = await db.query(
-            "SELECT role, user_id as id, name, email, phone, account_status, created_at FROM Users WHERE role IN ('receptionist', 'kitchen', 'driver') ORDER BY created_at DESC"
+            "SELECT role, user_id as id, CONCAT(first_name, ' ', last_name) as name, email, phone, account_status, created_at FROM Users WHERE role IN ('receptionist', 'chef', 'driver') ORDER BY created_at DESC"
         );
         res.json(staff);
     } catch (error) {
@@ -117,8 +117,8 @@ exports.getAllStaff = async (req, res) => {
 exports.getAllGuests = async (req, res) => {
     try {
         const [guests] = await db.query(`
-            SELECT u.user_id as id, u.name, u.email, u.phone, u.account_status, u.created_at, 
-                   g.guest_address, g.nationality 
+            SELECT u.user_id as id, CONCAT(u.first_name, ' ', u.last_name) as name, u.email, u.phone, u.account_status, u.created_at, 
+                   g.guest_nic_passport, g.nationality 
             FROM Users u 
             JOIN Guest g ON u.user_id = g.user_id 
             WHERE u.role = 'guest'
@@ -147,9 +147,13 @@ exports.inviteStaff = async (req, res) => {
         }
 
         // 2. Insert into Users (Inactive, No Password, Phone might be null)
+        const nameParts = name.trim().split(/\s+/);
+        const firstName = nameParts[0];
+        const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+
         const [userRes] = await connection.query(
-            "INSERT INTO Users (name, email, phone, role, account_status) VALUES (?, ?, ?, ?, 'Inactive')",
-            [name, email, phone, role]
+            "INSERT INTO Users (first_name, last_name, email, phone, role, account_status) VALUES (?, ?, ?, ?, ?, 'Inactive')",
+            [firstName, lastName, email, phone, role]
         );
         const userId = userRes.insertId;
 
@@ -159,7 +163,7 @@ exports.inviteStaff = async (req, res) => {
                 "INSERT INTO Receptionist (user_id, receptionist_address) VALUES (?, ?)",
                 [userId, address]
             );
-        } else if (role === 'kitchen') {
+        } else if (role === 'chef') {
             await connection.query(
                 "INSERT INTO KitchenStaff (user_id, staff_address) VALUES (?, ?)",
                 [userId, address]
@@ -232,7 +236,11 @@ exports.updateStaff = async (req, res) => {
         const { name, email, phone, address, nationality } = req.body;
 
         // Update basic User info
-        await db.query('UPDATE Users SET name = ?, email = ?, phone = ? WHERE user_id = ?', [name, email, phone, id]);
+        const nameParts = name.trim().split(/\s+/);
+        const firstName = nameParts[0];
+        const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+
+        await db.query('UPDATE Users SET first_name = ?, last_name = ?, email = ?, phone = ? WHERE user_id = ?', [firstName, lastName, email, phone, id]);
 
         // Fetch User Role to know which table to update
         const [users] = await db.query('SELECT role FROM Users WHERE user_id = ?', [id]);
@@ -242,7 +250,7 @@ exports.updateStaff = async (req, res) => {
 
             if (role === 'guest') {
                 if (address !== undefined || nationality !== undefined) {
-                    await db.query('UPDATE Guest SET guest_address = ?, nationality = ? WHERE user_id = ?', [address, nationality, id]);
+                    await db.query('UPDATE Guest SET guest_nic_passport = ?, nationality = ? WHERE user_id = ?', [address, nationality, id]);
                 }
             } else if (role === 'driver') {
                 if (address !== undefined) {
@@ -252,7 +260,7 @@ exports.updateStaff = async (req, res) => {
                 if (address !== undefined) {
                     await db.query('UPDATE Receptionist SET receptionist_address = ? WHERE user_id = ?', [address, id]);
                 }
-            } else if (role === 'kitchen') {
+            } else if (role === 'chef') {
                 if (address !== undefined) {
                     await db.query('UPDATE KitchenStaff SET staff_address = ? WHERE user_id = ?', [address, id]);
                 }
@@ -324,7 +332,7 @@ exports.generateReport = async (req, res) => {
 exports.getAllReports = async (req, res) => {
     try {
         const [reports] = await db.query(
-            `SELECT r.*, u.name as admin_name 
+            `SELECT r.*, CONCAT(u.first_name, ' ', u.last_name) as admin_name 
              FROM report r 
              JOIN Users u ON r.user_id = u.user_id 
              ORDER BY generated_date DESC`

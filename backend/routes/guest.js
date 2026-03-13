@@ -11,6 +11,8 @@ router.use(authorizeRole('guest'));
 router.get('/profile', guestController.getProfile);
 router.put('/profile', guestController.updateProfile);
 router.get('/bookings', guestController.getMyBookings);
+router.get('/bookings/grouped', guestController.getGroupedBookings);
+router.get('/bookings/active', guestController.getActiveBookings);
 router.post('/bookings/rooms/:id/cancel', guestController.cancelRoomBooking);
 // router.post('/bookings/room', guestController.createRoomBooking); // Moved to bookingController
 router.get('/activities', guestController.getActivities);
@@ -18,6 +20,7 @@ router.get('/vehicles', guestController.getVehicles);
 router.get('/menu', guestController.getMenu);
 router.get('/orders', guestController.getOrders);
 router.post('/orders', orderController.placeOrder);
+router.post('/orders/bulk', orderController.placeBulkOrder);
 
 router.post('/bookings/vehicles/:id/pay', guestController.payVehicleBooking);
 

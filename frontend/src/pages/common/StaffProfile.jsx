@@ -6,7 +6,8 @@ import { toast } from 'react-hot-toast';
 const StaffProfile = () => {
     const { user, setUser } = useAuth(); // Assuming setUser updates context local state
     const [formData, setFormData] = useState({
-        name: '',
+        first_name: '',
+        last_name: '',
         email: '',
         phone: '',
         address: '',
@@ -24,7 +25,8 @@ const StaffProfile = () => {
             const res = await axios.get('/api/auth/me');
             const data = res.data;
             setFormData({
-                name: data.name || '',
+                first_name: data.first_name || '',
+                last_name: data.last_name || '',
                 email: data.email || '',
                 phone: data.phone || '',
                 address: data.address || '',
@@ -61,16 +63,29 @@ const StaffProfile = () => {
 
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Name</label>
-                        <input
-                            type="text"
-                            name="name"
-                            value={formData.name}
-                            onChange={handleChange}
-                            className="w-full rounded-lg border-slate-300 focus:ring-gold-500 focus:border-gold-500"
-                            required
-                        />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">First Name</label>
+                            <input
+                                type="text"
+                                name="first_name"
+                                value={formData.first_name}
+                                onChange={handleChange}
+                                className="w-full rounded-lg border-slate-300 focus:ring-gold-500 focus:border-gold-500"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Last Name</label>
+                            <input
+                                type="text"
+                                name="last_name"
+                                value={formData.last_name}
+                                onChange={handleChange}
+                                className="w-full rounded-lg border-slate-300 focus:ring-gold-500 focus:border-gold-500"
+                                required
+                            />
+                        </div>
                     </div>
 
                     <div>
@@ -97,7 +112,7 @@ const StaffProfile = () => {
                         />
                     </div>
 
-                    {(formData.role === 'receptionist' || formData.role === 'kitchen' || formData.role === 'driver') && (
+                    {(formData.role === 'receptionist' || formData.role === 'chef' || formData.role === 'driver') && (
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Address</label>
                             <textarea

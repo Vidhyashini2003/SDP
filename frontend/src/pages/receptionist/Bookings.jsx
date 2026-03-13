@@ -228,7 +228,7 @@ const ReceptionistBookings = () => {
                                             <div className="text-sm text-slate-600 space-y-1">
                                                 <p><span className="font-medium">Guest:</span> {booking.guest_name}</p>
                                                 <p><span className="font-medium">Phone:</span> {booking.guest_phone}</p>
-                                                <p><span className="font-medium">From:</span> {booking.nationality}, {booking.guest_address}</p>
+                                                <p><span className="font-medium">From:</span> {booking.nationality}, {booking.guest_nic_passport}</p>
                                             </div>
                                         </div>
                                         <div className="text-right">

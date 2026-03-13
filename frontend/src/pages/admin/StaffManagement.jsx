@@ -12,7 +12,8 @@ const StaffManagement = () => {
 
     // Form State
     const [formData, setFormData] = useState({
-        name: '',
+        first_name: '',
+        last_name: '',
         email: '',
         role: 'receptionist'
     });
@@ -52,12 +53,13 @@ const StaffManagement = () => {
     const handleEdit = (staff) => {
         setEditingStaff(staff);
         setFormData({
-            name: staff.name,
+            first_name: staff.first_name || staff.name?.split(' ')[0] || '',
+            last_name: staff.last_name || staff.name?.split(' ').slice(1).join(' ') || '',
             email: staff.email,
             phone: staff.phone,
-            address: staff.address || '', // Address might not be present for all roles or in initial fetch
+            address: staff.address || '',
             role: staff.role,
-            vehicle_id: staff.vehicle_id || '' // Vehicle ID might not be present for all roles
+            vehicle_id: staff.vehicle_id || ''
         });
         setShowAddModal(true);
     };
@@ -77,7 +79,8 @@ const StaffManagement = () => {
             setShowAddModal(false);
             setEditingStaff(null);
             setFormData({
-                name: '',
+                first_name: '',
+                last_name: '',
                 email: '',
                 role: 'receptionist'
             });
@@ -113,14 +116,14 @@ const StaffManagement = () => {
     const tabs = [
         { name: 'All', count: allStaff.length },
         { name: 'Receptionist', count: allStaff.filter(s => s.role === 'receptionist').length },
-        { name: 'Kitchen', count: allStaff.filter(s => s.role === 'kitchen').length },
+        { name: 'Chef', count: allStaff.filter(s => s.role === 'chef').length },
         { name: 'Driver', count: allStaff.filter(s => s.role === 'driver').length }
     ];
 
     const getRoleBadgeColor = (role) => {
         switch (role) {
             case 'receptionist': return 'bg-orange-100 text-orange-600 border-orange-200';
-            case 'kitchen': return 'bg-slate-100 text-slate-600 border-slate-200'; // Neutral for kitchen to avoid blue
+            case 'chef': return 'bg-yellow-100 text-yellow-700 border-yellow-200'; 
             case 'driver': return 'bg-purple-100 text-purple-600 border-purple-200';
             default: return 'bg-gray-100 text-gray-600 border-gray-200';
         }
@@ -144,11 +147,12 @@ const StaffManagement = () => {
                 <button
                     onClick={() => {
                         setEditingStaff(null);
-                        setFormData({
-                            name: '',
-                            email: '',
-                            role: 'receptionist'
-                        });
+                            setFormData({
+                                first_name: '',
+                                last_name: '',
+                                email: '',
+                                role: 'receptionist'
+                            });
                         setShowAddModal(true);
                     }}
                     className="flex items-center gap-2 px-6 py-2.5 bg-gold-500 hover:bg-gold-600 text-white font-semibold rounded-lg shadow-sm transition-all"
@@ -272,16 +276,29 @@ const StaffManagement = () => {
                         </div>
 
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
-                                <input
-                                    name="name"
-                                    required
-                                    value={formData.name}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-gold-500 outline-none transition-all"
-                                    placeholder="John Doe"
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">First Name</label>
+                                    <input
+                                        name="first_name"
+                                        required
+                                        value={formData.first_name}
+                                        onChange={handleChange}
+                                        className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-gold-500 outline-none transition-all"
+                                        placeholder="John"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Last Name</label>
+                                    <input
+                                        name="last_name"
+                                        required
+                                        value={formData.last_name}
+                                        onChange={handleChange}
+                                        className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-gold-500 outline-none transition-all"
+                                        placeholder="Doe"
+                                    />
+                                </div>
                             </div>
 
                             <div>
@@ -308,12 +325,10 @@ const StaffManagement = () => {
                                     className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-gold-500 outline-none transition-all disabled:bg-gray-100 disabled:text-gray-500"
                                 >
                                     <option value="receptionist">Receptionist</option>
-                                    <option value="kitchen">Kitchen Staff</option>
+                                    <option value="chef">Chef</option>
                                     <option value="driver">Driver</option>
                                 </select>
                             </div>
-
-
 
                             <div className="flex gap-3 pt-4">
                                 <button

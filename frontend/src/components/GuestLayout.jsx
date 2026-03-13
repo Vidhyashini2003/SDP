@@ -8,7 +8,7 @@ const GuestLayout = ({ children }) => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-    const [profileData, setProfileData] = useState({ guest_name: '' });
+    const [profileData, setProfileData] = useState({ first_name: '', last_name: '' });
 
     useEffect(() => {
         fetchProfile();
@@ -31,10 +31,7 @@ const GuestLayout = ({ children }) => {
     const menuItems = [
         { icon: '📊', label: 'Dashboard', path: '/guest/bookings' },
         { icon: '📋', label: 'My Bookings', path: '/guest/my-bookings' },
-        { icon: '🏨', label: 'Room Booking', path: '/guest/rooms' },
-        { icon: '🎯', label: 'Activity Booking', path: '/guest/activities' },
-        { icon: '🍽️', label: 'Food Orders', path: '/guest/food-orders' },
-        { icon: '🚗', label: 'Vehicle Hire', path: '/guest/vehicle-hire' },
+        { icon: '🏨', label: 'Book Room', path: '/guest/rooms' },
         { icon: '🔔', label: 'Notifications', path: '/guest/notifications' }
     ];
 
@@ -64,14 +61,14 @@ const GuestLayout = ({ children }) => {
                     <div className="p-6 text-slate-900 border-b border-black/10 bg-black/20">
                         <div className="flex items-center gap-3">
                             <div className="w-12 h-12 rounded-full bg-slate-900 text-[#D4AF37] flex items-center justify-center font-serif font-bold text-xl border-2 border-white/30 shadow-lg shrink-0">
-                                {(profileData.guest_name || user?.name || 'G').charAt(0).toUpperCase()}
+                                {(profileData.first_name || user?.name || 'G').charAt(0).toUpperCase()}
                             </div>
                             <div className="min-w-0">
                                 <p className="text-[10px] text-slate-900 font-bold uppercase tracking-widest mb-1 font-serif opacity-90">
                                     Guest Portal
                                 </p>
-                                <p className="font-serif font-bold text-lg truncate leading-tight text-slate-900 drop-shadow-sm" title={profileData.guest_name || user?.name}>
-                                    {profileData.guest_name || user?.name || 'Guest'}
+                                <p className="font-serif font-bold text-lg truncate leading-tight text-slate-900 drop-shadow-sm" title={profileData.first_name ? `${profileData.first_name} ${profileData.last_name}` : user?.name}>
+                                    {profileData.first_name ? `${profileData.first_name} ${profileData.last_name}` : user?.name || 'Guest'}
                                 </p>
                             </div>
                         </div>

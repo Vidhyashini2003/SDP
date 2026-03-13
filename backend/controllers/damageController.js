@@ -19,8 +19,9 @@ exports.reportDamage = async (req, res) => {
             await notificationController.createNotification(
                 guest[0].user_id,
                 'New Damage Report',
-                `A damage report for '${damage_type}' has been filed. Amount: Rs. ${charge_amount}. Please review details.`,
-                'Damage'
+                `A damage report for '${damage_type}' has been filed. Amount: Rs. ${charge_amount}. Please review details and proceed to payment.`,
+                'Damage',
+                '/guest/notifications'
             );
         }
 
@@ -35,7 +36,7 @@ exports.reportDamage = async (req, res) => {
 exports.getAllDamages = async (req, res) => {
     try {
         const [damages] = await db.query(
-            `SELECT d.*, u.name as guest_name, u.phone as guest_phone 
+            `SELECT d.*, CONCAT(u.first_name, ' ', u.last_name) as guest_name, u.phone as guest_phone 
              FROM damage d 
              JOIN Guest g ON d.guest_id = g.guest_id 
              JOIN Users u ON g.user_id = u.user_id

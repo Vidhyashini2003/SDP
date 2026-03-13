@@ -9,16 +9,31 @@ const Register = () => {
     const navigate = useNavigate();
     const { registerGuest } = useAuth();
     const [formData, setFormData] = useState({
-        guest_name: '',
+        first_name: '',
+        last_name: '',
         guest_email: '',
         guest_phone: '',
         guest_password: '',
         confirmPassword: '',
-        guest_address: '',
+        guest_nic_passport: '',
         nationality: ''
     });
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+    // Password validation helper
+    const getPasswordValidation = (password) => {
+        return {
+            minLength: password.length >= 8,
+            hasUppercase: /[A-Z]/.test(password),
+            hasLowercase: /[a-z]/.test(password),
+            hasSpecialChar: /[!@#$%^&*(),.?":{}|<>]/.test(password)
+        };
+    };
+
+    const passwordValidation = getPasswordValidation(formData.guest_password);
+    const passwordsMatch = formData.guest_password && formData.confirmPassword &&
+        formData.guest_password === formData.confirmPassword;
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -56,8 +71,8 @@ const Register = () => {
         const result = await registerGuest(dataToSend);
 
         if (result.success) {
-            toast.success('Account created successfully!');
-            navigate('/login');
+            toast.success('Account created successfully! Please check your email.');
+            navigate('/check-email', { state: { email: formData.guest_email } });
         } else {
             toast.error(result.error);
         }
@@ -88,14 +103,26 @@ const Register = () => {
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-xs font-semibold text-gold-500/80 uppercase tracking-wider mb-2 ml-1">Full Name</label>
+                            <label className="block text-xs font-semibold text-gold-500/80 uppercase tracking-wider mb-2 ml-1">First Name</label>
                             <input
-                                name="guest_name"
+                                name="first_name"
                                 required
-                                value={formData.guest_name}
+                                value={formData.first_name}
                                 onChange={handleChange}
                                 className="w-full px-4 py-2.5 rounded-lg border border-slate-700 bg-black/50 text-slate-200 focus:border-gold-500 focus:ring-1 focus:ring-gold-500/50 outline-none transition-all placeholder:text-slate-600"
-                                placeholder="Jana Doe"
+                                placeholder="Jana"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-semibold text-gold-500/80 uppercase tracking-wider mb-2 ml-1">Last Name</label>
+                            <input
+                                name="last_name"
+                                required
+                                value={formData.last_name}
+                                onChange={handleChange}
+                                className="w-full px-4 py-2.5 rounded-lg border border-slate-700 bg-black/50 text-slate-200 focus:border-gold-500 focus:ring-1 focus:ring-gold-500/50 outline-none transition-all placeholder:text-slate-600"
+                                placeholder="Doe"
                             />
                         </div>
 
@@ -109,6 +136,19 @@ const Register = () => {
                                 onChange={handleChange}
                                 className="w-full px-4 py-2.5 rounded-lg border border-slate-700 bg-black/50 text-slate-200 focus:border-gold-500 focus:ring-1 focus:ring-gold-500/50 outline-none transition-all placeholder:text-slate-600"
                                 placeholder="guest@example.com"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-semibold text-gold-500/80 uppercase tracking-wider mb-2 ml-1">NIC / Passport Number</label>
+                            <input
+                                type="text"
+                                name="guest_nic_passport"
+                                required
+                                value={formData.guest_nic_passport}
+                                onChange={handleChange}
+                                className="w-full px-4 py-2.5 rounded-lg border border-slate-700 bg-black/50 text-slate-200 focus:border-gold-500 focus:ring-1 focus:ring-gold-500/50 outline-none transition-all placeholder:text-slate-600"
+                                placeholder="Your NIC or Passport Number"
                             />
                         </div>
                     </div>
@@ -136,19 +176,6 @@ const Register = () => {
                                 placeholder="e.g., Sri Lankan"
                             />
                         </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-xs font-semibold text-gold-500/80 uppercase tracking-wider mb-2 ml-1">Address</label>
-                        <textarea
-                            name="guest_address"
-                            required
-                            value={formData.guest_address}
-                            onChange={handleChange}
-                            rows="2"
-                            className="w-full px-4 py-2.5 rounded-lg border border-slate-700 bg-black/50 text-slate-200 focus:border-gold-500 focus:ring-1 focus:ring-gold-500/50 outline-none transition-all placeholder:text-slate-600 resize-none"
-                            placeholder="Your full address"
-                        />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -182,6 +209,68 @@ const Register = () => {
                                     )}
                                 </button>
                             </div>
+
+                            {/* Password Validation Indicators */}
+                            {formData.guest_password && (
+                                <div className="mt-2 space-y-1.5">
+                                    <div className="flex items-center gap-2">
+                                        {passwordValidation.minLength ? (
+                                            <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        ) : (
+                                            <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        )}
+                                        <span className={`text-xs ${passwordValidation.minLength ? 'text-green-400' : 'text-slate-400'}`}>
+                                            At least 8 characters
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {passwordValidation.hasUppercase ? (
+                                            <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        ) : (
+                                            <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        )}
+                                        <span className={`text-xs ${passwordValidation.hasUppercase ? 'text-green-400' : 'text-slate-400'}`}>
+                                            One uppercase letter
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {passwordValidation.hasLowercase ? (
+                                            <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        ) : (
+                                            <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        )}
+                                        <span className={`text-xs ${passwordValidation.hasLowercase ? 'text-green-400' : 'text-slate-400'}`}>
+                                            One lowercase letter
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {passwordValidation.hasSpecialChar ? (
+                                            <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        ) : (
+                                            <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        )}
+                                        <span className={`text-xs ${passwordValidation.hasSpecialChar ? 'text-green-400' : 'text-slate-400'}`}>
+                                            One special character (!@#$%^&*...)
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div>
@@ -214,6 +303,26 @@ const Register = () => {
                                     )}
                                 </button>
                             </div>
+
+                            {/* Password Match Indicator */}
+                            {formData.confirmPassword && (
+                                <div className="mt-2">
+                                    <div className="flex items-center gap-2">
+                                        {passwordsMatch ? (
+                                            <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        ) : (
+                                            <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        )}
+                                        <span className={`text-xs ${passwordsMatch ? 'text-green-400' : 'text-slate-400'}`}>
+                                            Passwords match
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 

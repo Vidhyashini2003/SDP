@@ -4,10 +4,11 @@ import axios from '../../config/axios';
 const Profile = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [profileData, setProfileData] = useState({
-        guest_name: '',
+        first_name: '',
+        last_name: '',
         guest_email: '',
         guest_phone: '',
-        guest_address: '',
+        guest_nic_passport: '',
         nationality: ''
     });
     const [originalData, setOriginalData] = useState({});
@@ -60,21 +61,39 @@ const Profile = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Full Name */}
+                    {/* First Name */}
                     <div>
                         <label className="block text-sm font-medium text-slate-600 mb-2">
-                            Full Name
+                            First Name
                         </label>
                         {isEditing ? (
                             <input
                                 type="text"
-                                name="guest_name"
-                                value={profileData.guest_name}
+                                name="first_name"
+                                value={profileData.first_name || ''}
                                 onChange={handleChange}
                                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
                             />
                         ) : (
-                            <p className="text-slate-900 font-medium">{profileData.guest_name}</p>
+                            <p className="text-slate-900 font-medium">{profileData.first_name}</p>
+                        )}
+                    </div>
+
+                    {/* Last Name */}
+                    <div>
+                        <label className="block text-sm font-medium text-slate-600 mb-2">
+                            Last Name
+                        </label>
+                        {isEditing ? (
+                            <input
+                                type="text"
+                                name="last_name"
+                                value={profileData.last_name || ''}
+                                onChange={handleChange}
+                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                            />
+                        ) : (
+                            <p className="text-slate-900 font-medium">{profileData.last_name}</p>
                         )}
                     </div>
 
@@ -132,21 +151,21 @@ const Profile = () => {
                         )}
                     </div>
 
-                    {/* Address - Full Width */}
+                    {/* NIC / Passport - Full Width */}
                     <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-slate-600 mb-2">
-                            Address
+                            NIC / Passport Number
                         </label>
                         {isEditing ? (
-                            <textarea
-                                name="guest_address"
-                                value={profileData.guest_address}
+                            <input
+                                type="text"
+                                name="guest_nic_passport"
+                                value={profileData.guest_nic_passport || ''}
                                 onChange={handleChange}
-                                rows="2"
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gold-500 outline-none resize-none"
+                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
                             />
                         ) : (
-                            <p className="text-slate-900 font-medium">{profileData.guest_address}</p>
+                            <p className="text-slate-900 font-medium">{profileData.guest_nic_passport}</p>
                         )}
                     </div>
 

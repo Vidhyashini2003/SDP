@@ -1,14 +1,37 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import axios from '../../config/axios';
 
+// Image helper removed - all images served from backend uploads
+import DemoPaymentGateway from '../../components/DemoPaymentGateway';
+
 const FoodOrders = () => {
+    const navigate = useNavigate();
     const [menuItems, setMenuItems] = useState([]);
     const [cart, setCart] = useState([]);
     const [profileData, setProfileData] = useState({ guest_name: '' });
-    const [currentBooking, setCurrentBooking] = useState(null);
+    const [activeBookings, setActiveBookings] = useState([]);
+    const [hasActiveBooking, setHasActiveBooking] = useState(false);
+    const [selectedBooking, setSelectedBooking] = useState(null);
     const [loading, setLoading] = useState(true);
     const [diningOption, setDiningOption] = useState('Delivery');
+    
+    // Scheduled Order states
+    const [selectedDate, setSelectedDate] = useState('');
+    const [selectedMealType, setSelectedMealType] = useState('Breakfast');
 
+    const [searchParams] = useSearchParams();
+    const urlLinkedRbId = searchParams.get('rb_id');
+
+    const getItemDescription = (itemName) => {
+        const name = itemName.toLowerCase();
+        if (name.includes('kothu') || name.includes('kottu') || name.includes('koththu')) return 'Traditional chopped roti with vegetables and spices';
+        if (name.includes('pol') || name.includes('rotti') || name.includes('roti') || name.includes('sambol')) return 'Traditional Sri Lankan flatbread with spicy sambol';
+        if (name.includes('dosa')) return 'South Indian crispy crepe served with chutney';
+        if (name.includes('chicken') && name.includes('bun')) return 'Soft bun filled with spicy chicken';
+        if (name.includes('fried') && name.includes('rice')) return 'Flavorful Sri Lankan style fried rice';
+        return 'Delicious food item';
+    };
 
     useEffect(() => {
         fetchData();
@@ -16,19 +39,28 @@ const FoodOrders = () => {
 
     const fetchData = async () => {
         try {
-            const [menuRes, profileRes, bookingsRes] = await Promise.all([
+            const [menuRes, profileRes, activeBookingsRes] = await Promise.all([
                 axios.get('/api/guest/menu'),
                 axios.get('/api/guest/profile'),
-                axios.get('/api/guest/bookings')
+                axios.get('/api/guest/bookings/active')
             ]);
 
             setMenuItems(menuRes.data || []);
             setProfileData(profileRes.data || {});
 
-            const activeBooking = bookingsRes.data?.rooms?.find(
-                b => b.rb_status === 'Checked-in' || b.rb_status === 'Active'
-            );
-            setCurrentBooking(activeBooking);
+            const bookingsData = activeBookingsRes.data;
+            setHasActiveBooking(bookingsData.hasActiveBooking);
+            setActiveBookings(bookingsData.bookings || []);
+
+            if (bookingsData.bookings && bookingsData.bookings.length > 0) {
+                const targetId = urlLinkedRbId ? parseInt(urlLinkedRbId, 10) : bookingsData.bookings[0].rb_id;
+                setSelectedBooking(targetId);
+                const b = bookingsData.bookings.find(x => x.rb_id === targetId) || bookingsData.bookings[0];
+                if (b.check_in_date && !selectedDate) {
+                    setSelectedDate(new Date(b.check_in_date).toISOString().split('T')[0]);
+                }
+            }
+
             setLoading(false);
         } catch (error) {
             console.error('Error fetching data:', error);
@@ -36,61 +68,68 @@ const FoodOrders = () => {
         }
     };
 
-    const categorizeMenu = () => {
-        const categories = {
-            'Main Course': [],
-            'Breakfast': [],
-            'Snacks': [],
-            'Beverages': []
-        };
-
-        menuItems.forEach(item => {
-            const name = item.item_name.toLowerCase();
-            if (name.includes('kottu') || name.includes('rice') || name.includes('curry') || name.includes('biriyani')) {
-                categories['Main Course'].push(item);
-            } else if (name.includes('dosa') || name.includes('bread') || name.includes('egg') || name.includes('pancake')) {
-                categories['Breakfast'].push(item);
-            } else if (name.includes('bun') || name.includes('roll') || name.includes('sandwich') || name.includes('chicken') || name.includes('samosa')) {
-                categories['Snacks'].push(item);
-            } else if (name.includes('tea') || name.includes('coffee') || name.includes('juice') || name.includes('water')) {
-                categories['Beverages'].push(item);
-            } else {
-                categories['Main Course'].push(item);
-            }
-        });
-
-        return categories;
-    };
+    const categorizedMenu = { 'Our Menu': menuItems };
 
     const addToCart = (item) => {
-        const existingItem = cart.find(cartItem => cartItem.item_id === item.item_id);
-        if (existingItem) {
-            setCart(cart.map(cartItem =>
-                cartItem.item_id === item.item_id
-                    ? { ...cartItem, quantity: cartItem.quantity + 1 }
-                    : cartItem
-            ));
+        // Find existing group for current selection
+        const existingGroupIdx = cart.findIndex(g => g.date === selectedDate && g.mealType === selectedMealType);
+        
+        if (existingGroupIdx > -1) {
+            const newCart = [...cart];
+            const group = { ...newCart[existingGroupIdx] };
+            const existingItemIdx = group.items.findIndex(i => i.item_id === item.item_id);
+            
+            if (existingItemIdx > -1) {
+                const newItems = [...group.items];
+                newItems[existingItemIdx] = { ...newItems[existingItemIdx], quantity: newItems[existingItemIdx].quantity + 1 };
+                group.items = newItems;
+            } else {
+                group.items = [...group.items, { ...item, quantity: 1 }];
+            }
+            
+            newCart[existingGroupIdx] = group;
+            setCart(newCart);
         } else {
-            setCart([...cart, { ...item, quantity: 1 }]);
+            // Create new group
+            setCart([...cart, {
+                date: selectedDate,
+                mealType: selectedMealType,
+                items: [{ ...item, quantity: 1 }]
+            }]);
         }
     };
 
-    const removeFromCart = (item_id) => {
-        setCart(cart.filter(item => item.item_id !== item_id));
+    const removeFromCart = (date, mealType, item_id) => {
+        const newCart = cart.map(group => {
+            if (group.date === date && group.mealType === mealType) {
+                return { ...group, items: group.items.filter(i => i.item_id !== item_id) };
+            }
+            return group;
+        }).filter(group => group.items.length > 0);
+        setCart(newCart);
     };
 
-    const updateQuantity = (item_id, newQuantity) => {
+    const updateQuantity = (date, mealType, item_id, newQuantity) => {
         if (newQuantity <= 0) {
-            removeFromCart(item_id);
+            removeFromCart(date, mealType, item_id);
         } else {
-            setCart(cart.map(item =>
-                item.item_id === item_id ? { ...item, quantity: newQuantity } : item
-            ));
+            const newCart = cart.map(group => {
+                if (group.date === date && group.mealType === mealType) {
+                    return {
+                        ...group,
+                        items: group.items.map(i => i.item_id === item_id ? { ...i, quantity: newQuantity } : i)
+                    };
+                }
+                return group;
+            });
+            setCart(newCart);
         }
     };
 
     const getTotalAmount = () => {
-        return cart.reduce((total, item) => total + (item.item_price * item.quantity), 0);
+        return cart.reduce((total, group) => {
+            return total + group.items.reduce((gTotal, item) => gTotal + (item.item_price * item.quantity), 0);
+        }, 0);
     };
 
     const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -105,28 +144,36 @@ const FoodOrders = () => {
 
     const confirmPayment = async () => {
         try {
-            const orderData = {
-                items: cart.map(item => ({
-                    item_id: item.item_id,
-                    quantity: item.quantity,
-                    price: item.item_price
+            const bulkData = {
+                orderGroups: cart.map(group => ({
+                    scheduled_date: group.date,
+                    meal_type: group.mealType,
+                    items: group.items.map(item => ({
+                        item_id: item.item_id,
+                        quantity: item.quantity
+                    }))
                 })),
                 total_amount: getTotalAmount(),
-                dining_option: diningOption
+                dining_option: diningOption,
+                rb_id: selectedBooking
             };
 
-            await axios.post('/api/guest/orders', orderData);
+            const response = await axios.post('/api/guest/orders/bulk', bulkData);
             setShowPaymentModal(false);
-            alert('Payment successful! Order placed.');
+            alert(`Payment successful! ${response.data.orderIds.length} orders placed for your stay.`);
             setCart([]);
             fetchData();
         } catch (error) {
-            console.error('Error placing order:', error);
-            alert('Failed to place order. Please try again.');
+            console.error('Error placing bulk order:', error);
+            if (error.response?.data?.requiresBooking) {
+                alert(error.response.data.message || 'You must have an active room booking to order food.');
+                navigate('/guest/rooms');
+            } else {
+                alert('Failed to place orders. Please try again.');
+            }
         }
     };
 
-    const categorizedMenu = categorizeMenu();
 
     if (loading) {
         return (
@@ -136,208 +183,301 @@ const FoodOrders = () => {
         );
     }
 
+    if (!hasActiveBooking && !urlLinkedRbId) {
+        return (
+            <div className="flex items-center justify-center p-8">
+                <div className="bg-white border border-slate-200 rounded-xl p-8 max-w-md text-center shadow-lg">
+                    <div className="w-16 h-16 bg-gold-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span className="text-2xl">🏨</span>
+                    </div>
+                    <h2 className="text-xl font-bold text-slate-900 mb-2">Room Booking Required</h2>
+                    <p className="text-slate-500 mb-6">
+                        You must have an active room booking to order food.
+                    </p>
+                    <button
+                        onClick={() => navigate('/guest/rooms')}
+                        className="w-full bg-gold-500 hover:bg-gold-600 text-white px-6 py-2.5 rounded-lg font-bold transition-colors"
+                    >
+                        Book a Room
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    const currentLinkedBookingKey = urlLinkedRbId ? parseInt(urlLinkedRbId, 10) : selectedBooking;
+    const currentLinkedBooking = activeBookings.find(b => b.rb_id === currentLinkedBookingKey);
+
     return (
-        <div className="flex h-full relative">
-            {/* Payment Modal */}
-            {showPaymentModal && (
-                <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
-                        <div className="text-center mb-6">
-                            <div className="w-16 h-16 bg-gold-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <span className="text-3xl">💳</span>
-                            </div>
-                            <h3 className="text-xl font-bold text-slate-900">Confirm Payment</h3>
-                            <p className="text-slate-500 mt-1">Please confirm your payment to place the order.</p>
-                        </div>
+        <div className="h-full flex flex-col bg-slate-50">
+            {/* Header / Linked Booking Banner */}
+            <div className="bg-white border-b border-slate-200 p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div>
+                    <h3 className="text-3xl font-black text-slate-900 tracking-tight">Cuisine Selection</h3>
+                    <p className="text-slate-500 text-sm font-medium">Authentic flavors scheduled for your stay</p>
+                </div>
 
-                        <div className="bg-slate-50 rounded-lg p-4 mb-6">
-                            <div className="flex justify-between mb-2">
-                                <span className="text-slate-600">Total Amount</span>
-                                <span className="font-bold text-slate-900">Rs. {getTotalAmount()}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-slate-600">Payment Method</span>
-                                <span className="font-medium text-slate-900">Card (Simulated)</span>
+                <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4 w-full md:w-auto">
+                    {/* Booking Selector */}
+                    {activeBookings.length > 0 && (
+                        <div className="bg-slate-50 border border-slate-200 p-3 rounded-2xl flex items-center gap-3">
+                            <span className="text-xl">🏨</span>
+                            <div className="flex flex-col">
+                                <span className="text-[10px] pb-1 uppercase font-black text-slate-400 leading-none">Your Stay</span>
+                                <select
+                                    value={selectedBooking}
+                                    onChange={(e) => {
+                                        const bId = parseInt(e.target.value);
+                                        setSelectedBooking(bId);
+                                        const b = activeBookings.find(x => x.rb_id === bId);
+                                        if (b?.check_in_date) setSelectedDate(new Date(b.check_in_date).toISOString().split('T')[0]);
+                                    }}
+                                    className="bg-transparent text-sm font-bold text-slate-800 outline-none cursor-pointer"
+                                >
+                                    {activeBookings.map(b => (
+                                        <option key={b.rb_id} value={b.rb_id}>
+                                            {b.room_type} Room #{b.room_number}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
+                    )}
 
-                        <div className="flex gap-3">
+                    {/* Dining Option Toggle */}
+                    <div className="bg-slate-50 border border-slate-200 p-1.5 rounded-2xl flex">
+                        {['Delivery', 'Dine-in'].map(opt => (
                             <button
-                                onClick={() => setShowPaymentModal(false)}
-                                className="flex-1 py-3 px-4 border border-slate-200 rounded-lg text-slate-600 font-medium hover:bg-slate-50 transition-colors"
+                                key={opt}
+                                onClick={() => setDiningOption(opt)}
+                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${diningOption === opt ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                             >
-                                Cancel
+                                {opt === 'Delivery' ? '🛵' : '🍽️'} {opt}
                             </button>
-                            <button
-                                onClick={confirmPayment}
-                                className="flex-1 py-3 px-4 bg-gold-500 text-white rounded-lg font-bold hover:bg-gold-600 transition-colors shadow-lg shadow-gold-200"
-                            >
-                                Pay & Place Order
-                            </button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* Scheduled Controls Banner */}
+            {currentLinkedBooking && (
+                <div className="bg-slate-900 px-8 py-6 text-white flex flex-col md:flex-row gap-8 items-center border-b border-slate-800">
+                    <div className="flex-1 space-y-3 w-full">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Choose Date for this Order</label>
+                        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+                            {(() => {
+                                const start = new Date(currentLinkedBooking.check_in_date);
+                                const end = new Date(currentLinkedBooking.check_out_date);
+                                const dates = [];
+                                let curr = new Date(start);
+                                while (curr <= end) {
+                                    dates.push(new Date(curr).toISOString().split('T')[0]);
+                                    curr.setDate(curr.getDate() + 1);
+                                }
+                                return dates.map(date => {
+                                    const d = new Date(date);
+                                    const isActive = selectedDate === date;
+                                    return (
+                                        <button
+                                            key={date}
+                                            onClick={() => setSelectedDate(date)}
+                                            className={`flex-shrink-0 w-14 h-18 rounded-xl flex flex-col items-center justify-center transition-all ${isActive ? 'bg-gold-500 text-white shadow-lg' : 'bg-slate-800 text-slate-500 hover:bg-slate-700'}`}
+                                        >
+                                            <span className="text-[10px] font-black uppercase">{d.toLocaleDateString(undefined, { month: 'short' })}</span>
+                                            <span className="text-lg font-black">{d.getDate()}</span>
+                                        </button>
+                                    );
+                                });
+                            })()}
+                        </div>
+                    </div>
+
+                    <div className="w-full md:w-64 space-y-3">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Meal Slot</label>
+                        <div className="grid grid-cols-3 bg-slate-800 p-1 rounded-xl">
+                            {['Breakfast', 'Lunch', 'Dinner'].map(type => (
+                                <button
+                                    key={type}
+                                    onClick={() => setSelectedMealType(type)}
+                                    className={`py-2 rounded-lg text-[10px] font-black transition-all ${selectedMealType === type ? 'bg-white text-slate-900' : 'text-slate-500 hover:text-white'}`}
+                                >
+                                    {type}
+                                </button>
+                            ))}
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Menu Section */}
-            <div className="flex-1 p-8 overflow-auto">
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-                    <div className="mb-4">
-                        <h3 className="text-xl font-bold text-slate-900">Food Ordering</h3>
-                        <p className="text-sm text-slate-500">Order authentic Sri Lankan cuisine to your room</p>
-                    </div>
-
+            {/* Main Content Area */}
+            <div className="flex-1 flex overflow-hidden">
+                {/* Left Side: Menu List */}
+                <div className="flex-1 overflow-y-auto p-8 space-y-12 custom-scrollbar">
                     {Object.entries(categorizedMenu).map(([category, items]) => (
-                        items.length > 0 && (
-                            <div key={category} className="mb-6">
-                                <h4 className="font-semibold text-slate-900 mb-3">{category}</h4>
-                                <div className="space-y-3">
-                                    {items.map((item) => (
-                                        <div key={item.item_id} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                                            <div className="flex-1">
-                                                <h5 className="font-semibold text-slate-900">{item.item_name}</h5>
-                                                <p className="text-xs text-slate-500 mt-1">
-                                                    {item.item_name.includes('Kottu') && 'Traditional chopped up fried roti with vegetables'}
-                                                    {item.item_name.includes('Rice') && 'Sri Lankan style fried rice'}
-                                                    {!item.item_name.includes('Kottu') && !item.item_name.includes('Rice') && 'Delicious food item'}
-                                                </p>
-                                                <p className="text-gold-600 font-semibold mt-2">Rs. {item.item_price}</p>
+                        <div key={category}>
+                            <h4 className="text-xl font-bold text-slate-900 mb-6 border-l-4 border-gold-500 pl-4 uppercase tracking-wide">
+                                {category}
+                            </h4>
+                            <div className="space-y-4">
+                                {items.map((item) => {
+                                    const itemImage = item.item_image ? (item.item_image.startsWith('/') ? `${axios.defaults.baseURL}${item.item_image}` : item.item_image) : null;
+                                    const displayName = item.item_name === 'Pol Sambol & Hoppers' ? 'pol rotti and sambol' : item.item_name;
+                                    
+                                    return (
+                                        <div 
+                                            key={item.item_id} 
+                                            className="bg-white border border-slate-200 rounded-2xl p-4 flex gap-6 hover:border-gold-400 hover:shadow-md transition-all group"
+                                        >
+                                            {/* Image on left */}
+                                            <div className="w-28 h-28 flex-shrink-0 relative">
+                                                {itemImage ? (
+                                                    <img
+                                                        src={itemImage}
+                                                        alt={item.item_name}
+                                                        className="w-full h-full object-cover rounded-xl shadow-sm"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full bg-slate-100 rounded-xl flex items-center justify-center text-4xl">
+                                                        🍽️
+                                                    </div>
+                                                )}
                                             </div>
-                                            <button
-                                                onClick={() => addToCart(item)}
-                                                className="ml-4 px-6 py-2 bg-gold-500 text-white rounded-lg hover:bg-gold-600 transition-colors font-medium text-sm"
-                                            >
-                                                Add
-                                            </button>
+
+                                            {/* Details in middle */}
+                                            <div className="flex-1 flex flex-col justify-center">
+                                                <h5 className="font-bold text-slate-900 text-lg group-hover:text-gold-600 transition-colors">
+                                                    {displayName}
+                                                </h5>
+                                                <p className="text-slate-500 text-xs mt-1 leading-relaxed line-clamp-2">
+                                                    {getItemDescription(item.item_name)}
+                                                </p>
+                                                <p className="text-gold-600 font-bold mt-2 text-lg">
+                                                    Rs. {item.item_price.toLocaleString()}
+                                                </p>
+                                            </div>
+
+                                            {/* Add button on right */}
+                                            <div className="flex items-center">
+                                                <button
+                                                    onClick={() => addToCart(item)}
+                                                    className="px-8 py-3 bg-gold-500 hover:bg-gold-600 text-white rounded-xl font-bold transition-all transform active:scale-95 shadow-md"
+                                                >
+                                                    + Add
+                                                </button>
+                                            </div>
                                         </div>
-                                    ))}
-                                </div>
+                                    );
+                                })}
                             </div>
-                        )
+                        </div>
                     ))}
                 </div>
-            </div>
 
-            {/* Cart Sidebar */}
-            <div className="w-80 bg-white border-l border-slate-200 p-6 overflow-auto">
-                <div className="mb-6">
-                    <div className="flex items-center gap-2 mb-2">
-                        <span className="text-lg">🛒</span>
-                        <h3 className="font-bold text-slate-900">Your Cart</h3>
+                {/* Right Side: Cart Sidebar (Fixed/Sticky) */}
+                <div className="w-[400px] bg-white border-l border-slate-200 flex flex-col shadow-xl">
+                    <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                        <h4 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                            <span>🛒</span> Your Cart
+                        </h4>
+                        <span className="bg-gold-100 text-gold-700 px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wider">
+                            {cart.reduce((acc, g) => acc + g.items.length, 0)} Items
+                        </span>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                        {cart.length === 0 ? (
+                            <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center">
+                                <span className="text-5xl mb-4">🍲</span>
+                                <p className="font-medium">Selection is empty</p>
+                                <p className="text-xs mt-1">Add items from the menu to start your order</p>
+                            </div>
+                        ) : (
+                            cart.map((group, gIdx) => (
+                                <div key={`${group.date}-${group.mealType}-${gIdx}`} className="space-y-3">
+                                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-black text-slate-900 uppercase">
+                                                {new Date(group.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                            </span>
+                                            <span className={`px-2 py-0.5 text-[8px] font-black rounded uppercase tracking-widest ${
+                                                group.mealType === 'Breakfast' ? 'bg-orange-50 text-orange-600' :
+                                                group.mealType === 'Lunch' ? 'bg-blue-50 text-blue-600' :
+                                                'bg-purple-50 text-purple-600'
+                                            }`}>
+                                                {group.mealType}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {group.items.map((item) => (
+                                            <div key={item.item_id} className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                                <div className="flex justify-between items-start mb-3">
+                                                    <h5 className="font-bold text-slate-900 text-sm">
+                                                        {item.item_name}
+                                                    </h5>
+                                                    <button
+                                                        onClick={() => removeFromCart(group.date, group.mealType, item.item_id)}
+                                                        className="text-slate-400 hover:text-red-500 transition-colors"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-lg p-1">
+                                                        <button
+                                                            onClick={() => updateQuantity(group.date, group.mealType, item.item_id, item.quantity - 1)}
+                                                            className="w-8 h-8 rounded-md hover:bg-slate-100 flex items-center justify-center text-lg font-bold text-slate-600"
+                                                        >
+                                                            -
+                                                        </button>
+                                                        <span className="font-bold w-4 text-center text-sm">{item.quantity}</span>
+                                                        <button
+                                                            onClick={() => updateQuantity(group.date, group.mealType, item.item_id, item.quantity + 1)}
+                                                            className="w-8 h-8 rounded-md hover:bg-slate-100 flex items-center justify-center text-lg font-bold text-slate-600"
+                                                        >
+                                                            +
+                                                        </button>
+                                                    </div>
+                                                    <p className="text-gold-600 font-bold text-sm">
+                                                        Rs. {(item.item_price * item.quantity).toLocaleString()}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    <div className="p-6 bg-slate-50/50 border-t border-slate-200 space-y-6">
+                        {/* Summary */}
+                        <div className="bg-slate-900 rounded-2xl p-6 text-white">
+                            <div className="flex justify-between items-center mb-4">
+                                <span className="text-slate-400 font-medium">Total Price</span>
+                                <span className="text-2xl font-bold tracking-tighter">
+                                    Rs. {getTotalAmount().toLocaleString()}
+                                </span>
+                            </div>
+                            <button
+                                onClick={handlePlaceOrder}
+                                disabled={cart.length === 0}
+                                className="w-full py-4 bg-gold-500 hover:bg-gold-600 text-white font-bold rounded-xl shadow-lg transition-all transform active:scale-95 disabled:opacity-50 disabled:grayscale"
+                            >
+                                Confirm All Orders
+                            </button>
+                        </div>
                     </div>
                 </div>
-
-                {cart.length === 0 ? (
-                    <p className="text-slate-500 text-sm italic text-center py-8">Your cart is empty</p>
-                ) : (
-                    <div className="space-y-3 mb-6">
-                        {cart.map((item) => (
-                            <div key={item.item_id} className="border border-slate-200 rounded-lg p-3">
-                                <div className="flex justify-between items-start mb-2">
-                                    <h5 className="font-semibold text-slate-900 text-sm">{item.item_name}</h5>
-                                    <button
-                                        onClick={() => removeFromCart(item.item_id)}
-                                        className="text-red-500 hover:text-red-700 text-xs"
-                                    >
-                                        ✕
-                                    </button>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            onClick={() => updateQuantity(item.item_id, item.quantity - 1)}
-                                            className="w-6 h-6 bg-slate-200 rounded hover:bg-slate-300 flex items-center justify-center"
-                                        >
-                                            -
-                                        </button>
-                                        <span className="font-medium text-sm">{item.quantity}</span>
-                                        <button
-                                            onClick={() => updateQuantity(item.item_id, item.quantity + 1)}
-                                            className="w-6 h-6 bg-slate-200 rounded hover:bg-slate-300 flex items-center justify-center"
-                                        >
-                                            +
-                                        </button>
-                                    </div>
-                                    <p className="text-gold-600 font-semibold text-sm">
-                                        Rs. {item.item_price * item.quantity}
-                                    </p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {currentBooking && (
-                    <div className="mb-6 p-4 bg-slate-50 rounded-lg">
-                        <h4 className="font-semibold text-slate-900 text-sm mb-2">Order Status</h4>
-                        <div className="space-y-1">
-                            <p className="text-xs text-slate-600">
-                                <span className="font-medium">Room:</span> {currentBooking.room_number || 'N/A'}
-                            </p>
-                            <p className="text-xs text-slate-600">
-                                <span className="font-medium">Status:</span>{' '}
-                                <span className="px-2 py-1 bg-gold-500 text-white rounded-full text-xs">
-                                    {currentBooking.rb_status}
-                                </span>
-                            </p>
-                        </div>
-                    </div>
-                )}
-
-                {cart.length > 0 && (
-                    <div>
-                        {/* Dining Option Selection */}
-                        <div className="border-t border-slate-200 pt-4 mb-4">
-                            <h4 className="font-semibold text-slate-900 mb-3">Dining Option</h4>
-                            <div className="flex gap-4">
-                                <button
-                                    onClick={() => setDiningOption('Delivery')}
-                                    className={`flex-1 p-3 rounded-lg border-2 transition-all text-center font-medium ${diningOption === 'Delivery'
-                                        ? 'border-gold-500 bg-gold-50 text-gold-700'
-                                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                                        }`}
-                                >
-                                    🛵 Delivery
-                                </button>
-                                <button
-                                    onClick={() => setDiningOption('Dine-in')}
-                                    className={`flex-1 p-3 rounded-lg border-2 transition-all text-center font-medium ${diningOption === 'Dine-in'
-                                        ? 'border-gold-500 bg-gold-50 text-gold-700'
-                                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                                        }`}
-                                >
-                                    🍽️ Dine-in
-                                </button>
-                            </div>
-                        </div>
-
-
-
-                        {/* Total Amount */}
-                        <div className="border-t border-slate-200 pt-4 mb-4">
-                            <div className="flex justify-between items-center mb-2">
-                                <span className="font-semibold text-slate-900">Total</span>
-                                <span className="font-bold text-xl text-gold-600">
-                                    Rs. {getTotalAmount()}
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Order Button */}
-                        <button
-                            onClick={handlePlaceOrder}
-                            className={`w-full py-3 rounded-lg font-semibold transition-all ${cart.length > 0
-                                ? 'bg-gold-500 hover:bg-gold-600 text-white'
-                                : 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                                }`}
-                            disabled={cart.length === 0}
-                        >
-                            {cart.length > 0 ? 'Place Order' : 'Cart is Empty'}
-                        </button>
-                    </div>
-                )}
             </div>
-        </div >
+
+            <DemoPaymentGateway 
+                isOpen={showPaymentModal}
+                onClose={() => setShowPaymentModal(false)}
+                amount={getTotalAmount()}
+                onPaymentSuccess={confirmPayment}
+            />
+        </div>
     );
 };
 

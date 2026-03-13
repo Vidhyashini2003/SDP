@@ -5,7 +5,7 @@ const notificationController = require('./notificationController');
 exports.getProfile = async (req, res) => {
     try {
         const [rows] = await db.query(
-            `SELECT g.*, u.name as guest_name, u.email as guest_email, u.phone as guest_phone, u.role 
+            `SELECT g.*, u.first_name, u.last_name, CONCAT(u.first_name, ' ', u.last_name) as guest_name, u.email as guest_email, u.phone as guest_phone, u.role 
              FROM Guest g 
              JOIN Users u ON g.user_id = u.user_id 
              WHERE u.user_id = ?`,
@@ -26,20 +26,20 @@ exports.updateProfile = async (req, res) => {
     const connection = await db.getConnection();
     try {
         await connection.beginTransaction();
-        const { guest_name, guest_phone, guest_address, nationality } = req.body;
+        const { first_name, last_name, guest_phone, guest_nic_passport, nationality } = req.body;
 
         const userId = req.user.id;
 
         // 1. Update Users Table (Common info)
         await connection.query(
-            'UPDATE Users SET name = ?, phone = ? WHERE user_id = ?',
-            [guest_name, guest_phone, userId]
+            'UPDATE Users SET first_name = ?, last_name = ?, phone = ? WHERE user_id = ?',
+            [first_name, last_name, guest_phone, userId]
         );
 
         // 2. Update Guest Table (Specific info)
         await connection.query(
-            'UPDATE Guest SET guest_address = ?, nationality = ? WHERE user_id = ?',
-            [guest_address, nationality, userId]
+            'UPDATE Guest SET guest_nic_passport = ?, nationality = ? WHERE user_id = ?',
+            [guest_nic_passport, nationality, userId]
         );
 
         await connection.commit();
@@ -95,6 +95,160 @@ exports.getMyBookings = async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch bookings' });
     }
 };
+
+// --- NEW ROUND-UP AGGREGATOR ---
+exports.getGroupedBookings = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        // 1. Get Room Bookings (Parents)
+        const [rooms] = await db.query(
+            `SELECT rb.rb_id, rb.rb_status, rb.rb_checkin as check_in_date, rb.rb_checkout as check_out_date, rb.rb_total_amount as total_price, r.room_type, r.room_number
+             FROM roombooking rb 
+             JOIN room r ON rb.room_id = r.room_id 
+             JOIN Guest g ON rb.guest_id = g.guest_id
+             WHERE g.user_id = ? 
+             ORDER BY rb.rb_checkin DESC`,
+            [userId]
+        );
+
+        if (rooms.length === 0) {
+            return res.json([]); 
+        }
+
+        // Prepare grouping
+        const groupedMap = new Map();
+        rooms.forEach(room => {
+            groupedMap.set(room.rb_id, {
+                ...room,
+                activities: [],
+                vehicles: [],
+                foodOrders: []
+            });
+        });
+
+        const activeRoomIds = Array.from(groupedMap.keys());
+
+        if (activeRoomIds.length > 0) {
+            // 2. Fetch linked Activities
+            const [activities] = await db.query(
+                `SELECT ab.*, ab.ab_start_time as booking_date, ab.ab_total_amount as total_price, a.activity_name 
+                 FROM activitybooking ab 
+                 JOIN activity a ON ab.activity_id = a.activity_id 
+                 WHERE ab.rb_id IN (?)`,
+                [activeRoomIds]
+            );
+
+            activities.forEach(act => {
+                if (groupedMap.has(act.rb_id)) {
+                    groupedMap.get(act.rb_id).activities.push(act);
+                }
+            });
+
+            // 3. Fetch linked Vehicles
+            const [vehicles] = await db.query(
+                `SELECT vb.*, vb.vb_date as booking_date, v.vehicle_type, v.vehicle_number, v.vehicle_price_per_day 
+                 FROM vehiclebooking vb 
+                 JOIN vehicle v ON vb.vehicle_id = v.vehicle_id 
+                 WHERE vb.rb_id IN (?)`,
+                [activeRoomIds]
+            );
+
+            vehicles.forEach(veh => {
+                if (groupedMap.has(veh.rb_id)) {
+                    groupedMap.get(veh.rb_id).vehicles.push(veh);
+                }
+            });
+
+            // 4. Fetch linked Food Orders
+            const [foodOrderRows] = await db.query(
+                `SELECT fo.order_id, fo.order_status, fo.order_date, fo.dining_option, fo.rb_id,
+                        p.payment_amount as order_total_amount, p.payment_status,
+                        oi.order_item_id, oi.quantity as order_quantity, oi.item_price, oi.item_status,
+                        (oi.quantity * oi.item_price) as item_subtotal,
+                        mi.item_name
+                 FROM foodorder fo
+                 JOIN orderitem oi ON fo.order_id = oi.order_id
+                 JOIN menuitem mi ON oi.item_id = mi.item_id
+                 LEFT JOIN payment p ON fo.payment_id = p.payment_id
+                 WHERE fo.rb_id IN (?)
+                 ORDER BY fo.order_date DESC`,
+                [activeRoomIds]
+            );
+
+             // Group items internally first
+            const ordersMap = new Map();
+            foodOrderRows.forEach(row => {
+                if (!ordersMap.has(row.order_id)) {
+                    ordersMap.set(row.order_id, {
+                        order_id: row.order_id,
+                        order_status: row.order_status,
+                        order_date: row.order_date,
+                        dining_option: row.dining_option,
+                        order_total_amount: row.order_total_amount,
+                        payment_status: row.payment_status,
+                        rb_id: row.rb_id,
+                        items: []
+                    });
+                }
+                ordersMap.get(row.order_id).items.push({
+                    order_item_id: row.order_item_id,
+                    item_name: row.item_name,
+                    order_quantity: row.order_quantity,
+                    item_price: row.item_price,
+                    item_status: row.item_status,
+                    order_total_amount: row.item_subtotal
+                });
+            });
+
+            // Distribute fully nested orders into the trips
+            const finalOrders = Array.from(ordersMap.values());
+            finalOrders.forEach(order => {
+                if (groupedMap.has(order.rb_id)) {
+                    groupedMap.get(order.rb_id).foodOrders.push(order);
+                }
+            });
+        }
+
+        res.json(Array.from(groupedMap.values()));
+
+    } catch (error) {
+        console.error("Grouped Booking Fetch Error:", error);
+        res.status(500).json({ error: 'Failed to fetch grouped bookings' });
+    }
+};
+
+// Get Active Bookings (for service validation)
+exports.getActiveBookings = async (req, res) => {
+    try {
+        const [guestRows] = await db.query('SELECT guest_id FROM Guest WHERE user_id = ?', [req.user.id]);
+        if (guestRows.length === 0) {
+            return res.status(404).json({ error: 'Guest profile not found' });
+        }
+        const guest_id = guestRows[0].guest_id;
+
+        const [bookings] = await db.query(
+            `SELECT rb.rb_id, rb.rb_checkin as check_in_date, rb.rb_checkout as check_out_date, rb.rb_status, rb.rb_total_amount,
+                    r.room_id, r.room_type
+             FROM roombooking rb
+             JOIN room r ON rb.room_id = r.room_id
+             WHERE rb.guest_id = ? 
+             AND rb.rb_status IN ('Booked', 'Checked-in', 'Active')
+             AND rb.rb_checkout >= CURDATE()
+             ORDER BY rb.rb_checkin ASC`,
+            [guest_id]
+        );
+
+        res.json({
+            hasActiveBooking: bookings.length > 0,
+            bookings: bookings
+        });
+    } catch (error) {
+        console.error("Active Bookings Fetch Error:", error);
+        res.status(500).json({ error: 'Failed to fetch active bookings' });
+    }
+};
+
 
 // Cancel Room Booking
 exports.cancelRoomBooking = async (req, res) => {

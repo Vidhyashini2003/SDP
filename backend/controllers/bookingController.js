@@ -149,7 +149,7 @@ exports.getActivitySlots = async (req, res) => {
 
 exports.createActivityBooking = async (req, res) => {
     try {
-        const { activity_id, start_time, end_time, total_amount } = req.body;
+        const { activity_id, start_time, end_time, total_amount, rb_id } = req.body;
         const userId = req.user.id;
 
         const connection = await db.getConnection();
@@ -164,7 +164,69 @@ exports.createActivityBooking = async (req, res) => {
 
             await connection.beginTransaction();
 
-            // 1. Check for Overlapping Bookings for this Guest
+            // 1. Validate Active Booking
+            const [activeBookings] = await connection.query(
+                `SELECT rb_id, rb_checkin, rb_checkout 
+                 FROM roombooking 
+                 WHERE guest_id = ? 
+                 AND rb_status IN ('Booked', 'Checked-in', 'Active')
+                 AND rb_checkout >= CURDATE()
+                 ORDER BY rb_checkin ASC`,
+                [guest_id]
+            );
+
+            if (activeBookings.length === 0) {
+                await connection.rollback();
+                return res.status(403).json({
+                    error: 'No active booking found',
+                    message: 'You must have an active room booking to book activities. Please book a room first.',
+                    requiresBooking: true
+                });
+            }
+
+            // 2. Determine booking to link (use provided or default to first active)
+            let linkedBookingId = rb_id ? Number(rb_id) : null;
+            if (!linkedBookingId) {
+                linkedBookingId = activeBookings[0].rb_id;
+            } else {
+                // Validate provided booking belongs to guest
+                const isValid = activeBookings.some(b => b.rb_id === parseInt(linkedBookingId, 10));
+                if (!isValid) {
+                    await connection.rollback();
+                    return res.status(400).json({ error: 'Invalid booking ID provided' });
+                }
+            }
+
+            // 3. Validate activity dates fall within room booking dates
+            const linkedBookingIdNum = parseInt(linkedBookingId, 10);
+            const linkedBooking = activeBookings.find(b => b.rb_id === linkedBookingIdNum);
+            
+            console.log('DEBUG: linkedBookingId:', linkedBookingId, 'Parsed:', linkedBookingIdNum);
+            console.log('DEBUG: available rb_ids:', activeBookings.map(b => b.rb_id));
+            
+            if (!linkedBooking) {
+                await connection.rollback();
+                console.error('DEBUG: linkedBooking NOT FOUND for id:', linkedBookingIdNum);
+                return res.status(400).json({ error: 'Linked booking not found in active list' });
+            }
+
+            const activityStart = new Date(start_time);
+            const activityEnd = new Date(end_time);
+            const roomCheckIn = new Date(linkedBooking.rb_checkin);
+            const roomCheckOut = new Date(linkedBooking.rb_checkout);
+
+            console.log('DEBUG: activityStart:', activityStart, 'activityEnd:', activityEnd);
+            console.log('DEBUG: roomCheckIn:', roomCheckIn, 'roomCheckOut:', roomCheckOut);
+
+            if (activityStart < roomCheckIn || activityEnd > roomCheckOut) {
+                await connection.rollback();
+                return res.status(400).json({
+                    error: 'Activity dates must fall within your room booking dates',
+                    message: `Activity must be between ${linkedBooking.rb_checkin} and ${linkedBooking.rb_checkout}`
+                });
+            }
+
+            // 4. Check for Overlapping Bookings for this Guest
             // Overlap: (ExistingStart < NewEnd) AND (ExistingEnd > NewStart)
             const [existing] = await connection.query(
                 `SELECT ab_id FROM activitybooking 
@@ -187,12 +249,15 @@ exports.createActivityBooking = async (req, res) => {
             const payment_id = paymentResult.insertId;
 
             const [bookingResult] = await connection.query(
-                'INSERT INTO activitybooking (guest_id, activity_id, ab_start_time, ab_end_time, ab_total_amount, ab_payment_id, ab_status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                [guest_id, activity_id, start_time, end_time, total_amount, payment_id, 'Reserved']
+                'INSERT INTO activitybooking (guest_id, activity_id, ab_start_time, ab_end_time, ab_total_amount, ab_payment_id, ab_status, rb_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                [guest_id, activity_id, start_time, end_time, total_amount, payment_id, 'Reserved', linkedBookingId]
             );
 
             await connection.commit();
-            res.status(201).json({ message: 'Activity booked successfully' });
+            res.status(201).json({
+                message: 'Activity booked successfully',
+                linkedBooking: linkedBookingId
+            });
         } catch (err) {
             await connection.rollback();
             throw err;
@@ -201,7 +266,11 @@ exports.createActivityBooking = async (req, res) => {
         }
     } catch (error) {
         console.error('Error creating activity booking:', error);
-        res.status(500).json({ error: 'Failed to book activity' });
+        res.status(500).json({ 
+            error: 'Failed to book activity',
+            detail: error.message,
+            stack: error.stack
+        });
     }
 };
 
@@ -252,7 +321,7 @@ exports.getAvailableVehicles = async (req, res) => {
 
 exports.createVehicleBooking = async (req, res) => {
     try {
-        const { vehicle_id, vb_date, vb_days } = req.body;
+        const { vehicle_id, vb_date, vb_days, rb_id } = req.body;
         const userId = req.user.id;
 
         // Validation
@@ -272,7 +341,63 @@ exports.createVehicleBooking = async (req, res) => {
 
             await connection.beginTransaction();
 
-            // 1. Check for availability (Overlap Logic)
+            // 1. Validate Active Booking
+            const [activeBookings] = await connection.query(
+                `SELECT rb_id, rb_checkin, rb_checkout 
+                 FROM roombooking 
+                 WHERE guest_id = ? 
+                 AND rb_status IN ('Booked', 'Checked-in', 'Active')
+                 AND rb_checkout >= CURDATE()
+                 ORDER BY rb_checkin ASC`,
+                [guest_id]
+            );
+
+            if (activeBookings.length === 0) {
+                await connection.rollback();
+                return res.status(403).json({
+                    error: 'No active booking found',
+                    message: 'You must have an active room booking to hire a vehicle. Please book a room first.',
+                    requiresBooking: true
+                });
+            }
+
+            // 2. Determine booking to link (use provided or default to first active)
+            let linkedBookingId = rb_id ? Number(rb_id) : null;
+            if (!linkedBookingId) {
+                linkedBookingId = activeBookings[0].rb_id;
+            } else {
+                // Validate provided booking belongs to guest
+                const isValid = activeBookings.some(b => b.rb_id === parseInt(linkedBookingId, 10));
+                if (!isValid) {
+                    await connection.rollback();
+                    return res.status(400).json({ error: 'Invalid booking ID provided' });
+                }
+            }
+
+            // 3. Validate vehicle dates overlap with room booking (allow 1 day before/after)
+            const linkedBooking = activeBookings.find(b => b.rb_id === linkedBookingId);
+            const vehicleStart = new Date(vb_date);
+            const vehicleEnd = new Date(vb_date);
+            vehicleEnd.setDate(vehicleEnd.getDate() + parseInt(vb_days));
+
+            const roomCheckIn = new Date(linkedBooking.rb_checkin);
+            const roomCheckOut = new Date(linkedBooking.rb_checkout);
+
+            // Allow 1 day buffer before check-in and after checkout
+            const bufferStart = new Date(roomCheckIn);
+            bufferStart.setDate(bufferStart.getDate() - 1);
+            const bufferEnd = new Date(roomCheckOut);
+            bufferEnd.setDate(bufferEnd.getDate() + 1);
+
+            if (vehicleStart < bufferStart || vehicleEnd > bufferEnd) {
+                await connection.rollback();
+                return res.status(400).json({
+                    error: 'Vehicle hire dates should be within your room booking dates',
+                    message: `Vehicle hire should be between ${bufferStart.toISOString().split('T')[0]} and ${bufferEnd.toISOString().split('T')[0]}`
+                });
+            }
+
+            // 4. Check for availability (Overlap Logic)
             // Requested Range: Start = vb_date, End = vb_date + vb_days
             // Existing Booking: Start = existing.vb_date, End = existing.vb_date + existing.vb_days
             // Overlap Condition: (StartA < EndB) && (EndA > StartB)
@@ -293,14 +418,16 @@ exports.createVehicleBooking = async (req, res) => {
                 return res.status(400).json({ error: 'Vehicle is already booked for these dates' });
             }
 
-            // Insert with Pending Approval, NO Driver, NO Payment
             await connection.query(
-                'INSERT INTO vehiclebooking (guest_id, vehicle_id, vb_date, vb_days, vb_status) VALUES (?, ?, ?, ?, ?)',
-                [guest_id, vehicle_id, vb_date, vb_days, 'Pending Approval']
+                'INSERT INTO vehiclebooking (guest_id, vehicle_id, vb_date, vb_days, vb_status, rb_id) VALUES (?, ?, ?, ?, ?, ?)',
+                [guest_id, vehicle_id, vb_date, vb_days, 'Pending Approval', linkedBookingId]
             );
 
             await connection.commit();
-            res.status(201).json({ message: 'Hire request sent successfully! Waiting for driver acceptance.' });
+            res.status(201).json({
+                message: 'Hire request sent successfully! Waiting for driver acceptance.',
+                linkedBooking: linkedBookingId
+            });
         } catch (err) {
             await connection.rollback();
             throw err;
@@ -391,5 +518,249 @@ exports.cancelBooking = async (req, res) => {
     } catch (error) {
         console.error('Cancellation error:', error);
         res.status(500).json({ error: 'Failed to cancel booking' });
+    }
+};
+
+// --- Complete Booking (Unified Flow) ---
+exports.completeBooking = async (req, res) => {
+    try {
+        const { room, food, activities, vehicle, paymentMethod } = req.body;
+        const userId = req.user.id;
+
+        // Validate room booking data
+        if (!room || !room.room_id || !room.checkIn || !room.checkOut || !room.totalAmount) {
+            return res.status(400).json({ error: 'Room booking details are required' });
+        }
+
+        const connection = await db.getConnection();
+
+        try {
+            // Get Guest ID
+            const [guests] = await connection.query('SELECT guest_id FROM Guest WHERE user_id = ?', [userId]);
+            if (guests.length === 0) {
+                return res.status(404).json({ error: 'Guest profile not found' });
+            }
+            const guest_id = guests[0].guest_id;
+
+            await connection.beginTransaction();
+
+            // Calculate total amount
+            let totalAmount = parseFloat(room.totalAmount);
+
+            // Add food costs
+            if (food && food.length > 0) {
+                food.forEach(orderGroup => {
+                    if (orderGroup.items) {
+                        orderGroup.items.forEach(item => {
+                            totalAmount += parseFloat(item.item_price) * parseInt(item.quantity);
+                        });
+                    }
+                });
+            }
+
+            // Add activity costs
+            if (activities && activities.length > 0) {
+                activities.forEach(activity => {
+                    totalAmount += parseFloat(activity.price);
+                });
+            }
+
+            // Note: Vehicle hire has no upfront payment
+
+            // 1. Create Single Payment Record
+            const [paymentResult] = await connection.query(
+                'INSERT INTO payment (payment_amount, payment_status) VALUES (?, ?)',
+                [totalAmount, 'Success']
+            );
+            const payment_id = paymentResult.insertId;
+
+            // 2. Create Room Booking
+            const [roomBookingResult] = await connection.query(
+                'INSERT INTO roombooking (guest_id, room_id, rb_checkin, rb_checkout, rb_total_amount, rb_payment_id, rb_status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [guest_id, room.room_id, room.checkIn, room.checkOut, room.totalAmount, payment_id, 'Booked']
+            );
+            const rb_id = roomBookingResult.insertId;
+
+            // 3. Create Food Orders (if any)
+            let foodOrderIds = [];
+            if (food && food.length > 0) {
+                // 'food' is now expected to be an array of scheduled orders:
+                // [{ scheduled_date, meal_type, items: [{ item_id, quantity, item_price }] }]
+                
+                for (const orderGroup of food) {
+                    const { scheduled_date, meal_type, items } = orderGroup;
+                    
+                    const [orderResult] = await connection.query(
+                        'INSERT INTO foodorder (guest_id, order_status, dining_option, rb_id, scheduled_date, meal_type, payment_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                        [guest_id, 'Pending', room.diningOption || 'Delivery', rb_id, scheduled_date, meal_type, payment_id]
+                    );
+                    const order_id = orderResult.insertId;
+                    foodOrderIds.push(order_id);
+
+                    for (const item of items) {
+                        await connection.query(
+                            'INSERT INTO orderitem (order_id, item_id, quantity, item_price) VALUES (?, ?, ?, ?)',
+                            [order_id, item.item_id, item.quantity, item.item_price]
+                        );
+                    }
+                }
+            }
+
+            // 4. Create Activity Bookings (if any)
+            let activityBookingIds = [];
+            if (activities && activities.length > 0) {
+                for (const activity of activities) {
+                    // Validate dates within room booking
+                    const activityStart = new Date(activity.start_time);
+                    const activityEnd = new Date(activity.end_time);
+                    const roomCheckIn = new Date(room.checkIn);
+                    // Allow activities through the end of checkout day
+                    const roomCheckOut = new Date(room.checkOut);
+                    roomCheckOut.setHours(23, 59, 59, 999);
+
+                    if (activityStart < roomCheckIn || activityEnd > roomCheckOut) {
+                        await connection.rollback();
+                        return res.status(400).json({
+                            error: `Activity "${activity.name}" date must fall within your room booking dates (${room.checkIn} to ${room.checkOut})`,
+                        });
+                    }
+
+                    // Create activity booking (no separate payment - bundled)
+                    const [activityResult] = await connection.query(
+                        'INSERT INTO activitybooking (guest_id, activity_id, ab_start_time, ab_end_time, ab_total_amount, ab_payment_id, ab_status, rb_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                        [guest_id, activity.activity_id, activity.start_time, activity.end_time, activity.price, payment_id, 'Reserved', rb_id]
+                    );
+                    activityBookingIds.push(activityResult.insertId);
+                }
+            }
+
+            // 5. Create Vehicle Booking (if requested)
+            let vehicleBookingId = null;
+            if (vehicle && vehicle.vehicle_id) {
+                // Validate dates (allow ±1 day buffer)
+                const vehicleStart = new Date(vehicle.date);
+                const vehicleEnd = new Date(vehicle.date);
+                vehicleEnd.setDate(vehicleEnd.getDate() + parseInt(vehicle.days));
+
+                const roomCheckIn = new Date(room.checkIn);
+                const roomCheckOut = new Date(room.checkOut);
+
+                const bufferStart = new Date(roomCheckIn);
+                bufferStart.setDate(bufferStart.getDate() - 1);
+                const bufferEnd = new Date(roomCheckOut);
+                bufferEnd.setDate(bufferEnd.getDate() + 1);
+
+                if (vehicleStart < bufferStart || vehicleEnd > bufferEnd) {
+                    await connection.rollback();
+                    return res.status(400).json({
+                        error: 'Vehicle hire dates should be within your room booking dates (±1 day)'
+                    });
+                }
+
+                // Create vehicle booking (pending driver acceptance)
+                const [vehicleResult] = await connection.query(
+                    'INSERT INTO vehiclebooking (guest_id, vehicle_id, vb_date, vb_days, vb_status, rb_id) VALUES (?, ?, ?, ?, ?, ?)',
+                    [guest_id, vehicle.vehicle_id, vehicle.date, vehicle.days, 'Pending Approval', rb_id]
+                );
+                vehicleBookingId = vehicleResult.insertId;
+            }
+
+            await connection.commit();
+
+            // Return complete booking summary
+            res.status(201).json({
+                message: 'Booking completed successfully!',
+                booking: {
+                    roomBookingId: rb_id,
+                    paymentId: payment_id,
+                    totalAmount: totalAmount,
+                    extras: {
+                        foodOrders: foodOrderIds,
+                        activities: activityBookingIds,
+                        vehicle: vehicleBookingId
+                    }
+                }
+            });
+
+        } catch (err) {
+            await connection.rollback();
+            throw err;
+        } finally {
+            connection.release();
+        }
+    } catch (error) {
+        console.error('Error completing booking:', error.message, '| SQL:', error.sql, '| Code:', error.code, '| SQLMessage:', error.sqlMessage);
+        res.status(500).json({ 
+            error: 'Failed to complete booking',
+            detail: error.sqlMessage || error.message
+        });
+    }
+};
+
+exports.extendRoomBooking = async (req, res) => {
+    try {
+        const { id } = req.params; // rb_id
+        const { newCheckOut, extraAmount } = req.body;
+        const guest_id = req.user.role === 'guest' ? req.user.id : null;
+
+        if (!newCheckOut || extraAmount === undefined) {
+            return res.status(400).json({ error: 'Missing newCheckOut date or extraAmount' });
+        }
+
+        // 1. Verify ownership and get current booking details
+        let query = 'SELECT * FROM roombooking WHERE rb_id = ?';
+        let params = [id];
+        
+        if (guest_id) {
+            query += ' AND guest_id = (SELECT guest_id FROM guest WHERE user_id = ?)';
+            params.push(guest_id);
+        }
+
+        const [bookings] = await db.execute(query, params);
+        if (bookings.length === 0) {
+            return res.status(404).json({ error: 'Booking not found or not authorized' });
+        }
+
+        const booking = bookings[0];
+        const currentCheckOut = new Date(booking.rb_checkout);
+        const proposedCheckOut = new Date(newCheckOut);
+
+        if (proposedCheckOut <= currentCheckOut) {
+            return res.status(400).json({ error: 'New checkout date must be after current checkout date' });
+        }
+
+        // 2. Check room availability for the extended period
+        // We only need to check from currentCheckOut to proposedCheckOut
+        const [conflicts] = await db.execute(`
+            SELECT rb_id FROM roombooking
+            WHERE room_id = ? 
+            AND rb_id != ?
+            AND rb_status != 'Cancelled'
+            AND (
+                (rb_checkin < ? AND rb_checkout > ?)
+            )
+        `, [booking.room_id, id, newCheckOut, booking.rb_checkout]);
+
+        if (conflicts.length > 0) {
+            return res.status(400).json({ error: 'Room is already booked for the requested extension dates.' });
+        }
+
+        // 3. Update the booking
+        const newTotal = parseFloat(booking.rb_total_amount) + parseFloat(extraAmount);
+        
+        await db.execute(
+            'UPDATE roombooking SET rb_checkout = ?, rb_total_amount = ? WHERE rb_id = ?',
+            [newCheckOut, newTotal, id]
+        );
+
+        res.json({
+            message: 'Room booking extended successfully',
+            newCheckOut,
+            newTotal
+        });
+
+    } catch (error) {
+        console.error('Error extending booking:', error);
+        res.status(500).json({ error: 'Failed to extend room booking' });
     }
 };

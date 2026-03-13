@@ -1,11 +1,11 @@
 const db = require('../config/db');
 
 // --- Helper Function ---
-exports.createNotification = async (userId, title, message, type = 'System') => {
+exports.createNotification = async (userId, title, message, type = 'System', action_url = null) => {
     try {
         await db.query(
-            'INSERT INTO notifications (user_id, title, message, type, is_read) VALUES (?, ?, ?, ?, FALSE)',
-            [userId, title, message, type]
+            'INSERT INTO notifications (user_id, title, message, type, is_read, action_url) VALUES (?, ?, ?, ?, FALSE, ?)',
+            [userId, title, message, type, action_url]
         );
         console.log(`Notification sent to User ${userId}: ${title}`);
     } catch (error) {

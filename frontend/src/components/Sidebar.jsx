@@ -29,7 +29,7 @@ const Sidebar = ({ items }) => {
                     </div>
                     <div className="min-w-0">
                         <p className="text-xs text-slate-900 font-bold uppercase tracking-widest mb-0.5 font-sans opacity-80">
-                            {user?.role === 'kitchen' ? 'Kitchen Portal' : (user?.role || 'Staff') + ' Portal'}
+                            {user?.role === 'chef' ? 'Chef Portal' : (user?.role || 'Staff') + ' Portal'}
                         </p>
                         <p className="font-serif font-medium text-xl truncate text-slate-900" title={user?.name}>
                             {user?.name || 'User'}

@@ -18,7 +18,7 @@ const Login = () => {
             if (user.role === 'guest') navigate('/guest/bookings');
             else if (user.role === 'admin') navigate('/admin/dashboard');
             else if (user.role === 'receptionist') navigate('/receptionist/dashboard');
-            else if (user.role === 'kitchen') navigate('/kitchen/dashboard');
+            else if (user.role === 'chef' || user.role === 'kitchen') navigate('/chef/dashboard');
             else if (user.role === 'driver') navigate('/driver/dashboard');
         }
     }, [user, navigate]);

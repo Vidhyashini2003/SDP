@@ -6,7 +6,7 @@ exports.getAssignedTrips = async (req, res) => {
     try {
         const driverId = req.user.id;
         const [trips] = await db.query(
-            `SELECT vb.*, u.name as guest_name, u.phone as guest_phone, v.vehicle_number, v.vehicle_type
+            `SELECT vb.*, CONCAT(u.first_name, ' ', u.last_name) as guest_name, u.phone as guest_phone, v.vehicle_number, v.vehicle_type
          FROM vehiclebooking vb
          JOIN Driver d ON vb.driver_id = d.driver_id
          JOIN Guest g ON vb.guest_id = g.guest_id
@@ -27,7 +27,7 @@ exports.getHireRequests = async (req, res) => {
     try {
         // Fetch all pending requests (driver_id is null)
         const [requests] = await db.query(
-            `SELECT vb.*, u.name as guest_name, v.vehicle_type, v.vehicle_number, v.vehicle_price_per_day
+            `SELECT vb.*, CONCAT(u.first_name, ' ', u.last_name) as guest_name, v.vehicle_type, v.vehicle_number, v.vehicle_price_per_day
              FROM vehiclebooking vb
              JOIN Guest g ON vb.guest_id = g.guest_id
              JOIN Users u ON g.user_id = u.user_id
@@ -84,8 +84,9 @@ exports.acceptHireRequest = async (req, res) => {
                 await notificationController.createNotification(
                     guestUserId,
                     'Hire Request Accepted',
-                    `Your ${vehicleType} hire request has been accepted by a driver. Please proceed to payment.`,
-                    'Booking'
+                    `Your ${vehicleType} hire request has been accepted by a driver. Please proceed to payment to confirm your trip.`,
+                    'Booking',
+                    '/guest/my-bookings'
                 );
             }
 

@@ -1,0 +1,18 @@
+const pool = require('./config/db');
+
+async function checkSchema() {
+    try {
+        const tables = ['Users', 'Guest', 'Receptionist', 'KitchenStaff', 'Driver'];
+        for (const table of tables) {
+            const [rows] = await pool.execute(`DESCRIBE ${table}`);
+            console.log(`${table} Schema:`);
+            console.table(rows);
+        }
+        process.exit(0);
+    } catch (error) {
+        console.error('Schema check failed:', error);
+        process.exit(1);
+    }
+}
+
+checkSchema();

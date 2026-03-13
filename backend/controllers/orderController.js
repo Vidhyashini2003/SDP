@@ -14,7 +14,7 @@ exports.getMenu = async (req, res) => {
 
 exports.placeOrder = async (req, res) => {
     try {
-        const { items, total_amount, dining_option } = req.body;
+        const { items, total_amount, dining_option, rb_id, scheduled_date, meal_type } = req.body;
         const userId = req.user.id; // user_id
 
         const connection = await db.getConnection();
@@ -29,14 +29,47 @@ exports.placeOrder = async (req, res) => {
             }
             const guest_id = guestRows[0].guest_id;
 
-            // 1. Create Order in foodorder table (Removed total_amount)
+            // 1. Validate Active Booking (Hybrid Strategy)
+            const [activeBookings] = await connection.query(
+                `SELECT rb_id, rb_checkin, rb_checkout 
+                 FROM roombooking 
+                 WHERE guest_id = ? 
+                 AND rb_status IN ('Booked', 'Checked-in', 'Active')
+                 AND rb_checkout >= CURDATE()
+                 ORDER BY rb_checkin ASC`,
+                [guest_id]
+            );
+
+            if (activeBookings.length === 0) {
+                await connection.rollback();
+                return res.status(403).json({
+                    error: 'No active booking found',
+                    message: 'You must have an active room booking to order food. Please book a room first.',
+                    requiresBooking: true
+                });
+            }
+
+            // 2. Determine booking to link (use provided or default to first active)
+            let linkedBookingId = rb_id;
+            if (!linkedBookingId) {
+                linkedBookingId = activeBookings[0].rb_id;
+            } else {
+                // Validate provided booking belongs to guest
+                const isValid = activeBookings.some(b => b.rb_id === parseInt(linkedBookingId, 10));
+                if (!isValid) {
+                    await connection.rollback();
+                    return res.status(400).json({ error: 'Invalid booking ID provided' });
+                }
+            }
+
+            // 4. Create Order in foodorder table
             const [orderResult] = await connection.query(
-                'INSERT INTO foodorder (guest_id, order_status, dining_option) VALUES (?, ?, ?)',
-                [guest_id, 'Pending', dining_option || 'Delivery']
+                'INSERT INTO foodorder (guest_id, order_status, dining_option, rb_id, scheduled_date, meal_type) VALUES (?, ?, ?, ?, ?, ?)',
+                [guest_id, 'Pending', dining_option || 'Delivery', linkedBookingId, scheduled_date, meal_type]
             );
             const order_id = orderResult.insertId;
 
-            // 2. Insert each OrderItem
+            // 5. Insert each OrderItem
             for (const item of items) {
                 // Fetch price to be safe
                 const [menuItem] = await connection.query('SELECT item_price FROM menuitem WHERE item_id = ?', [item.item_id]);
@@ -49,34 +82,38 @@ exports.placeOrder = async (req, res) => {
                 );
             }
 
-            // 3. Create Payment record
+            // 6. Create Payment record
             const [paymentResult] = await connection.query(
                 'INSERT INTO payment (payment_amount, payment_status) VALUES (?, ?)',
                 [total_amount, 'Success']
             );
             const payment_id = paymentResult.insertId;
 
-            // 4. Update FoodOrder with Payment ID
+            // 7. Update FoodOrder with Payment ID
             await connection.query('UPDATE foodorder SET payment_id = ? WHERE order_id = ?', [payment_id, order_id]);
 
             await connection.commit();
 
-            // Notify Kitchen Staff
+            // Notify Chefs
             try {
-                const [kitchenStaff] = await db.query("SELECT user_id FROM Users WHERE role = 'kitchen'");
-                for (const staff of kitchenStaff) {
+                const [chefs] = await db.query("SELECT user_id FROM Users WHERE role = 'chef'");
+                for (const chef of chefs) {
                     await notificationController.createNotification(
-                        staff.user_id,
+                        chef.user_id,
                         'New Food Order',
                         `New order #${order_id} received. Amount: Rs. ${total_amount}.`,
                         'Order'
                     );
                 }
             } catch (notifyErr) {
-                console.error('Failed to notify kitchen:', notifyErr);
+                console.error('Failed to notify chefs:', notifyErr);
             }
 
-            res.status(201).json({ message: 'Order placed successfully', orderId: order_id });
+            res.status(201).json({
+                message: 'Order placed successfully',
+                orderId: order_id,
+                linkedBooking: linkedBookingId
+            });
 
         } catch (err) {
             await connection.rollback();
@@ -91,18 +128,109 @@ exports.placeOrder = async (req, res) => {
     }
 };
 
-// --- Kitchen Staff: Management ---
+exports.placeBulkOrder = async (req, res) => {
+    try {
+        const { orderGroups, total_amount, dining_option, rb_id } = req.body;
+        const userId = req.user.id;
+
+        const connection = await db.getConnection();
+        await connection.beginTransaction();
+
+        try {
+            // 0. Get guest_id
+            const [guestRows] = await connection.query('SELECT guest_id FROM Guest WHERE user_id = ?', [userId]);
+            if (guestRows.length === 0) {
+                await connection.rollback();
+                return res.status(404).json({ error: 'Guest profile not found' });
+            }
+            const guest_id = guestRows[0].guest_id;
+
+            // 1. Create a single Payment record for the entire cart
+            const [paymentResult] = await connection.query(
+                'INSERT INTO payment (payment_amount, payment_status) VALUES (?, ?)',
+                [total_amount, 'Success']
+            );
+            const payment_id = paymentResult.insertId;
+
+            const createdOrderIds = [];
+
+            // 2. Process each group (date + meal_type)
+            for (const group of orderGroups) {
+                const { scheduled_date, meal_type, items } = group;
+
+                // Create FoodOrder
+                const [orderResult] = await connection.query(
+                    'INSERT INTO foodorder (guest_id, order_status, dining_option, rb_id, scheduled_date, meal_type, payment_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    [guest_id, 'Pending', dining_option || 'Delivery', rb_id, scheduled_date, meal_type, payment_id]
+                );
+                const order_id = orderResult.insertId;
+                createdOrderIds.push(order_id);
+
+                // Insert each OrderItem for this group
+                for (const item of items) {
+                    const [menuItem] = await connection.query('SELECT item_price FROM menuitem WHERE item_id = ?', [item.item_id]);
+                    if (menuItem.length === 0) continue;
+
+                    const itemPrice = menuItem[0].item_price;
+                    await connection.query(
+                        'INSERT INTO orderitem (order_id, item_id, quantity, item_price) VALUES (?, ?, ?, ?)',
+                        [order_id, item.item_id, item.quantity, itemPrice]
+                    );
+                }
+            }
+
+            await connection.commit();
+
+            // Notify Chefs for each new order
+            try {
+                const [chefs] = await db.query("SELECT user_id FROM Users WHERE role = 'chef'");
+                for (const orderId of createdOrderIds) {
+                    for (const chef of chefs) {
+                        await notificationController.createNotification(
+                            chef.user_id,
+                            'New Food Order',
+                            `New order #${orderId} received as part of a multi-meal booking.`,
+                            'Order'
+                        );
+                    }
+                }
+            } catch (notifyErr) {
+                console.error('Failed to notify chefs:', notifyErr);
+            }
+
+            res.status(201).json({
+                message: 'Multiple orders placed successfully',
+                orderIds: createdOrderIds,
+                linkedBooking: rb_id
+            });
+
+        } catch (err) {
+            await connection.rollback();
+            throw err;
+        } finally {
+            connection.release();
+        }
+    } catch (error) {
+        console.error('Error placing bulk order:', error);
+        res.status(500).json({ error: 'Failed to place bulk orders' });
+    }
+};
+
+// --- Chef: Management ---
 
 exports.getAllOrders = async (req, res) => {
     try {
-        // Fetch all active orders with their items
         // Joined with payment table to get total_amount
+        const { date } = req.query; // Chef can filter by date
+        const filterDate = date || new Date().toISOString().split('T')[0];
+
         const [rows] = await db.query(
-            `SELECT fo.order_id, fo.guest_id, fo.order_status, fo.order_date, fo.dining_option,
+            `SELECT fo.order_id, fo.guest_id, fo.order_status, fo.order_date, fo.scheduled_date, fo.meal_type, fo.dining_option, fo.assigned_chef_id,
                     p.payment_amount as total_amount,
                     oi.order_item_id, oi.quantity, oi.item_price, oi.item_status, oi.subtotal,
                     mi.item_name, 
-                    u.name as guest_name, 
+                    CONCAT(u.first_name, ' ', u.last_name) as guest_name, 
+                    CONCAT(c.first_name, ' ', c.last_name) as chef_name,
                     r.room_number 
              FROM foodorder fo
              LEFT JOIN payment p ON fo.payment_id = p.payment_id
@@ -110,9 +238,12 @@ exports.getAllOrders = async (req, res) => {
              JOIN menuitem mi ON oi.item_id = mi.item_id 
              JOIN Guest g ON fo.guest_id = g.guest_id
              JOIN Users u ON g.user_id = u.user_id
-             LEFT JOIN roombooking rb ON g.guest_id = rb.guest_id AND rb.rb_status = 'Checked-in' 
+             LEFT JOIN Users c ON fo.assigned_chef_id = c.user_id
+             LEFT JOIN roombooking rb ON fo.rb_id = rb.rb_id
              LEFT JOIN room r ON rb.room_id = r.room_id
-             ORDER BY fo.order_date DESC`
+             WHERE fo.scheduled_date = ?
+             ORDER BY fo.order_date DESC`,
+            [filterDate]
         );
 
         // Group by Order ID
@@ -125,10 +256,14 @@ exports.getAllOrders = async (req, res) => {
                     guest_id: row.guest_id,
                     order_status: row.order_status,
                     order_date: row.order_date,
-                    total_amount: row.total_amount, // Now from payment
+                    total_amount: row.total_amount,
+                    scheduled_date: row.scheduled_date,
+                    meal_type: row.meal_type,
                     dining_option: row.dining_option || 'Delivery',
                     guest_name: row.guest_name,
                     room_number: row.room_number || 'N/A',
+                    assigned_chef_id: row.assigned_chef_id,
+                    chef_name: row.chef_name || null,
                     items: []
                 });
             }
@@ -213,6 +348,35 @@ exports.updateOrderItemStatus = async (req, res) => {
     }
 };
 
+exports.startCooking = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const chefId = req.user.id;
+
+        // 1. Double check if already assigned to someone else
+        const [order] = await db.query("SELECT assigned_chef_id FROM foodorder WHERE order_id = ?", [id]);
+        if (order.length === 0) return res.status(404).json({ error: 'Order not found' });
+        
+        if (order[0].assigned_chef_id && order[0].assigned_chef_id !== chefId) {
+            return res.status(403).json({ error: 'Order is already being prepared by another chef' });
+        }
+
+        // 2. Assign and update status
+        await db.query(
+            "UPDATE foodorder SET assigned_chef_id = ?, order_status = 'Preparing' WHERE order_id = ?",
+            [chefId, id]
+        );
+
+        // Also update all items to 'Preparing'
+        await db.query("UPDATE orderitem SET item_status = 'Preparing' WHERE order_id = ?", [id]);
+
+        res.json({ message: 'Assignment successful. Happy cooking!' });
+    } catch (error) {
+        console.error("Error assigning order:", error);
+        res.status(500).json({ error: 'Failed to assign order' });
+    }
+};
+
 // --- Menu Management (Kitchen/Admin) ---
 
 exports.getAllMenuItems = async (req, res) => {
@@ -229,13 +393,19 @@ exports.updateMenuItem = async (req, res) => {
     try {
         const { item_name, item_price, item_availability } = req.body;
         const { id } = req.params;
+        
+        let item_image = req.body.item_image; // Keep existing if no new file
+        if (req.file) {
+            item_image = `/uploads/menu/${req.file.filename}`;
+        }
 
         await db.query(
-            'UPDATE menuitem SET item_name = ?, item_price = ?, item_availability = ? WHERE item_id = ?',
-            [item_name, item_price, item_availability, id]
+            'UPDATE menuitem SET item_name = ?, item_price = ?, item_availability = ?, item_image = ? WHERE item_id = ?',
+            [item_name, item_price, item_availability, item_image, id]
         );
         res.json({ message: 'Menu item updated' });
     } catch (error) {
+        console.error('Update Menu Item Error:', error);
         res.status(500).json({ error: 'Failed to update menu item' });
     }
 }
@@ -243,12 +413,39 @@ exports.updateMenuItem = async (req, res) => {
 exports.addMenuItem = async (req, res) => {
     try {
         const { item_name, item_price, item_availability } = req.body;
+        let item_image = null;
+        if (req.file) {
+            item_image = `/uploads/menu/${req.file.filename}`;
+        }
+
         await db.query(
-            'INSERT INTO menuitem (item_name, item_price, item_availability) VALUES (?, ?, ?)',
-            [item_name, item_price, item_availability || 'Available']
+            'INSERT INTO menuitem (item_name, item_price, item_availability, item_image) VALUES (?, ?, ?, ?)',
+            [item_name, item_price, item_availability || 'Available', item_image]
         );
         res.status(201).json({ message: 'Menu item added' });
     } catch (error) {
+        console.error('Add Menu Item Error:', error);
         res.status(500).json({ error: 'Failed to add menu item' });
+    }
+}
+
+exports.deleteMenuItem = async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Check if item is linked to any orders first
+        const [linked] = await db.query('SELECT count(*) as count FROM orderitem WHERE item_id = ?', [id]);
+        if (linked[0].count > 0) {
+            return res.status(400).json({ 
+                error: 'Cannot delete item', 
+                message: 'This item has historical order data and cannot be deleted. Try making it "Unavailable" instead.' 
+            });
+        }
+
+        await db.query('DELETE FROM menuitem WHERE item_id = ?', [id]);
+        res.json({ message: 'Menu item deleted' });
+    } catch (error) {
+        console.error('Delete Menu Item Error:', error);
+        res.status(500).json({ error: 'Failed to delete menu item' });
     }
 }

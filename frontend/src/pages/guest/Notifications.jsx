@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import axios from '../../config/axios';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import Card from '../../components/Card';
 
 const Notifications = () => {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const [damages, setDamages] = useState([]);
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -18,14 +20,9 @@ const Notifications = () => {
 
     const fetchData = async () => {
         try {
-            const token = localStorage.getItem('token');
             const [damagesRes, notificationsRes] = await Promise.all([
-                axios.get(`http://localhost:5000/api/notifications/${user.id}/damages`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                }),
-                axios.get(`http://localhost:5000/api/notifications`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                })
+                axios.get(`/api/notifications/${user.id}/damages`),
+                axios.get(`/api/notifications`)
             ]);
             setDamages(damagesRes.data);
             setNotifications(notificationsRes.data);
@@ -38,12 +35,7 @@ const Notifications = () => {
 
     const handlePay = async (damageId) => {
         try {
-            const token = localStorage.getItem('token');
-            await axios.post(
-                `http://localhost:5000/api/notifications/damages/${damageId}/pay`,
-                {},
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
+            await axios.post(`/api/notifications/damages/${damageId}/pay`);
             toast.success('Payment successful');
             fetchData(); // Refresh list
         } catch (error) {
@@ -54,10 +46,7 @@ const Notifications = () => {
 
     const markAsRead = async (id) => {
         try {
-            const token = localStorage.getItem('token');
-            await axios.put(`http://localhost:5000/api/notifications/${id}/read`, {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await axios.put(`/api/notifications/${id}/read`);
             setNotifications(prev => prev.map(n => n.notification_id === id ? { ...n, is_read: 1 } : n));
         } catch (error) {
             console.error('Error marking as read', error);
@@ -66,10 +55,7 @@ const Notifications = () => {
 
     const deleteNotification = async (id) => {
         try {
-            const token = localStorage.getItem('token');
-            await axios.delete(`http://localhost:5000/api/notifications/${id}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await axios.delete(`/api/notifications/${id}`);
             setNotifications(prev => prev.filter(n => n.notification_id !== id));
             toast.success('Notification removed');
         } catch (error) {
@@ -111,9 +97,9 @@ const Notifications = () => {
                                     <p className="text-lg font-bold text-red-600 mb-2">Rs. {Number(damage.charge_amount).toLocaleString()}</p>
                                     <button
                                         onClick={() => handlePay(damage.damage_id)}
-                                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                                        className="bg-rose-600 hover:bg-rose-700 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-rose-600/20 active:scale-95"
                                     >
-                                        Pay Now
+                                        Settle Charge
                                     </button>
                                 </div>
                             </div>
@@ -149,7 +135,16 @@ const Notifications = () => {
                                     <p className="text-sm text-slate-600 leading-relaxed mb-3">
                                         {notification.message}
                                     </p>
-                                    <div className="flex gap-4">
+                                    <div className="flex gap-4 items-center">
+                                        {notification.action_url && (
+                                            <button
+                                                onClick={() => navigate(notification.action_url)}
+                                                className="bg-gold-600 hover:bg-gold-700 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-gold-600/20 active:scale-95 flex items-center gap-2"
+                                            >
+                                                {notification.action_url.includes('payment') || notification.action_url.includes('bookings') ? 'Proceed to Payment' : 'Review Details'}
+                                                <span className="text-sm">➔</span>
+                                            </button>
+                                        )}
                                         {!notification.is_read && (
                                             <button
                                                 onClick={() => markAsRead(notification.notification_id)}

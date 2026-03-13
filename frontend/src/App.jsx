@@ -10,6 +10,7 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ActivateAccount from './pages/auth/ActivateAccount';
+import CheckEmail from './pages/auth/CheckEmail';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 
@@ -22,6 +23,7 @@ import ActivityBooking from './pages/guest/ActivityBooking';
 import FoodOrders from './pages/guest/FoodOrders';
 import VehicleHire from './pages/guest/VehicleHire';
 import Notifications from './pages/guest/Notifications';
+import ExtendRoomBooking from './pages/guest/ExtendRoomBooking';
 
 // Staff Pages
 import ReceptionistDashboard from './pages/receptionist/Dashboard';
@@ -39,11 +41,11 @@ import DriverTrips from './pages/driver/Trips';
 import DriverRefunds from './pages/driver/Refunds';
 import DriverHireRequests from './pages/driver/HireRequests';
 
-import KitchenDashboard from './pages/kitchen/Dashboard';
-import KitchenOrders from './pages/kitchen/Orders';
-import KitchenMenu from './pages/kitchen/Menu';
-import KitchenDamages from './pages/kitchen/Damages';
-import KitchenHistory from './pages/kitchen/History';
+import ChefDashboard from './pages/chef/Dashboard';
+import ChefOrders from './pages/chef/Orders';
+import ChefMenu from './pages/chef/Menu';
+import ChefDamages from './pages/chef/Damages';
+import ChefHistory from './pages/chef/History';
 import StaffProfile from './pages/common/StaffProfile';
 import ChangePassword from './pages/common/ChangePassword';
 import CommonNotifications from './pages/common/Notifications';
@@ -98,13 +100,13 @@ const driverItems = [
     { name: 'Notifications', path: '/driver/notifications', icon: BellIcon }, // Added
 ];
 
-const kitchenItems = [
-    { name: 'Dashboard', path: '/kitchen/dashboard', icon: HomeIcon },
-    { name: 'Orders', path: '/kitchen/orders', icon: ClipboardDocumentListIcon },
-    { name: 'Menu Management', path: '/kitchen/menu', icon: CakeIcon },
-    { name: 'Damages', path: '/kitchen/damages', icon: ExclamationCircleIcon },
-    { name: 'Order History', path: '/kitchen/history', icon: ClockIcon },
-    { name: 'Notifications', path: '/kitchen/notifications', icon: BellIcon }, // Added
+const chefItems = [
+    { name: 'Dashboard', path: '/chef/dashboard', icon: HomeIcon },
+    { name: 'Orders', path: '/chef/orders', icon: ClipboardDocumentListIcon },
+    { name: 'Menu Management', path: '/chef/menu', icon: CakeIcon },
+    { name: 'Damages', path: '/chef/damages', icon: ExclamationCircleIcon },
+    { name: 'Order History', path: '/chef/history', icon: ClockIcon },
+    { name: 'Notifications', path: '/chef/notifications', icon: BellIcon },
 ];
 
 
@@ -118,6 +120,7 @@ function App() {
                         <Route path="/" element={<Home />} />
                         <Route path="/login" element={<Login />} />
                         <Route path="/register" element={<Register />} />
+                        <Route path="/check-email" element={<CheckEmail />} />
                         <Route path="/activate-account" element={<ActivateAccount />} />
                         <Route path="/forgot-password" element={<ForgotPassword />} />
                         <Route path="/reset-password/:token" element={<ResetPassword />} />
@@ -138,6 +141,7 @@ function App() {
                         <Route path="activities" element={<ActivityBooking />} />
                         <Route path="food-orders" element={<FoodOrders />} />
                         <Route path="vehicle-hire" element={<VehicleHire />} />
+                        <Route path="extend-room" element={<ExtendRoomBooking />} />
                         <Route path="notifications" element={<Notifications />} />
                         <Route index element={<Navigate to="my-bookings" replace />} />
                     </Route>
@@ -193,18 +197,18 @@ function App() {
                         <Route index element={<Navigate to="dashboard" replace />} />
                     </Route>
 
-                    {/* Kitchen Routes */}
-                    <Route path="/kitchen" element={
-                        <ProtectedRoute allowedRoles={['kitchen', 'admin']}>
-                            <DashboardLayout items={kitchenItems} />
+                    {/* Chef Routes */}
+                    <Route path="/chef" element={
+                        <ProtectedRoute allowedRoles={['chef', 'admin']}>
+                            <DashboardLayout items={chefItems} />
                         </ProtectedRoute>
                     }>
-                        <Route path="dashboard" element={<KitchenDashboard />} />
-                        <Route path="orders" element={<KitchenOrders />} />
-                        <Route path="menu" element={<KitchenMenu />} />
-                        <Route path="damages" element={<KitchenDamages />} />
-                        <Route path="history" element={<KitchenHistory />} />
-                        <Route path="notifications" element={<CommonNotifications />} /> {/* Added */}
+                        <Route path="dashboard" element={<ChefDashboard />} />
+                        <Route path="orders" element={<ChefOrders />} />
+                        <Route path="menu" element={<ChefMenu />} />
+                        <Route path="damages" element={<ChefDamages />} />
+                        <Route path="history" element={<ChefHistory />} />
+                        <Route path="notifications" element={<CommonNotifications />} />
                         <Route path="profile" element={<StaffProfile />} />
                         <Route path="change-password" element={<ChangePassword />} />
                         <Route index element={<Navigate to="dashboard" replace />} />

@@ -38,7 +38,7 @@ exports.updateRoomBookingStatus = async (req, res) => {
 exports.getAllGuests = async (req, res) => {
     try {
         const [guests] = await db.query(
-            `SELECT g.*, u.name as guest_name, u.email as guest_email, u.phone as guest_phone, u.created_at
+            `SELECT g.*, CONCAT(u.first_name, ' ', u.last_name) as guest_name, u.email as guest_email, u.phone as guest_phone, u.created_at
              FROM Guest g
              JOIN Users u ON g.user_id = u.user_id`
         );
@@ -53,9 +53,9 @@ exports.getAllRoomBookings = async (req, res) => {
     try {
         const [bookings] = await db.query(
             `SELECT rb.*, 
-                    u.name as guest_name, 
+                    CONCAT(u.first_name, ' ', u.last_name) as guest_name, 
                     u.phone as guest_phone, 
-                    g.guest_address,
+                    g.guest_nic_passport,
                     g.nationality,
                     r.room_type, 
                     r.room_price_per_day
@@ -77,9 +77,9 @@ exports.getAllActivityBookings = async (req, res) => {
     try {
         const [bookings] = await db.query(
             `SELECT ab.*, 
-                    u.name as guest_name, 
+                    CONCAT(u.first_name, ' ', u.last_name) as guest_name, 
                     u.phone as guest_phone, 
-                    g.guest_address,
+                    g.guest_nic_passport,
                     g.nationality,
                     a.activity_name, 
                     a.activity_price_per_hour
@@ -128,7 +128,7 @@ exports.getRefundRequests = async (req, res) => {
                         WHEN fo.order_id IS NOT NULL THEN 'Food'
                         ELSE 'Unknown'
                     END as service_type,
-                    u.name as guest_name, 
+                    CONCAT(u.first_name, ' ', u.last_name) as guest_name, 
                     u.email as guest_email 
              FROM refund r
              JOIN payment p ON r.payment_id = p.payment_id
@@ -163,9 +163,9 @@ exports.getAllVehicleBookings = async (req, res) => {
     try {
         const [bookings] = await db.query(
             `SELECT vb.*, 
-                    u.name as guest_name, 
+                    CONCAT(u.first_name, ' ', u.last_name) as guest_name, 
                     u.phone as guest_phone,
-                    g.guest_address,
+                    g.guest_nic_passport,
                     g.nationality,
                     v.vehicle_type
              FROM vehiclebooking vb 
@@ -184,9 +184,9 @@ exports.getAllFoodOrders = async (req, res) => {
     try {
         const [orders] = await db.query(
             `SELECT fo.*, 
-                    u.name as guest_name, 
+                    CONCAT(u.first_name, ' ', u.last_name) as guest_name, 
                     u.phone as guest_phone,
-                    g.guest_address,
+                    g.guest_nic_passport,
                     g.nationality,
                     p.payment_amount,
                     COALESCE(p.payment_amount, SUM(oi.subtotal), 0) as order_total_amount,

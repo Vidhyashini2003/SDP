@@ -1,0 +1,4 @@
+Receptionist columns: receptionist_id, receptionist_address, user_id
+KitchenStaff columns: staff_id, staff_address, user_id
+Driver columns: driver_id, user_id, driver_address
+Guest columns: guest_id, guest_nic_passport, nationality, user_id

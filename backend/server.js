@@ -10,13 +10,22 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve static files from uploads directory
+app.use('/uploads', express.static('uploads'));
+
+// Request Logger
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});
+
 // Import routes
 const authRoutes = require('./routes/auth');
 const guestRoutes = require('./routes/guest');
 const bookingRoutes = require('./routes/bookings');
 const orderRoutes = require('./routes/orders');
 const receptionistRoutes = require('./routes/receptionist');
-const kitchenRoutes = require('./routes/kitchen');
+const chefRoutes = require('./routes/chef');
 const driverRoutes = require('./routes/driver');
 const adminRoutes = require('./routes/admin');
 const paymentRoutes = require('./routes/payments');
@@ -41,7 +50,7 @@ app.use('/api/guest', guestRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/receptionist', receptionistRoutes);
-app.use('/api/kitchen', kitchenRoutes);
+app.use('/api/chef', chefRoutes);
 app.use('/api/driver', driverRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payments', paymentRoutes);

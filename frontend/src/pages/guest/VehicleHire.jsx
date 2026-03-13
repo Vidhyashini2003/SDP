@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import axios from '../../config/axios';
 import { ExclamationCircleIcon } from '@heroicons/react/24/outline';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 const VehicleHire = () => {
+    const navigate = useNavigate();
     const [vehicles, setVehicles] = useState([]);
     const [searchParams, setSearchParams] = useState({
         vb_date: '',
@@ -11,6 +13,35 @@ const VehicleHire = () => {
     const [hasSearched, setHasSearched] = useState(false);
     const [loading, setLoading] = useState(false);
     const [requesting, setRequesting] = useState(null);
+    const [activeBookings, setActiveBookings] = useState([]);
+    const [hasActiveBooking, setHasActiveBooking] = useState(false);
+    const [selectedBooking, setSelectedBooking] = useState(null);
+    const [checkingBooking, setCheckingBooking] = useState(true);
+
+    const [searchParamsUrl] = useSearchParams();
+    const urlLinkedRbId = searchParamsUrl.get('rb_id');
+
+    useEffect(() => {
+        fetchActiveBookings();
+    }, []);
+
+    const fetchActiveBookings = async () => {
+        try {
+            const response = await axios.get('/api/guest/bookings/active');
+            const bookingsData = response.data;
+            setHasActiveBooking(bookingsData.hasActiveBooking);
+            setActiveBookings(bookingsData.bookings || []);
+
+            if (bookingsData.bookings && bookingsData.bookings.length > 0) {
+                const targetId = urlLinkedRbId ? parseInt(urlLinkedRbId, 10) : bookingsData.bookings[0].rb_id;
+                setSelectedBooking(targetId);
+            }
+        } catch (error) {
+            console.error('Error fetching active bookings:', error);
+        } finally {
+            setCheckingBooking(false);
+        }
+    };
 
     const handleSearch = async (e) => {
         e.preventDefault();
@@ -40,17 +71,28 @@ const VehicleHire = () => {
             const payload = {
                 vehicle_id: vehicle.vehicle_id,
                 vb_date: searchParams.vb_date,
-                vb_days: parseInt(searchParams.vb_days)
+                vb_days: parseInt(searchParams.vb_days),
+                rb_id: urlLinkedRbId || selectedBooking
             };
+            console.log('Vehicle hire payload:', payload);
 
-            await axios.post('/api/bookings/vehicles', payload);
-            alert('Hire request sent! Please wait for a driver to accept.');
+
+            const response = await axios.post('/api/bookings/vehicles', payload);
+            alert(`Hire request sent and linked to booking #${response.data.linkedBooking}! Please wait for a driver to accept.`);
             // Optionally remove from list or refresh
             const newVehicles = vehicles.filter(v => v.vehicle_id !== vehicle.vehicle_id);
             setVehicles(newVehicles);
         } catch (error) {
             console.error('Error requesting hire:', error);
-            alert(error.response?.data?.error || 'Failed to send request');
+            const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to send request';
+            alert(`ERROR from server: ${errorMsg}\nCode: ${error.response?.status}`);
+            
+            if (error.response?.data?.requiresBooking) {
+                alert(error.response.data.message || 'You must have an active room booking to hire a vehicle.');
+                navigate('/guest/rooms');
+            } else {
+                alert(error.response?.data?.error || error.response?.data?.message || 'Failed to send request');
+            }
         } finally {
             setRequesting(null);
         }
@@ -58,6 +100,29 @@ const VehicleHire = () => {
 
     // Get today's date for min attribute
     const today = new Date().toISOString().split('T')[0];
+
+    // Restrict dates based on selected/linked booking
+    const currentLinkedBooking = activeBookings.find(b => b.rb_id == (urlLinkedRbId ? parseInt(urlLinkedRbId, 10) : selectedBooking));
+    
+    let minDate = today;
+    let maxDate = '';
+
+    if (currentLinkedBooking) {
+        const checkIn = new Date(currentLinkedBooking.rb_checkin);
+        const checkOut = new Date(currentLinkedBooking.rb_checkout);
+        
+        // Add 1 day buffer as allowed by backend
+        const bufferStart = new Date(checkIn);
+        bufferStart.setDate(bufferStart.getDate() - 1);
+        const bufferEnd = new Date(checkOut);
+        bufferEnd.setDate(bufferEnd.getDate() + 1);
+
+        const minS = bufferStart.toISOString().split('T')[0];
+        const maxS = bufferEnd.toISOString().split('T')[0];
+
+        minDate = minS > today ? minS : today;
+        maxDate = maxS;
+    }
 
     const getPassengerCount = (vehicleType) => {
         const type = vehicleType?.toLowerCase() || '';
@@ -69,12 +134,74 @@ const VehicleHire = () => {
         return '4';
     };
 
+    if (checkingBooking) {
+        return (
+            <div className="flex items-center justify-center p-12">
+                <div className="text-slate-600">Loading...</div>
+            </div>
+        );
+    }
+
+    // Check if user has active booking
+    if (!hasActiveBooking && !urlLinkedRbId) {
+        return (
+            <div className="flex items-center justify-center p-8">
+                <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-8 max-w-md text-center shadow-lg">
+                    <div className="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span className="text-4xl">🏨</span>
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-900 mb-3">Room Booking Required</h2>
+                    <p className="text-slate-600 mb-6">
+                        You must have an active room booking to hire a vehicle.
+                        Book your stay first to arrange transportation!
+                    </p>
+                    <button
+                        onClick={() => navigate('/guest/rooms')}
+                        className="w-full bg-gold-500 hover:bg-gold-600 text-white px-8 py-3 rounded-lg font-semibold transition-colors shadow-lg"
+                    >
+                        Book a Room Now
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="p-8 overflow-auto">
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 mb-8">
                 <div className="mb-6">
                     <h3 className="text-xl font-bold text-slate-900">Vehicle Hire</h3>
                     <p className="text-sm text-slate-500">Search for available vehicles for your dates</p>
+
+                    {/* Booking Info */}
+                    {activeBookings.length > 0 && !urlLinkedRbId && (
+                        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg inline-block">
+                            <p className="text-sm text-slate-700">
+                                <span className="font-medium">📌 Linked to:</span> {activeBookings.find(b => b.rb_id == selectedBooking)?.room_type} ({new Date(activeBookings.find(b => b.rb_id == selectedBooking)?.rb_checkin).toLocaleDateString()} - {new Date(activeBookings.find(b => b.rb_id == selectedBooking)?.rb_checkout).toLocaleDateString()})
+                            </p>
+                            {activeBookings.length > 1 && (
+                                <select
+                                    value={selectedBooking}
+                                    onChange={(e) => setSelectedBooking(parseInt(e.target.value))}
+                                    className="mt-2 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                                >
+                                    {activeBookings.map(booking => (
+                                        <option key={booking.rb_id} value={booking.rb_id}>
+                                            {booking.room_type} ({new Date(booking.rb_checkin).toLocaleDateString()} - {new Date(booking.rb_checkout).toLocaleDateString()})
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
+                    )}
+                    
+                    {urlLinkedRbId && (
+                        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg inline-block">
+                            <p className="text-sm text-slate-700">
+                                <span className="font-medium">📌 Linked to Room Booking:</span> #{urlLinkedRbId}
+                            </p>
+                        </div>
+                    )}
                 </div>
 
                 <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-4 items-end bg-slate-50 p-6 rounded-xl border border-slate-200">
@@ -83,7 +210,8 @@ const VehicleHire = () => {
                         <input
                             type="date"
                             required
-                            min={today}
+                            min={minDate}
+                            max={maxDate}
                             value={searchParams.vb_date}
                             onChange={(e) => setSearchParams({ ...searchParams, vb_date: e.target.value })}
                             className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gold-500"
@@ -145,7 +273,8 @@ const VehicleHire = () => {
                                 </div>
 
                                 <button
-                                    onClick={() => handleRequestHire(vehicle)}
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); handleRequestHire(vehicle); }}
                                     disabled={requesting === vehicle.vehicle_id}
                                     className="w-full py-3 bg-gold-600 text-white rounded-lg hover:bg-gold-700 transition-colors font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                 >

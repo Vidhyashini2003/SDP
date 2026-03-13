@@ -1,20 +1,51 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from '../../config/axios';
 import { toast } from 'react-hot-toast';
+import { 
+    BuildingOfficeIcon, 
+    CakeIcon, 
+    TicketIcon, 
+    TruckIcon,
+    ClipboardDocumentListIcon,
+    SparklesIcon
+} from '@heroicons/react/24/outline';
 
 const GuestDashboard = () => {
-    const [activeTab, setActiveTab] = useState('all');
+    const navigate = useNavigate();
     const [bookings, setBookings] = useState({
         rooms: [],
         activities: [],
         foodOrders: [],
         vehicles: []
     });
+    const [activeBooking, setActiveBooking] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetchAllBookings();
+        const loadDashboardData = async () => {
+            try {
+                await Promise.all([
+                    fetchAllBookings(),
+                    fetchActiveBooking()
+                ]);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadDashboardData();
     }, []);
+
+    const fetchActiveBooking = async () => {
+        try {
+            const res = await axios.get('/api/guest/bookings/active');
+            if (res.data?.hasActiveBooking) {
+                setActiveBooking(res.data.bookings[0]);
+            }
+        } catch (error) {
+            console.error('Error fetching active booking:', error);
+        }
+    };
 
     const fetchAllBookings = async () => {
         try {
@@ -29,178 +60,185 @@ const GuestDashboard = () => {
                 foodOrders: ordersRes.data || [],
                 vehicles: bookingsRes.data?.vehicles || []
             });
-            setLoading(false);
         } catch (error) {
             console.error('Error fetching bookings:', error);
-            setLoading(false);
-        }
-    };
-
-    const handleCancel = async (bookingId) => {
-        if (!window.confirm('Are you sure you want to cancel this booking? Cancellation is only allowed 24 hours before check-in.')) {
-            return;
-        }
-
-        try {
-            const token = localStorage.getItem('token');
-            await axios.post(`/api/guest/bookings/rooms/${bookingId}/cancel`, {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            toast.success('Booking cancelled successfully');
-            fetchAllBookings(); // Refresh list
-        } catch (error) {
-            console.error('Cancellation error:', error);
-            toast.error(error.response?.data?.error || 'Failed to cancel booking');
         }
     };
 
     const getStatusColor = (status) => {
-        const statusColors = {
-            'checked-in': 'bg-blue-500',
-            'confirmed': 'bg-green-500',
-            'pending': 'bg-yellow-500',
-            'active': 'bg-blue-500',
-            'booked': 'bg-green-500',
-            'delivered': 'bg-green-500',
-            'ordered': 'bg-yellow-500',
-            'cancelled': 'bg-red-500',
-            'completed': 'bg-slate-500'
-        };
-        return `${statusColors[status?.toLowerCase()] || 'bg-slate-500'} text-white`;
+        const s = status?.toLowerCase();
+        if (['active', 'checked-in', 'confirmed', 'success', 'booked', 'delivered'].includes(s)) return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20';
+        if (['pending', 'ordered', 'pending payment'].includes(s)) return 'bg-amber-500/10 text-amber-600 border-amber-500/20';
+        if (['cancelled', 'failed'].includes(s)) return 'bg-rose-500/10 text-rose-500 border-rose-500/20';
+        return 'bg-slate-500/10 text-slate-500 border-slate-500/20';
     };
 
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
         return new Date(dateString).toLocaleDateString('en-US', {
-            year: 'numeric',
             month: 'short',
-            day: 'numeric'
+            day: 'numeric',
+            year: 'numeric'
         });
     };
-
-    const tabs = [
-        { id: 'all', label: 'All Bookings', icon: '📋' },
-        { id: 'rooms', label: 'Rooms', icon: '🏨' },
-        { id: 'activities', label: 'Activities', icon: '🎯' },
-        { id: 'food', label: 'Food Orders', icon: '🍽️' },
-        { id: 'vehicles', label: 'Vehicles', icon: '🚗' }
-    ];
 
     const getTotalCount = () => {
         return bookings.rooms.length + bookings.activities.length +
             bookings.foodOrders.length + bookings.vehicles.length;
     };
 
+    const getRecentActivity = () => {
+        const combined = [
+            ...bookings.rooms.map(r => ({ id: r.rb_id, type: 'Room', date: r.check_in_date, title: r.room_type, status: r.rb_status })),
+            ...bookings.activities.map(a => ({ id: a.ab_id, type: 'Activity', date: a.booking_date, title: a.activity_name, status: a.ab_status })),
+            ...bookings.foodOrders.map(f => ({ id: f.order_id, type: 'Dining', date: f.order_date, title: `${f.items?.length || 0} Items`, status: f.order_status })),
+            ...bookings.vehicles.map(v => ({ id: v.vb_id, type: 'Transport', date: v.booking_date, title: v.vehicle_type, status: v.vb_status }))
+        ];
+        return combined.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
+    };
+
     if (loading) {
         return (
-            <div className="flex items-center justify-center p-12">
-                <div className="text-slate-600">Loading bookings...</div>
+            <div className="flex items-center justify-center p-24">
+                <div className="w-12 h-12 border-4 border-slate-200 border-t-gold-600 rounded-full animate-spin"></div>
             </div>
         );
     }
 
+    const recentItems = getRecentActivity();
+
     return (
-        <div className="p-6 overflow-auto">
-            {/* Header */}
-            <div className="mb-6">
-                <h1 className="text-3xl font-bold text-slate-900">Guest <span className="bg-gradient-to-r from-gold-500 to-yellow-500 bg-clip-text text-transparent">Dashboard</span></h1>
-                <p className="text-slate-500 mt-1">Welcome back! Here's an overview of your activity.</p>
+        <div className="p-8 max-w-7xl mx-auto space-y-8">
+            {/* Header - Fixed Clipping */}
+            <div className="pb-4">
+                <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-tight">
+                    Guest <span className="bg-gradient-to-r from-gold-500 to-yellow-600 bg-clip-text text-transparent px-1">Dashboard</span>
+                </h1>
+                <p className="text-slate-500 mt-2 font-medium">Welcome back! Here's an overview of your activity.</p>
             </div>
 
-            {/* Stats Summary */}
-            {/* Stats Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-                {/* Total Bookings */}
-                <div className="bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 border border-slate-100 relative overflow-hidden group">
-                    <div className="flex justify-between items-start z-10 relative">
-                        <div>
-                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Total Bookings</p>
-                            <h3 className="text-2xl font-bold text-slate-900">{getTotalCount()}</h3>
-                        </div>
-                        <div className="p-2 bg-slate-100 rounded-lg text-slate-600 group-hover:bg-slate-800 group-hover:text-white transition-colors duration-300">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
-                        </div>
-                    </div>
-                    <div className="absolute -bottom-4 -right-4 w-16 h-16 bg-slate-100 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-500 ease-out" />
-                </div>
-
-                {/* Room Bookings */}
-                <div className="bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 border border-slate-100 relative overflow-hidden group">
-                    <div className="flex justify-between items-start z-10 relative">
-                        <div>
-                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Rooms</p>
-                            <h3 className="text-2xl font-bold text-slate-900">{bookings.rooms.length}</h3>
-                        </div>
-                        <div className="p-2 bg-gold-50 rounded-lg text-gold-600 group-hover:bg-gold-600 group-hover:text-white transition-colors duration-300">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {[
+                    { label: 'Total', value: getTotalCount(), icon: ClipboardDocumentListIcon, color: 'slate' },
+                    { label: 'Rooms', value: bookings.rooms.length, icon: BuildingOfficeIcon, color: 'gold' },
+                    { label: 'Activities', value: bookings.activities.length, icon: TicketIcon, color: 'purple' },
+                    { label: 'Orders', value: bookings.foodOrders.length, icon: CakeIcon, color: 'green' },
+                    { label: 'Vehicles', value: bookings.vehicles.length, icon: TruckIcon, color: 'orange' }
+                ].map((stat, idx) => (
+                    <div key={idx} className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 group hover:shadow-md transition-all">
+                        <div className="flex justify-between items-start">
+                            <div className="p-2 bg-slate-50 rounded-2xl group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300">
+                                <stat.icon className="w-6 h-6" />
+                            </div>
+                            <div className="text-right">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
+                                <h3 className="text-3xl font-black text-slate-900 leading-none">{stat.value}</h3>
+                            </div>
                         </div>
                     </div>
-                    <div className="absolute -bottom-4 -right-4 w-16 h-16 bg-gold-50 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-500 ease-out" />
-                </div>
-
-                {/* Activities */}
-                <div className="bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 border border-slate-100 relative overflow-hidden group">
-                    <div className="flex justify-between items-start z-10 relative">
-                        <div>
-                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Activities</p>
-                            <h3 className="text-2xl font-bold text-slate-900">{bookings.activities.length}</h3>
-                        </div>
-                        <div className="p-2 bg-purple-50 rounded-lg text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-colors duration-300">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" /></svg>
-                        </div>
-                    </div>
-                    <div className="absolute -bottom-4 -right-4 w-16 h-16 bg-purple-50 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-500 ease-out" />
-                </div>
-
-                {/* Food Orders */}
-                <div className="bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 border border-slate-100 relative overflow-hidden group">
-                    <div className="flex justify-between items-start z-10 relative">
-                        <div>
-                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Food Orders</p>
-                            <h3 className="text-2xl font-bold text-slate-900">{bookings.foodOrders.length}</h3>
-                        </div>
-                        <div className="p-2 bg-green-50 rounded-lg text-green-600 group-hover:bg-green-600 group-hover:text-white transition-colors duration-300">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-                        </div>
-                    </div>
-                    <div className="absolute -bottom-4 -right-4 w-16 h-16 bg-green-50 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-500 ease-out" />
-                </div>
-
-                {/* Vehicle Hire */}
-                <div className="bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 border border-slate-100 relative overflow-hidden group">
-                    <div className="flex justify-between items-start z-10 relative">
-                        <div>
-                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Vehicle Hire</p>
-                            <h3 className="text-2xl font-bold text-slate-900">{bookings.vehicles.length}</h3>
-                        </div>
-                        <div className="p-2 bg-orange-50 rounded-lg text-orange-600 group-hover:bg-orange-600 group-hover:text-white transition-colors duration-300">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                        </div>
-                    </div>
-                    <div className="absolute -bottom-4 -right-4 w-16 h-16 bg-orange-50 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-500 ease-out" />
-                </div>
+                ))}
             </div>
 
-            {/* Dashboard Actions */}
-            <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">Quick Actions</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <a href="/guest/rooms" className="flex flex-col items-center justify-center p-4 bg-gold-50 text-gold-700 rounded-xl hover:bg-gold-100 transition-colors">
-                        <span className="text-2xl mb-2">🏨</span>
-                        <span className="font-medium text-sm">Book a Room</span>
-                    </a>
-                    <a href="/guest/food-orders" className="flex flex-col items-center justify-center p-4 bg-green-50 text-green-700 rounded-xl hover:bg-green-100 transition-colors">
-                        <span className="text-2xl mb-2">🍽️</span>
-                        <span className="font-medium text-sm">Order Food</span>
-                    </a>
-                    <a href="/guest/activities" className="flex flex-col items-center justify-center p-4 bg-purple-50 text-purple-700 rounded-xl hover:bg-purple-100 transition-colors">
-                        <span className="text-2xl mb-2">🎯</span>
-                        <span className="font-medium text-sm">Book Activity</span>
-                    </a>
-                    <a href="/guest/vehicle-hire" className="flex flex-col items-center justify-center p-4 bg-orange-50 text-orange-700 rounded-xl hover:bg-orange-100 transition-colors">
-                        <span className="text-2xl mb-2">🚗</span>
-                        <span className="font-medium text-sm">Hire Vehicle</span>
-                    </a>
+            {/* Main Content Area */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                {/* Hero CTA - Left side */}
+                <div className="lg:col-span-5 space-y-6">
+                    <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden h-full flex flex-col justify-center min-h-[400px]">
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-gold-500/10 rounded-full -mr-32 -mt-32 blur-3xl"></div>
+                        <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 rounded-full -ml-32 -mb-32 blur-3xl"></div>
+                        
+                        <div className="relative z-10 space-y-6">
+                            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10">
+                                <SparklesIcon className="w-4 h-4 text-gold-400" />
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gold-400">Exclusive Travel</span>
+                            </div>
+                            
+                            <h2 className="text-4xl font-black leading-tight">Ready for your next adventure?</h2>
+                            <p className="text-slate-400 font-medium">Explore our premium rooms and book your stay at Janas Blue Water Corner today.</p>
+                            
+                            <button 
+                                onClick={() => navigate('/guest/rooms')}
+                                className="inline-flex items-center gap-3 bg-gold-500 hover:bg-gold-600 text-white px-8 py-5 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-gold-600/20 active:scale-95 group"
+                            >
+                                <BuildingOfficeIcon className="w-5 h-5" />
+                                Book a Room
+                                <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Recent Activity - Right side */}
+                <div className="lg:col-span-7 bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm h-full">
+                    <div className="flex justify-between items-center mb-8">
+                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em]">Recent Activity</h3>
+                        <button 
+                            onClick={() => navigate('/guest/my-bookings')}
+                            className="text-[10px] font-black text-gold-600 uppercase tracking-widest hover:text-gold-700 underline underline-offset-4"
+                        >
+                            View All Bookings
+                        </button>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead>
+                                <tr className="text-left border-b border-slate-50">
+                                    <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Type</th>
+                                    <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Detail</th>
+                                    <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</th>
+                                    <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                {recentItems.length > 0 ? recentItems.map((item, idx) => (
+                                    <tr key={idx} className="group hover:bg-slate-50/50 transition-colors">
+                                        <td className="py-4">
+                                            <span className="text-[10px] font-extrabold text-slate-900 uppercase tracking-wider">{item.type}</span>
+                                        </td>
+                                        <td className="py-4">
+                                            <p className="text-sm font-bold text-slate-600">{item.title}</p>
+                                        </td>
+                                        <td className="py-4">
+                                            <p className="text-xs font-medium text-slate-500">{formatDate(item.date)}</p>
+                                        </td>
+                                        <td className="py-4 text-right">
+                                            <span className={`px-2.5 py-1 text-[9px] font-black rounded-lg border uppercase tracking-widest ${getStatusColor(item.status)}`}>
+                                                {item.status}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                )) : (
+                                    <tr>
+                                        <td colSpan="4" className="py-12 text-center">
+                                            <p className="text-xs font-black text-slate-300 uppercase tracking-widest">No activity found</p>
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {activeBooking && (
+                        <div className="mt-8 pt-6 border-t border-slate-50">
+                            <div className="flex items-center gap-3 bg-emerald-50/50 px-4 py-3 rounded-2xl border border-emerald-50 transition-all hover:border-emerald-100">
+                                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                                <div className="flex-1">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Active Stay Detected</p>
+                                    <p className="text-xs font-bold text-slate-900">
+                                        You are currently staying in Room {activeBooking.room_number || activeBooking.room_type}
+                                    </p>
+                                </div>
+                                <button 
+                                    onClick={() => navigate('/guest/my-bookings')}
+                                    className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/10"
+                                >
+                                    Manage
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

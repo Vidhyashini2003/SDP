@@ -15,7 +15,13 @@ export const AuthProvider = ({ children }) => {
         const storedUser = localStorage.getItem('user');
 
         if (token && storedUser) {
-            setUser(JSON.parse(storedUser));
+            const parsedUser = JSON.parse(storedUser);
+            // Auto-migrate legacy role from localStorage
+            if (parsedUser.role === 'kitchen' || parsedUser.role === 'chief') {
+                parsedUser.role = 'chef';
+                localStorage.setItem('user', JSON.stringify(parsedUser));
+            }
+            setUser(parsedUser);
             // Set default auth header for all future requests
             axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         }

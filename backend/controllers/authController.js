@@ -9,7 +9,7 @@ const getRoleSchema = (role) => {
     switch (role) {
         case 'admin': return null; // Admin has no specific table
         case 'receptionist': return { table: 'Receptionist', idCol: 'receptionist_id' };
-        case 'kitchen': return { table: 'KitchenStaff', idCol: 'staff_id' };
+        case 'chef': return { table: 'KitchenStaff', idCol: 'staff_id' };
         case 'driver': return { table: 'Driver', idCol: 'driver_id' };
         case 'guest': return { table: 'Guest', idCol: 'guest_id' };
         default: return null;
@@ -38,7 +38,7 @@ exports.registerGuest = async (req, res) => {
     try {
         await connection.beginTransaction();
         const {
-            guest_name, guest_email, guest_phone, guest_password, guest_address, nationality
+            first_name, last_name, guest_email, guest_phone, guest_password, guest_nic_passport, nationality
         } = req.body;
 
         const passwordValidation = validatePassword(guest_password);
@@ -58,17 +58,17 @@ exports.registerGuest = async (req, res) => {
 
         // 1. Insert into Users (Inactive, With Password)
         const [userRes] = await connection.query(
-            "INSERT INTO Users (name, email, phone, password, role, account_status) VALUES (?, ?, ?, ?, 'guest', 'Inactive')",
-            [guest_name, guest_email, guest_phone, hashedPassword]
+            "INSERT INTO Users (first_name, last_name, email, phone, password, role, account_status) VALUES (?, ?, ?, ?, ?, 'guest', 'Inactive')",
+            [first_name, last_name, guest_email, guest_phone, hashedPassword]
         );
         const userId = userRes.insertId;
 
         // 2. Insert into Guest (linking to user_id)
         await connection.query(
             `INSERT INTO Guest (
-                user_id, guest_address, nationality
+                user_id, guest_nic_passport, nationality
              ) VALUES (?, ?, ?)`,
-            [userId, guest_address, nationality]
+            [userId, guest_nic_passport, nationality]
         );
 
         // 3. Generate Activation Token
@@ -144,7 +144,9 @@ exports.login = async (req, res) => {
             user: {
                 id: user.user_id,
                 userId: user.user_id,
-                name: user.name,
+                name: `${user.first_name} ${user.last_name}`.trim(),
+                first_name: user.first_name,
+                last_name: user.last_name,
                 email: user.email,
                 role: user.role
             }
@@ -247,12 +249,12 @@ exports.updateProfile = async (req, res) => {
         await connection.beginTransaction();
         const userId = req.user.id; // Now this is user_id
         const role = req.user.role;
-        const { name, email, phone, address, nationality } = req.body;
+        const { first_name, last_name, address, nationality } = req.body;
 
-        // 1. Update Common Fields in Users Table
+        // 1. Update Common Fields in Users Table (guest_phone handled in guestController)
         await connection.query(
-            'UPDATE Users SET name = ?, email = ?, phone = ? WHERE user_id = ?',
-            [name, email, phone, userId]
+            'UPDATE Users SET first_name = ?, last_name = ? WHERE user_id = ?',
+            [first_name, last_name, userId]
         );
 
         console.log(`Updating profile for UserID: ${userId}, Role: ${role}`);
@@ -264,15 +266,15 @@ exports.updateProfile = async (req, res) => {
 
         if (lowerRole === 'guest') {
             await connection.query(
-                'UPDATE Guest SET guest_address = ?, nationality = ? WHERE user_id = ?',
-                [address, nationality, userId]
+                'UPDATE Guest SET guest_nic_passport = ?, nationality = ? WHERE user_id = ?',
+                [address, nationality, userId] // frontend is still sending it as "address" in updateProfile payload for all roles, but we save it to guest_nic_passport
             );
         } else if (lowerRole === 'receptionist') {
             await connection.query(
                 'UPDATE Receptionist SET receptionist_address = ? WHERE user_id = ?',
                 [address, userId]
             );
-        } else if (lowerRole === 'kitchen') {
+        } else if (lowerRole === 'chef') {
             await connection.query(
                 'UPDATE KitchenStaff SET staff_address = ? WHERE user_id = ?',
                 [address, userId]
@@ -444,17 +446,17 @@ exports.getMe = async (req, res) => {
     const role = req.user.role;
     const connection = await db.getConnection();
     try {
-        let query = 'SELECT u.user_id, u.name, u.email, u.phone, u.role, u.account_status';
+        let query = "SELECT u.user_id, CONCAT(u.first_name, ' ', u.last_name) as name, u.first_name, u.last_name, u.email, u.phone, u.role, u.account_status";
         let params = [userId];
 
         if (role === 'receptionist') {
             query += ', r.receptionist_address as address FROM Users u LEFT JOIN Receptionist r ON u.user_id = r.user_id WHERE u.user_id = ?';
-        } else if (role === 'kitchen') {
+        } else if (role === 'chef') {
             query += ', k.staff_address as address FROM Users u LEFT JOIN KitchenStaff k ON u.user_id = k.user_id WHERE u.user_id = ?';
         } else if (role === 'driver') {
             query += ', d.driver_address as address FROM Users u LEFT JOIN Driver d ON u.user_id = d.user_id WHERE u.user_id = ?';
         } else if (role === 'guest') {
-            query += ', g.guest_address as address, g.nationality FROM Users u LEFT JOIN Guest g ON u.user_id = g.user_id WHERE u.user_id = ?';
+            query += ', g.guest_nic_passport, g.nationality FROM Users u LEFT JOIN Guest g ON u.user_id = g.user_id WHERE u.user_id = ?';
         } else {
             query += ' FROM Users u WHERE u.user_id = ?';
         }

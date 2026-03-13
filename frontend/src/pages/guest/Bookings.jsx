@@ -1,100 +1,101 @@
 import { useState, useEffect } from 'react';
-import axios from '../../config/axios'; // Use configured axios
+import { useNavigate } from 'react-router-dom';
+import axios from '../../config/axios';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../../context/AuthContext';
 import jsPDF from 'jspdf';
-import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import autoTable from 'jspdf-autotable';
+import { 
+    CalendarDaysIcon, 
+    MapPinIcon, 
+    HomeModernIcon, 
+    PlusCircleIcon, 
+    CurrencyDollarIcon,
+    ArrowDownTrayIcon
+} from '@heroicons/react/24/outline';
+import DemoPaymentGateway from '../../components/DemoPaymentGateway';
 
 const GuestBookings = () => {
-    const [activeTab, setActiveTab] = useState('all');
-    const [bookings, setBookings] = useState({
-        rooms: [],
-        activities: [],
-        foodOrders: [],
-        vehicles: []
-    });
+    const { user } = useAuth();
+    const navigate = useNavigate();
+    const [trips, setTrips] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [paymentModal, setPaymentModal] = useState({ isOpen: false, amount: 0, vehicle: null });
 
     useEffect(() => {
-        fetchAllBookings();
+        fetchGroupedBookings();
     }, []);
 
-    const fetchAllBookings = async () => {
+    const fetchGroupedBookings = async () => {
         try {
-            const [bookingsRes, ordersRes] = await Promise.all([
-                axios.get('/api/guest/bookings'),
-                axios.get('/api/guest/orders')
-            ]);
-
-            setBookings({
-                rooms: bookingsRes.data?.rooms || [],
-                activities: bookingsRes.data?.activities || [],
-                foodOrders: ordersRes.data || [],
-                vehicles: bookingsRes.data?.vehicles || []
-            });
+            const res = await axios.get('/api/guest/bookings/grouped');
+            setTrips(res.data || []);
             setLoading(false);
         } catch (error) {
-            console.error('Error fetching bookings:', error);
+            console.error('Error fetching grouped bookings:', error);
+            toast.error('Failed to load trips');
             setLoading(false);
         }
     };
 
-    const handleCancel = async (bookingId) => {
-        if (!window.confirm('Are you sure you want to cancel this booking? Cancellation is only allowed 24 hours before check-in.')) {
+    const handleCancelRoom = async (bookingId) => {
+        if (!window.confirm('Are you sure you want to cancel this ENTIRE trip and all nested bookings? Cancellation is only allowed 24 hours before check-in.')) {
             return;
         }
 
         try {
             await axios.post(`/api/guest/bookings/rooms/${bookingId}/cancel`);
-            toast.success('Booking cancelled successfully');
-            fetchAllBookings(); // Refresh list
+            toast.success('Trip cancelled successfully');
+            fetchGroupedBookings(); 
         } catch (error) {
-            console.error('Cancellation error:', error);
-            toast.error(error.response?.data?.error || 'Failed to cancel booking');
+            toast.error(error.response?.data?.error || 'Failed to cancel trip');
         }
-    };
-
-    const getStatusColor = (status) => {
-        const statusColors = {
-            'checked-in': 'bg-blue-500',
-            'confirmed': 'bg-green-500',
-            'pending': 'bg-yellow-500',
-            'pending approval': 'bg-yellow-100 text-yellow-800',
-            'pending payment': 'bg-orange-100 text-orange-800',
-            'active': 'bg-blue-500',
-            'booked': 'bg-green-500',
-            'delivered': 'bg-green-500',
-            'ordered': 'bg-yellow-500',
-            'cancelled': 'bg-red-500',
-            'completed': 'bg-slate-500',
-            'rejected': 'bg-red-500'
-        };
-        return `${statusColors[status?.toLowerCase()] || 'bg-slate-500'} text-white`;
     };
 
     const handleVehiclePayment = async (vehicle) => {
         const amount = vehicle.vehicle_price_per_day * vehicle.vb_days;
-        if (!confirm(`Confirm payment of Rs. ${amount} for ${vehicle.vehicle_type}?`)) return;
+        setPaymentModal({ isOpen: true, amount, vehicle });
+    };
 
+    const confirmVehiclePayment = async () => {
+        const { vehicle, amount } = paymentModal;
         try {
             await axios.post(`/api/guest/bookings/vehicles/${vehicle.vb_id}/pay`, {
-                payment_method: 'Card', // Hardcoded for demo/simplicity or ask user
+                payment_method: 'Card',
                 total_amount: amount
             });
             toast.success('Payment successful! Trip confirmed.');
-            window.location.reload();
+            fetchGroupedBookings();
         } catch (error) {
-            console.error('Payment error:', error);
             toast.error('Payment failed');
         }
     };
 
-    const formatDate = (dateString) => {
+    const getStatusBadge = (status) => {
+        const s = status?.toLowerCase() || '';
+        let style = 'bg-slate-100 text-slate-500 border-slate-200';
+        
+        if (['confirmed', 'booked', 'delivered', 'active', 'success'].includes(s)) {
+            style = 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20';
+        } else if (['pending', 'pending approval', 'ordered', 'pending payment'].includes(s)) {
+            style = 'bg-gold-500/10 text-gold-600 border-gold-500/20';
+        } else if (['cancelled', 'rejected'].includes(s)) {
+            style = 'bg-rose-500/10 text-rose-500 border-rose-500/20';
+        } else if (['completed', 'checked-in'].includes(s)) {
+            style = 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20';
+        }
+
+        return (
+            <span className={`px-2.5 py-1 text-[9px] font-black rounded-lg border ${style} uppercase tracking-[0.15em] whitespace-nowrap`}>
+                {status}
+            </span>
+        );
+    };
+
+    const formatDate = (dateString, options = {}) => {
         if (!dateString) return 'N/A';
         return new Date(dateString).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
+            month: 'short', day: 'numeric', ...options
         });
     };
 
@@ -102,520 +103,482 @@ const GuestBookings = () => {
         const doc = new jsPDF();
         const pageWidth = doc.internal.pageSize.width;
 
-        // --- Colors ---
-        const primaryColor = [30, 41, 59]; // Slate 800 (Navy-ish)
-        const accentColor = [218, 165, 32]; // Gold
+        const primaryColor = [15, 23, 42]; // Slate 900
+        const accentColor = [184, 134, 11]; // Dark Goldenrod
         const grayColor = [100, 116, 139]; // Slate 500
+        const lightGray = [248, 250, 252]; // Slate 50
 
-        // --- Header ---
-        // Company Info (Left)
+        // --- HEADER ---
+        doc.setFillColor(...primaryColor);
+        doc.rect(0, 0, pageWidth, 40, 'F');
+
         doc.setFontSize(22);
-        doc.setTextColor(...primaryColor);
+        doc.setTextColor(255, 255, 255);
         doc.setFont('helvetica', 'bold');
-        doc.text('Janas Blue Water Corner', 14, 20);
+        doc.text('Janas Blue Water Corner', 14, 25);
 
+        doc.setFontSize(30);
+        doc.setTextColor(...accentColor);
+        doc.text('INVOICE', pageWidth - 14, 28, { align: 'right' });
+
+        // --- INFO SECTION ---
+        doc.setTextColor(...primaryColor);
         doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text('BILL FROM:', 14, 55);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(...grayColor);
-        doc.text('123 Beach Road, Trincomalee', 14, 26);
-        doc.text('Email: info@janasblue.com | Tel: +94 77 123 4567', 14, 31);
+        doc.text('123 Beach Road, Trincomalee', 14, 60);
+        doc.text('info@janasblue.com', 14, 65);
+        doc.text('+94 77 123 4567', 14, 70);
 
-        // Receipt Label (Right)
-        doc.setFontSize(24);
-        doc.setTextColor(...accentColor);
-        doc.text('RECEIPT', pageWidth - 14, 22, { align: 'right' });
+        doc.setTextColor(...primaryColor);
+        doc.setFont('helvetica', 'bold');
+        doc.text('BILL TO:', 80, 55);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...grayColor);
+        doc.text(user?.name || 'Valued Guest', 80, 60);
+        doc.text(user?.email || 'N/A', 80, 65);
 
-        // --- Meta Data (Right below label) ---
-        let id = '';
-        let amount = 0;
-        let date = '';
-        let status = '';
+        const receiptNo = `${type.substring(0, 2).toUpperCase()}-${String(booking.rb_id || booking.order_id || booking.ab_id || booking.vb_id).padStart(4, '0')}`;
+        doc.setTextColor(...primaryColor);
+        doc.setFont('helvetica', 'bold');
+        doc.text('INVOICE DETAILS:', pageWidth - 14, 55, { align: 'right' });
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...grayColor);
+        doc.text(`Invoice #: ${receiptNo}`, pageWidth - 14, 60, { align: 'right' });
+        doc.text(`Date: ${new Date().toLocaleDateString()}`, pageWidth - 14, 65, { align: 'right' });
+        doc.text(`Booking Ref: #${booking.rb_id || 'N/A'}`, pageWidth - 14, 70, { align: 'right' });
+
+        doc.setDrawColor(...lightGray);
+        doc.line(14, 80, pageWidth - 14, 80);
+
+        // --- ITEMS PREPARATION ---
         let items = [];
+        let totalAmount = 0;
 
-        // Extract Data based on Type
-        if (type === 'Room') {
-            id = booking.rb_id;
-            amount = booking.total_price;
-            date = booking.created_at || new Date().toISOString();
-            status = booking.rb_status;
-            items = [
-                ['Room Booking', `Type: ${booking.room_type}\nCheck-in: ${formatDate(booking.check_in_date)}\nCheck-out: ${formatDate(booking.check_out_date)}`, '1', `Rs. ${amount}`]
-            ];
-        } else if (type === 'Activity') {
-            id = booking.ab_id;
-            amount = booking.total_price || 0;
-            date = booking.booking_date;
-            status = booking.ab_status;
-            items = [
-                ['Activity Booking', `${booking.activity_name}\nDate: ${formatDate(booking.booking_date)}\nDuration: ${booking.duration_hours} Hrs`, '1', `Rs. ${amount}`]
-            ];
-        } else if (type === 'Vehicle') {
-            id = booking.vb_id;
-            amount = booking.total_amount || (booking.vehicle_price_per_day * booking.vb_days);
-            date = booking.booking_date;
-            status = booking.vb_status;
-            items = [
-                ['Vehicle Rental', `${booking.vehicle_type} - ${booking.vehicle_number}\nDate: ${formatDate(booking.booking_date)}`, `${booking.vb_days} Days`, `Rs. ${amount}`]
-            ];
-        } else if (type === 'Food') {
-            id = booking.order_id;
-            amount = booking.order_total_amount;
-            date = booking.order_date;
-            status = booking.payment_status || booking.order_status;
-            items = booking.items.map(item => [
-                'Food Order',
-                item.item_name,
-                item.order_quantity,
-                `Rs. ${item.order_total_amount || (item.item_price * item.order_quantity)}`
-            ]);
+        const checkPaid = (s) => !['pending', 'pending payment', 'cancelled', 'rejected', 'pending approval', 'ordered'].includes(s?.toLowerCase()) ? 'PAID' : 'PENDING';
+
+        if (type === 'Summary') {
+            // Room
+            const roomPrice = parseFloat(booking.total_price || 0);
+            items.push(['Room Stay', `${booking.room_type} (#${booking.room_number})\n${formatDate(booking.check_in_date)} - ${formatDate(booking.check_out_date)}`, 'Stay', `Rs. ${roomPrice.toLocaleString()}`, checkPaid(booking.rb_status)]);
+            totalAmount += roomPrice;
+
+            // Activities
+            booking.activities.forEach(act => {
+                const p = parseFloat(act.total_price || 0);
+                items.push(['Activity', `${act.activity_name}\n${formatDate(act.booking_date)}`, '1', `Rs. ${p.toLocaleString()}`, checkPaid(act.ab_status)]);
+                totalAmount += p;
+            });
+
+            // Food
+            booking.foodOrders.forEach(order => {
+                const orderPrice = order.items.reduce((sum, item) => sum + (parseFloat(item.item_price) * parseInt(item.order_quantity || 0)), 0);
+                items.push(['Catering', `Order #${order.order_id}\n${order.items.map(i => i.item_name).join(', ')}`, 'Order', `Rs. ${orderPrice.toLocaleString()}`, checkPaid(order.payment_status || order.order_status)]);
+                totalAmount += orderPrice;
+            });
+
+            // Vehicles
+            booking.vehicles.forEach(veh => {
+                const p = parseFloat(veh.vehicle_price_per_day || 0) * parseInt(veh.vb_days || 0);
+                items.push(['Transport', `${veh.vehicle_type} (${veh.vehicle_number})\n${veh.vb_days} Days Hiring`, 'Hire', `Rs. ${p.toLocaleString()}`, checkPaid(veh.vb_status)]);
+                totalAmount += p;
+            });
+        } else {
+            // Handle individual types (backward compatibility)
+            if (type === 'Room') {
+                items.push(['Room Booking', booking.room_type, '1', `Rs. ${booking.total_price}`, checkPaid(booking.rb_status)]);
+                totalAmount = booking.total_price;
+            } else if (type === 'Activity') {
+                items.push(['Activity', booking.activity_name, '1', `Rs. ${booking.total_price}`, checkPaid(booking.ab_status)]);
+                totalAmount = booking.total_price;
+            } else if (type === 'Vehicle') {
+                const p = parseFloat(booking.vehicle_price_per_day || 0) * parseInt(booking.vb_days || 0);
+                items.push(['Transport', `${booking.vehicle_type}\n${booking.vb_days} Days`, 'Hire', `Rs. ${p.toLocaleString()}`, checkPaid(booking.vb_status)]);
+                totalAmount = p;
+            }
         }
 
-        const receiptNo = `${type.substring(0, 2).toUpperCase()}-${String(id).padStart(4, '0')}`;
-        const issueDate = new Date().toLocaleDateString();
-
-        doc.setFontSize(10);
-        doc.setTextColor(...primaryColor);
-        doc.text(`Receipt #: ${receiptNo}`, pageWidth - 14, 32, { align: 'right' });
-        doc.text(`Date: ${issueDate}`, pageWidth - 14, 37, { align: 'right' });
-
-        // --- Divider ---
-        doc.setDrawColor(226, 232, 240); // Light gray line
-        doc.setLineWidth(0.5);
-        doc.line(14, 45, pageWidth - 14, 45);
-
-        // --- Payment Status Badge ---
-        const isPaid = !['pending', 'pending payment', 'cancelled', 'rejected', 'pending approval'].includes(status?.toLowerCase());
-        const statusText = isPaid ? 'PAID' : 'NOT PAID';
-        const statusColor = isPaid ? [22, 163, 74] : [220, 38, 38]; // Green or Red
-
-        // Status Label & Box
-        doc.setFontSize(10);
-        doc.setTextColor(...grayColor);
-        doc.text('Payment Status', 14, 53);
-
-        doc.setFillColor(...(isPaid ? [220, 252, 231] : [254, 226, 226]));
-        doc.rect(14, 56, 30, 8, 'F');
-
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(...statusColor);
-        doc.text(statusText, 29, 61, { align: 'center' });
-
-        // --- Table ---
+        // --- TABLE ---
         autoTable(doc, {
-            startY: 70,
-            head: [['Item', 'Description', 'Quantity', 'Amount']],
+            startY: 90,
+            head: [['Category', 'Description', 'Qty', 'Price', 'Status']],
             body: items,
-            theme: 'plain', // Clean theme
-            headStyles: {
-                fillColor: primaryColor,
-                textColor: [255, 255, 255],
-                fontStyle: 'bold',
-                halign: 'left'
-            },
-            styles: {
-                fontSize: 10,
-                cellPadding: 6,
-                textColor: [51, 65, 85],
-                lineColor: [226, 232, 240],
-                lineWidth: 0.1
-            },
+            theme: 'grid',
+            headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
+            styles: { fontSize: 9, cellPadding: 5, textColor: [51, 65, 85], valign: 'middle' },
             columnStyles: {
-                0: { cellWidth: 40, fontStyle: 'bold' },
+                0: { cellWidth: 25 },
                 1: { cellWidth: 'auto' },
-                2: { cellWidth: 30, halign: 'center' },
-                3: { cellWidth: 40, halign: 'right' }
+                2: { cellWidth: 22, halign: 'center' },
+                3: { cellWidth: 33, halign: 'right', fontStyle: 'bold' },
+                4: { cellWidth: 25, halign: 'center', fontStyle: 'bold' }
+            },
+            didParseCell: (data) => {
+                if (data.column.index === 4 && data.section === 'body') {
+                    if (data.cell.raw === 'PAID') data.cell.styles.textColor = [16, 185, 129];
+                    if (data.cell.raw === 'PENDING') data.cell.styles.textColor = [234, 179, 8];
+                }
             }
         });
 
-        // --- Total Section ---
-        const finalY = doc.lastAutoTable.finalY + 10;
+        // --- FINANCIAL SUMMARY BOX ---
+        let finalY = doc.lastAutoTable.finalY + 15;
+        const pageHeight = doc.internal.pageSize.height;
+        const boxHeight = 45; // Height of summary box + some padding
+
+        // Check for page overflow
+        if (finalY + boxHeight > pageHeight - 30) {
+            doc.addPage();
+            finalY = 20; // Start near top of new page
+        }
+
+        const getVal = (row) => parseFloat(row[3].replace('Rs. ', '').replace(/,/g, '') || 0);
+        const paidSum = items.filter(i => i[4] === 'PAID').reduce((sum, i) => sum + getVal(i), 0);
+        const pendingSum = items.filter(i => i[4] === 'PENDING').reduce((sum, i) => sum + getVal(i), 0);
+
+        doc.setFillColor(...lightGray);
+        doc.roundedRect(pageWidth - 95, finalY, 81, 42, 3, 3, 'F');
+
+        doc.setFontSize(10);
+        doc.setTextColor(...grayColor);
+        doc.text('Subtotal:', pageWidth - 90, finalY + 10);
+        doc.setTextColor(...primaryColor);
+        doc.text(`Rs. ${totalAmount.toLocaleString()}`, pageWidth - 18, finalY + 10, { align: 'right' });
+
+        doc.setTextColor(...grayColor);
+        doc.text('Amount Paid:', pageWidth - 90, finalY + 18);
+        doc.setTextColor(16, 185, 129);
+        doc.text(`- Rs. ${paidSum.toLocaleString()}`, pageWidth - 18, finalY + 18, { align: 'right' });
+
+        doc.setTextColor(...grayColor);
+        doc.text('Balance Due:', pageWidth - 90, finalY + 26);
+        doc.setTextColor(234, 179, 8);
+        doc.text(`Rs. ${pendingSum.toLocaleString()}`, pageWidth - 18, finalY + 26, { align: 'right' });
+
+        doc.setDrawColor(226, 232, 240);
+        doc.line(pageWidth - 90, finalY + 30, pageWidth - 18, finalY + 30);
 
         doc.setFontSize(11);
-        doc.setTextColor(...primaryColor);
-        doc.text('Total Amount:', pageWidth - 80, finalY);
-
-        doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...primaryColor);
+        doc.text('GRAND TOTAL:', pageWidth - 90, finalY + 37);
         doc.setTextColor(...accentColor);
-        doc.text(`Rs. ${amount || 0}`, pageWidth - 14, finalY, { align: 'right' });
+        doc.setFontSize(13);
+        doc.text(`Rs. ${totalAmount.toLocaleString()}`, pageWidth - 18, finalY + 37, { align: 'right' });
 
-        // --- Footer ---
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(...grayColor);
+        // --- FOOTER ---
         const footerY = doc.internal.pageSize.height - 30;
+        doc.setFontSize(10);
+        doc.setTextColor(...primaryColor);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Thank you for choosing Janas Blue Water Corner!', 14, footerY);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(...grayColor);
+        doc.text('Please note that all bookings are subject to our terms and conditions.', 14, footerY + 5);
+        doc.text('Electronic receipt - no signature required.', 14, footerY + 9);
 
-        doc.text('Thank you for your business!', 14, footerY);
-        doc.text('For questions concerning this receipt, please contact our front desk.', 14, footerY + 5);
-
-        // Brand Line at bottom
-        doc.setDrawColor(...accentColor);
-        doc.setLineWidth(1);
-        doc.line(14, footerY + 12, pageWidth - 14, footerY + 12);
-
-        doc.save(`Receipt_${receiptNo}.pdf`);
+        doc.save(`Invoice_${receiptNo}.pdf`);
     };
-
-    const tabs = [
-        { id: 'all', label: 'All Bookings', icon: '📋' },
-        { id: 'rooms', label: 'Rooms', icon: '🏨' },
-        { id: 'activities', label: 'Activities', icon: '🎯' },
-        { id: 'food', label: 'Food Orders', icon: '🍽️' },
-        { id: 'vehicles', label: 'Vehicles', icon: '🚗' }
-    ];
 
     if (loading) {
         return (
             <div className="flex items-center justify-center p-12">
-                <div className="text-slate-600">Loading bookings...</div>
+                <div className="w-10 h-10 border-4 border-gold-200 border-t-gold-600 rounded-full animate-spin"></div>
             </div>
         );
     }
 
     return (
-        <div className="p-6 overflow-auto">
-            {/* Header */}
-            <div className="mb-6">
-                <h1 className="text-3xl font-bold text-slate-900">My <span className="bg-gradient-to-r from-gold-600 to-yellow-500 bg-clip-text text-transparent">Bookings</span></h1>
-                <p className="text-slate-500 mt-1">View and manage all your bookings in one place</p>
+        <div className="p-4 md:p-8 max-w-7xl mx-auto">
+            <div className="mb-8">
+                <h1 className="text-3xl font-bold text-slate-900 mb-2">My <span className="text-gold-600">Bookings</span></h1>
+                <p className="text-slate-600">Manage your upcoming stays and all linked services</p>
             </div>
 
-            {/* Tabs */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-                <div className="border-b border-slate-200 px-6">
-                    <div className="flex gap-1 overflow-x-auto">
-                        {tabs.map(tab => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`px-4 py-3 text-sm font-medium transition-all whitespace-nowrap ${activeTab === tab.id
-                                    ? 'text-gold-600 border-b-2 border-gold-600'
-                                    : 'text-slate-600 hover:text-slate-900'
-                                    }`}
-                            >
-                                {tab.icon} {tab.label}
-                            </button>
-                        ))}
+            {trips.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
+                    <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <HomeModernIcon className="w-10 h-10 text-slate-400" />
                     </div>
+                    <h3 className="text-xl font-semibold text-slate-900 mb-2">No bookings planned yet</h3>
+                    <p className="text-slate-500 mb-6">Book a room to start planning your perfect getaway.</p>
+                    <button 
+                        onClick={() => navigate('/guest/rooms')}
+                        className="bg-gold-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-gold-700 transition"
+                    >
+                        Start a New Booking
+                    </button>
                 </div>
+            ) : (
+                <div className="space-y-12">
+                    {trips.map(trip => (
+                        <div key={trip.rb_id} className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
+                            <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] min-h-[500px]">
+                                
+                                {/* LEFT COLUMN: Summary & Main Controls */}
+                                <div className="bg-slate-900 p-8 text-white flex flex-col h-full relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 w-64 h-64 bg-gold-500/5 rounded-full -mr-32 -mt-32 blur-3xl"></div>
+                                    <div className="relative z-10 flex flex-col h-full">
+                                        <div className="mb-8">
+                                            <div className="flex items-center gap-3 mb-4">
+                                                {getStatusBadge(trip.rb_status)}
+                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">#{trip.rb_id}</span>
+                                            </div>
+                                            <h2 className="text-2xl font-black mb-1">{trip.room_type || 'Room'}</h2>
+                                            <p className="text-gold-500 font-bold uppercase tracking-widest text-[10px]">Primary Reservation</p>
+                                        </div>
 
-                <div className="p-6">
-                    {/* All Bookings Tab */}
-                    {activeTab === 'all' && (
-                        <div className="space-y-6">
-                            {/* Room Bookings */}
-                            {bookings.rooms.length > 0 && (
-                                <div>
-                                    <h3 className="font-semibold text-slate-900 mb-3">🏨 Room Bookings</h3>
-                                    <div className="space-y-2">
-                                        {bookings.rooms.map((booking, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                                                <div>
-                                                    <p className="font-medium text-slate-900">{booking.room_type}</p>
-                                                    <p className="text-sm text-slate-500">
-                                                        {formatDate(booking.check_in_date)} - {formatDate(booking.check_out_date)}
+                                        <div className="space-y-6 pt-6 border-t border-slate-800">
+                                            <div>
+                                                <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-2">Check-in / Out</p>
+                                                <div className="flex items-center gap-3">
+                                                    <CalendarDaysIcon className="w-5 h-5 text-gold-500" />
+                                                    <p className="font-bold text-sm">
+                                                        {formatDate(trip.check_in_date)} &mdash; {formatDate(trip.check_out_date)}
                                                     </p>
                                                 </div>
-                                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(booking.rb_status)}`}>
-                                                    {booking.rb_status}
-                                                </span>
                                             </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
 
-                            {/* Food Orders */}
-                            {bookings.foodOrders.length > 0 && (
-                                <div>
-                                    <h3 className="font-semibold text-slate-900 mb-3">🍽️ Food Orders</h3>
-                                    <div className="space-y-2">
-                                        {bookings.foodOrders.map((order, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                                                <div>
-                                                    <p className="font-medium text-slate-900">{order.item_name}</p>
-                                                    <p className="text-sm text-slate-500">
-                                                        Qty: {order.order_quantity} • Rs. {order.order_total_amount}
-                                                    </p>
+                                            <div>
+                                                <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-2">Room Assigned</p>
+                                                <div className="flex items-center gap-3">
+                                                    <HomeModernIcon className="w-5 h-5 text-gold-500" />
+                                                    <p className="font-bold text-sm">Room {trip.room_number || 'TBD'}</p>
                                                 </div>
-                                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.item_status || order.order_status)}`}>
-                                                    {order.item_status || order.order_status}
-                                                </span>
                                             </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
 
-                            {/* Vehicles */}
-                            {bookings.vehicles.length > 0 && (
-                                <div>
-                                    <h3 className="font-semibold text-slate-900 mb-3">🚗 Vehicle Bookings</h3>
-                                    <div className="space-y-2">
-                                        {bookings.vehicles.map((vehicle, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                                                <div>
-                                                    <p className="font-medium text-slate-900">{vehicle.vehicle_type}</p>
-                                                    <p className="text-sm text-slate-500">{vehicle.vehicle_number}</p>
-                                                </div>
-                                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(vehicle.vb_status)}`}>
-                                                    {vehicle.vb_status || 'Active'}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
+                                            <div className="relative group">
+                                                <div className="absolute -inset-0.5 bg-gradient-to-r from-gold-500/20 to-orange-500/20 rounded-3xl blur opacity-30 group-hover:opacity-50 transition duration-1000"></div>
+                                                <div className="relative bg-slate-800/80 backdrop-blur-sm p-6 rounded-2xl border border-slate-700/50 shadow-2xl">
+                                                    {/* Condensed Breakdown */}
+                                                    <div className="space-y-2 mb-5 pb-5 border-b border-slate-700/50">
+                                                        <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
+                                                            <span className="text-slate-400">Room Base Stay</span>
+                                                            <span className="text-white">Rs. {Number(trip.total_price).toLocaleString()}</span>
+                                                        </div>
+                                                        
+                                                        {trip.activities?.length > 0 && (
+                                                            <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
+                                                                <span className="text-slate-400">Activities Total</span>
+                                                                <span className="text-white">
+                                                                    Rs. {trip.activities.reduce((sum, act) => sum + Number(act.total_price), 0).toLocaleString()}
+                                                                </span>
+                                                            </div>
+                                                        )}
 
-                            {/* Activities */}
-                            {bookings.activities.length > 0 && (
-                                <div>
-                                    <h3 className="font-semibold text-slate-900 mb-3">🎯 Activities</h3>
-                                    <div className="space-y-2">
-                                        {bookings.activities.map((activity, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                                                <div>
-                                                    <p className="font-medium text-slate-900">{activity.activity_name}</p>
-                                                    <p className="text-sm text-slate-500">
-                                                        {formatDate(activity.booking_date)}
-                                                    </p>
-                                                </div>
-                                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(activity.ab_status)}`}>
-                                                    {activity.ab_status}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
+                                                        {trip.foodOrders?.length > 0 && (
+                                                            <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
+                                                                <span className="text-slate-400">Catering Total</span>
+                                                                <span className="text-white">
+                                                                    Rs. {trip.foodOrders.reduce((sum, order) => sum + order.items.reduce((s, i) => s + (Number(i.item_price) * Number(i.order_quantity)), 0), 0).toLocaleString()}
+                                                                </span>
+                                                            </div>
+                                                        )}
 
-                            {bookings.rooms.length === 0 && bookings.activities.length === 0 && bookings.foodOrders.length === 0 && bookings.vehicles.length === 0 && (
-                                <div className="text-center py-12">
-                                    <div className="text-6xl mb-4">📋</div>
-                                    <p className="text-slate-500">No bookings yet</p>
-                                    <p className="text-sm text-slate-400 mt-1">Start booking rooms, activities, or order food!</p>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                                                        {trip.vehicles?.length > 0 && (
+                                                            <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
+                                                                <span className="text-slate-400">Transport Total</span>
+                                                                <span className="text-white">
+                                                                    Rs. {trip.vehicles.reduce((sum, veh) => sum + (Number(veh.vehicle_price_per_day) * Number(veh.vb_days)), 0).toLocaleString()}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                    </div>
 
-                    {/* Room Bookings Tab */}
-                    {activeTab === 'rooms' && (
-                        <div className="space-y-3">
-                            {bookings.rooms.length > 0 ? (
-                                bookings.rooms.map((booking, idx) => (
-                                    <div key={idx} className="p-5 border border-slate-200 rounded-lg">
-                                        <div className="flex items-start justify-between mb-3">
-                                            <div>
-                                                <h4 className="font-semibold text-slate-900 text-lg">{booking.room_type}</h4>
-                                                <p className="text-sm text-slate-500">Booking ID: {booking.rb_id}</p>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <button
-                                                    onClick={() => downloadReceipt(booking, 'Room')}
-                                                    className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:text-gold-600 hover:border-gold-200 hover:bg-gold-50 transition-all shadow-sm group"
-                                                    title="Download Receipt"
-                                                >
-                                                    <ArrowDownTrayIcon className="w-4 h-4 text-slate-400 group-hover:text-gold-600 transition-colors" />
-                                                    <span>Download Receipt</span>
-                                                </button>
-                                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(booking.rb_status)}`}>
-                                                    {booking.rb_status}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4 text-sm">
-                                            <div>
-                                                <p className="text-slate-500">Check-in</p>
-                                                <p className="font-medium text-slate-900">{formatDate(booking.check_in_date)}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-slate-500">Check-out</p>
-                                                <p className="font-medium text-slate-900">{formatDate(booking.check_out_date)}</p>
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-slate-900">Rs. {booking.total_price || 'N/A'}</p>
-                                            </div>
-                                            {(booking.rb_status === 'Pending' || booking.rb_status === 'Confirmed' || booking.rb_status === 'Booked') && (
-                                                <div className="col-span-2 mt-2">
-                                                    <button
-                                                        onClick={() => handleCancel(booking.rb_id)}
-                                                        className="w-full text-center px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-gold-50 hover:text-gold-600 hover:border-gold-200 text-sm font-medium transition-colors"
-                                                    >
-                                                        Cancel Booking
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="text-center py-12 text-slate-500">No room bookings</div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Activities Tab */}
-                    {activeTab === 'activities' && (
-                        <div className="space-y-3">
-                            {bookings.activities.length > 0 ? (
-                                bookings.activities.map((activity, idx) => (
-                                    <div key={idx} className="p-5 border border-slate-200 rounded-lg">
-                                        <div className="flex items-start justify-between">
-                                            <div>
-                                                <h4 className="font-semibold text-slate-900 text-lg">{activity.activity_name}</h4>
-                                                <p className="text-sm text-slate-500 mt-1">
-                                                    Date: {formatDate(activity.booking_date)}
-                                                </p>
-                                                <p className="text-sm text-slate-500">
-                                                    Duration: {activity.duration_hours} hours
-                                                </p>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <button
-                                                    onClick={() => downloadReceipt(activity, 'Activity')}
-                                                    className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:text-gold-600 hover:border-gold-200 hover:bg-gold-50 transition-all shadow-sm group"
-                                                    title="Download Receipt"
-                                                >
-                                                    <ArrowDownTrayIcon className="w-4 h-4 text-slate-400 group-hover:text-gold-600 transition-colors" />
-                                                    <span>Download Receipt</span>
-                                                </button>
-                                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(activity.ab_status)}`}>
-                                                    {activity.ab_status}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="text-center py-12 text-slate-500">No activity bookings</div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Food Orders Tab */}
-                    {activeTab === 'food' && (
-                        <div className="space-y-4">
-                            {bookings.foodOrders.length > 0 ? (
-                                bookings.foodOrders.map((order, idx) => (
-                                    <div key={idx} className="p-5 border border-slate-200 rounded-lg">
-                                        <div className="flex items-start justify-between mb-4 pb-4 border-b border-slate-100">
-                                            <div>
-                                                <h4 className="font-semibold text-slate-900 text-lg">Order #{order.order_id}</h4>
-                                                <p className="text-sm text-slate-500">
-                                                    {formatDate(order.order_date)} • {order.items.length} Items
-                                                </p>
-                                                <p className="text-xs text-slate-400 mt-1">
-                                                    Dining: {order.dining_option}
-                                                </p>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <button
-                                                    onClick={() => downloadReceipt(order, 'Food')}
-                                                    className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:text-gold-600 hover:border-gold-200 hover:bg-gold-50 transition-all shadow-sm group"
-                                                    title="Download Receipt"
-                                                >
-                                                    <ArrowDownTrayIcon className="w-4 h-4 text-slate-400 group-hover:text-gold-600 transition-colors" />
-                                                    <span>Download Receipt</span>
-                                                </button>
-                                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.order_status)}`}>
-                                                    {order.order_status}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-3">
-                                            {order.items.map((item, itemIdx) => (
-                                                <div key={itemIdx} className="flex justify-between items-center text-sm">
+                                                    {/* Grand Total Hero */}
                                                     <div>
-                                                        <p className="font-medium text-slate-900">{item.item_name}</p>
-                                                        <p className="text-slate-500 text-xs">Qty: {item.order_quantity}</p>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <p className="font-medium text-slate-900">Rs. {item.order_total_amount || (item.item_price * item.order_quantity)}</p>
-                                                        <span className={`text-[10px] uppercase font-bold ${item.item_status === 'Completed' ? 'text-green-600' : 'text-slate-400'}`}>
-                                                            {item.item_status}
-                                                        </span>
+                                                        <p className="text-[10px] text-white font-bold uppercase tracking-[0.2em] mb-2 leading-none">Total Estimated Amount</p>
+                                                        <div className="flex items-baseline gap-1.5 text-white">
+                                                            <span className="text-lg font-black text-gold-500 underline underline-offset-4 decoration-2">Rs.</span>
+                                                            <span className="text-4xl font-black tracking-tight">
+                                                                {(
+                                                                    Number(trip.total_price) +
+                                                                    trip.activities.reduce((sum, act) => sum + Number(act.total_price), 0) +
+                                                                    trip.foodOrders.reduce((sum, order) => sum + order.items.reduce((s, i) => s + (Number(i.item_price) * Number(i.order_quantity)), 0), 0) +
+                                                                    trip.vehicles.reduce((sum, veh) => sum + (Number(veh.vehicle_price_per_day) * Number(veh.vb_days)), 0)
+                                                                ).toLocaleString()}
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-auto pt-8 space-y-3">
+                                            <button 
+                                                onClick={() => downloadReceipt(trip, 'Summary')}
+                                                className="w-full flex items-center justify-center gap-2 py-4 bg-gold-600 hover:bg-gold-700 text-white rounded-xl font-black uppercase tracking-widest text-[10px] transition-all shadow-lg shadow-gold-600/20 active:scale-[0.98]"
+                                            >
+                                                <ArrowDownTrayIcon className="w-4 h-4" /> Download Full Receipt
+                                            </button>
+                                            <button 
+                                                onClick={() => handleCancelRoom(trip.rb_id)}
+                                                className="w-full py-3 border border-slate-800 text-slate-500 hover:text-rose-400 hover:border-rose-400/30 font-bold uppercase tracking-widest text-[9px] transition-all rounded-xl"
+                                            >
+                                                Cancel This Booking
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* RIGHT COLUMN: Linked Services */}
+                                <div className="p-8 bg-white overflow-y-auto">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Service Itinerary</h3>
+                                        <div className="h-[1px] flex-1 bg-slate-100 mx-6"></div>
+                                    </div>
+
+                                    <div className="space-y-8">
+                                        {/* Activities */}
+                                        {trip.activities?.length > 0 && (
+                                            <div className="space-y-4">
+                                                <div className="flex items-center gap-2 text-slate-900 mb-2">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                                                    <h4 className="text-xs font-black uppercase tracking-widest">Linked Activities</h4>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    {trip.activities.map(act => (
+                                                        <div key={act.ab_id} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4 p-4 bg-slate-50 hover:bg-gold-500/5 rounded-2xl border border-transparent hover:border-gold-500/20 transition-all group">
+                                                            <div>
+                                                                <p className="font-bold text-slate-800 text-sm">{act.activity_name}</p>
+                                                                <p className="text-[10px] font-black text-slate-400 uppercase mt-0.5">{formatDate(act.booking_date)}</p>
+                                                            </div>
+                                                            <div className="text-right min-w-[80px]">
+                                                                <span className="text-sm font-black text-slate-900">Rs. {act.total_price}</span>
+                                                            </div>
+                                                            <div className="min-w-[100px] flex justify-center">
+                                                                {getStatusBadge(act.ab_status)}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Food Orders */}
+                                        {trip.foodOrders?.length > 0 && (
+                                            <div className="space-y-4">
+                                                <div className="flex items-center gap-2 text-slate-900 mb-2">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
+                                                    <h4 className="text-xs font-black uppercase tracking-widest">Catering Services</h4>
+                                                </div>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    {trip.foodOrders.map(order => (
+                                                        <div key={order.order_id} className="p-5 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                                                            <div className="flex justify-between items-start mb-4">
+                                                                <div className="bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                                                                    <p className="text-[9px] font-black text-slate-400 uppercase leading-none mb-1">Status</p>
+                                                                    {getStatusBadge(order.order_status)}
+                                                                </div>
+                                                            </div>
+                                                            <ul className="space-y-2 mb-4">
+                                                                {order.items.map(item => (
+                                                                    <li key={item.order_item_id} className="flex justify-between items-center text-xs font-bold">
+                                                                        <span className="text-slate-500">{item.order_quantity}x {item.item_name}</span>
+                                                                        <span className="text-slate-900">Rs. {item.order_total_amount || (item.item_price * item.order_quantity)}</span>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                            <div className="flex justify-between items-center pt-3 border-t border-dashed border-slate-100">
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{order.dining_option}</span>
+                                                                    {order.scheduled_date && (
+                                                                        <span className="text-[9px] font-bold text-gold-600 uppercase">
+                                                                            {new Date(order.scheduled_date).toLocaleDateString()} • {order.meal_type}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <span className="text-[10px] text-slate-400 font-bold">{formatDate(order.order_date, { hour: '2-digit', minute:'2-digit' })}</span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Vehicles */}
+                                        {trip.vehicles?.length > 0 && (
+                                            <div className="space-y-4">
+                                                <div className="flex items-center gap-2 text-slate-900 mb-2">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                                                    <h4 className="text-xs font-black uppercase tracking-widest">Travel & Mobility</h4>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    {trip.vehicles.map(veh => (
+                                                        <div key={veh.vb_id} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4 p-4 bg-slate-50 hover:bg-gold-500/5 rounded-2xl border border-transparent hover:border-gold-500/20 transition-all group">
+                                                            <div>
+                                                                <p className="font-bold text-slate-800 text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]">{veh.vehicle_type}</p>
+                                                                <p className="text-[10px] font-black text-slate-500 uppercase">{veh.vehicle_number}</p>
+                                                            </div>
+                                                            <div className="text-right min-w-[100px] flex flex-col items-end">
+                                                                <span className="text-sm font-black text-slate-900">Rs. {veh.vehicle_price_per_day * veh.vb_days}</span>
+                                                                {veh.vb_status?.toLowerCase() === 'pending payment' && (
+                                                                    <button 
+                                                                        onClick={() => handleVehiclePayment(veh)}
+                                                                        className="mt-1 text-[9px] font-black uppercase tracking-widest bg-emerald-600 text-white px-2 py-1 rounded-md hover:bg-emerald-700 shadow-sm transition-transform active:scale-95"
+                                                                    >
+                                                                        Pay Now
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                            <div className="min-w-[100px] flex justify-center">
+                                                                {getStatusBadge(veh.vb_status)}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {(!trip.activities?.length && !trip.foodOrders?.length && !trip.vehicles?.length) && (
+                                            <div className="flex flex-col items-center justify-center py-20 text-center opacity-40 grayscale">
+                                                <div className="text-4xl mb-4">✨</div>
+                                                <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Personalize Your Stay Below</p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="mt-12 pt-10 border-t border-slate-100">
+                                        <div className="flex items-center justify-center gap-4 mb-6">
+                                            <div className="h-[1px] w-12 bg-slate-200"></div>
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Enhance Your Stay</p>
+                                            <div className="h-[1px] w-12 bg-slate-200"></div>
+                                        </div>
+                                        <div className="flex flex-wrap justify-center gap-4">
+                                            {[
+                                                { label: 'Extend Stay', icon: <CalendarDaysIcon className="w-4 h-4" />, path: `/guest/extend-room?rb_id=${trip.rb_id}` },
+                                                { label: 'Add Food', icon: <PlusCircleIcon className="w-4 h-4" />, path: `/guest/food-orders?rb_id=${trip.rb_id}` },
+                                                { label: 'Hire Vehicle', icon: <MapPinIcon className="w-4 h-4" />, path: `/guest/vehicle-hire?rb_id=${trip.rb_id}` },
+                                                { label: 'Book Activity', icon: <PlusCircleIcon className="w-4 h-4" />, path: `/guest/activities?rb_id=${trip.rb_id}` }
+                                            ].map(btn => (
+                                                <button 
+                                                    key={btn.label}
+                                                    onClick={() => navigate(btn.path)}
+                                                    className="group flex flex-col items-center gap-3 p-5 min-w-[130px] bg-white hover:bg-gold-500 rounded-2xl border-2 border-gold-500 hover:border-gold-600 text-slate-600 hover:text-white transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-gold-500/20 active:scale-95"
+                                                >
+                                                    <div className="w-10 h-10 flex items-center justify-center bg-slate-50 group-hover:bg-gold-400 rounded-xl transition-colors">
+                                                        {btn.icon}
+                                                    </div>
+                                                    <span className="text-[11px] font-black uppercase tracking-wider">{btn.label}</span>
+                                                </button>
                                             ))}
                                         </div>
-
-                                        <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center">
-                                            <span className="font-semibold text-slate-900">Total Amount</span>
-                                            <span className="font-bold text-lg text-gold-600">Rs. {order.order_total_amount}</span>
-                                        </div>
                                     </div>
-                                ))
-                            ) : (
-                                <div className="text-center py-12 text-slate-500">No food orders</div>
-                            )}
+                                </div>
+                            </div>
                         </div>
-                    )}
-
-                    {/* Vehicles Tab */}
-                    {activeTab === 'vehicles' && (
-                        <div className="space-y-3">
-                            {bookings.vehicles.length > 0 ? (
-                                bookings.vehicles.map((vehicle, idx) => (
-                                    <div key={idx} className="p-5 border border-slate-200 rounded-lg">
-                                        <div className="flex items-start justify-between mb-3">
-                                            <div>
-                                                <h4 className="font-semibold text-slate-900 text-lg">{vehicle.vehicle_type}</h4>
-                                                <p className="text-sm text-slate-500">{vehicle.vehicle_number}</p>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <button
-                                                    onClick={() => downloadReceipt(vehicle, 'Vehicle')}
-                                                    className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:text-gold-600 hover:border-gold-200 hover:bg-gold-50 transition-all shadow-sm group"
-                                                    title="Download Receipt"
-                                                >
-                                                    <ArrowDownTrayIcon className="w-4 h-4 text-slate-400 group-hover:text-gold-600 transition-colors" />
-                                                    <span>Download Receipt</span>
-                                                </button>
-                                                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(vehicle.vb_status)}`}>
-                                                    {vehicle.vb_status || 'Active'}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="mt-3 flex items-center justify-between">
-                                            <div className="text-sm">
-                                                <div>
-                                                    <p className="text-slate-500">Date</p>
-                                                    <p className="font-medium text-slate-900">
-                                                        {new Date(vehicle.booking_date).toLocaleDateString()}
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            {vehicle.vb_status === 'Pending Payment' && (
-                                                <button
-                                                    onClick={() => {
-                                                        const amount = vehicle.total_amount || (vehicle.vehicle_price_per_day || 0) * (vehicle.vb_days || 1);
-                                                        handleVehiclePayment(vehicle);
-                                                    }}
-                                                    className="px-4 py-2 bg-gold-500 hover:bg-gold-600 text-white text-sm font-bold rounded-lg transition-colors"
-                                                >
-                                                    Pay Now
-                                                </button>
-                                            )}
-
-                                            {vehicle.vb_status === 'Cancelled' && vehicle.cancel_reason && (
-                                                <div className="mt-2 text-red-600 bg-red-50 p-2 rounded text-xs">
-                                                    <strong>Cancelled:</strong> {vehicle.cancel_reason}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="text-center py-12 text-slate-500">No vehicle bookings</div>
-                            )}
-                        </div>
-                    )}
+                    ))}
                 </div>
-            </div>
+            )}
+            <DemoPaymentGateway 
+                isOpen={paymentModal.isOpen}
+                onClose={() => setPaymentModal({ isOpen: false, amount: 0, vehicle: null })}
+                amount={paymentModal.amount}
+                onPaymentSuccess={confirmVehiclePayment}
+            />
         </div>
     );
 };
