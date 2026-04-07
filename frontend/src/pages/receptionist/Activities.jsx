@@ -47,7 +47,13 @@ const ReceptionistActivities = () => {
 
     const formatTime = (timeString) => {
         if (!timeString) return '';
-        // Handle 'HH:mm:ss' or 'HH:mm'
+        // ab_start_time is a datetime string like '2026-03-18 14:30:00'
+        // Extract the time portion (after the space) and return HH:MM
+        const parts = timeString.split(' ');
+        if (parts.length > 1) {
+            return parts[1].substring(0, 5);
+        }
+        // If it's a pure time string like 'HH:mm:ss'
         return timeString.substring(0, 5);
     };
 

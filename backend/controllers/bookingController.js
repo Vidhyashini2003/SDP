@@ -5,15 +5,13 @@ const notificationController = require('./notificationController');
 
 exports.getAvailableRooms = async (req, res) => {
     try {
-        const { checkIn, checkOut } = req.query;
+        const { checkIn, checkOut, adults, kids, numRooms } = req.query;
 
         let query = "SELECT * FROM room WHERE room_status = 'Available'";
         let params = [];
 
         if (checkIn && checkOut) {
             // Find rooms that have NO booking overlapping with the requested dates
-            // Overlap condition: not (end <= req_start or start >= req_end)
-            // We verify rb_status is active (Booked/Checked-in)
             query += ` AND room_id NOT IN (
                 SELECT room_id FROM roombooking 
                 WHERE rb_status IN ('Booked', 'Checked-in')
@@ -23,7 +21,33 @@ exports.getAvailableRooms = async (req, res) => {
         }
 
         const [rooms] = await db.query(query, params);
-        res.json(rooms);
+
+        // Smart recommendation: score rooms by guest suitability
+        const totalGuests = parseInt(adults || 2) + parseInt(kids || 0);
+        const roomsNeeded = parseInt(numRooms || 1);
+
+        const getGuestCapacity = (roomType) => {
+            const type = (roomType || '').toLowerCase();
+            if (type.includes('suite') || type.includes('family')) return 5;
+            if (type.includes('deluxe')) return 3;
+            return 2; // standard
+        };
+
+        const scoredRooms = rooms.map(room => {
+            const capacity = getGuestCapacity(room.room_type);
+            const guestsPerRoom = Math.ceil(totalGuests / roomsNeeded);
+            // Score: 1 if capacity fits, 0 if not
+            const fits = capacity >= guestsPerRoom;
+            return { ...room, recommended: fits, capacity };
+        });
+
+        // Sort: recommended first, then by price ascending
+        scoredRooms.sort((a, b) => {
+            if (b.recommended !== a.recommended) return b.recommended - a.recommended;
+            return a.room_price_per_day - b.room_price_per_day;
+        });
+
+        res.json(scoredRooms);
     } catch (error) {
         console.error('Error fetching rooms:', error);
         res.status(500).json({ error: 'Failed to fetch rooms' });

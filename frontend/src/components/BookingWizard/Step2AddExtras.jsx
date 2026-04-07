@@ -531,10 +531,21 @@ const ActivitiesTab = ({ availableActivities, bookingData, addActivity, removeAc
                                 <button
                                     key={act.activity_id}
                                     onClick={() => setSelectedAct(act)}
-                                    className={`text-left p-4 rounded-2xl border transition-all ${selectedAct?.activity_id === act.activity_id ? 'border-gold-500 bg-gold-50 shadow-md shadow-gold-50' : 'border-slate-100 hover:border-gold-200 bg-slate-50/50'}`}
+                                    className={`text-left p-4 rounded-2xl border transition-all flex items-center gap-4 ${selectedAct?.activity_id === act.activity_id ? 'border-gold-500 bg-gold-50 shadow-md shadow-gold-50' : 'border-slate-100 hover:border-gold-200 bg-slate-50/50'}`}
                                 >
-                                    <h5 className="font-bold text-slate-900 text-sm">{act.activity_name}</h5>
-                                    <p className="text-[10px] font-bold text-gold-600 mt-1">Rs. {act.activity_price_per_hour}/hr</p>
+                                    {act.activity_image ? (
+                                        <img
+                                            src={act.activity_image.startsWith('/') ? `${axios.defaults.baseURL}${act.activity_image}` : act.activity_image}
+                                            alt={act.activity_name}
+                                            className="w-14 h-14 rounded-xl object-cover flex-shrink-0"
+                                        />
+                                    ) : (
+                                        <div className="w-14 h-14 rounded-xl bg-slate-200 flex items-center justify-center text-2xl flex-shrink-0">🏊</div>
+                                    )}
+                                    <div>
+                                        <h5 className="font-bold text-slate-900 text-sm">{act.activity_name}</h5>
+                                        <p className="text-[10px] font-bold text-gold-600 mt-1">Rs. {act.activity_price_per_hour}/hr</p>
+                                    </div>
                                 </button>
                             ))}
                         </div>
@@ -585,24 +596,35 @@ const VehicleTab = ({ availableVehicles, bookingData, selectVehicle, removeVehic
                     <div
                         key={v.vehicle_id}
                         onClick={() => selectVehicle(v)}
-                        className={`group p-6 rounded-[2rem] border transition-all cursor-pointer ${bookingData.vehicle?.vehicle_id === v.vehicle_id ? 'border-gold-500 bg-gold-50 shadow-xl shadow-gold-50' : 'border-slate-100 hover:border-gold-200 bg-white'}`}
+                        className={`group rounded-[2rem] border transition-all cursor-pointer overflow-hidden ${bookingData.vehicle?.vehicle_id === v.vehicle_id ? 'border-gold-500 bg-gold-50 shadow-xl shadow-gold-50' : 'border-slate-100 hover:border-gold-200 bg-white'}`}
                     >
-                        <div className="flex justify-between items-start mb-6">
-                            <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-3xl group-hover:scale-110 transition-transform">
+                        {/* Vehicle Image */}
+                        {v.vehicle_image ? (
+                            <img
+                                src={v.vehicle_image.startsWith('/') ? `${axios.defaults.baseURL}${v.vehicle_image}` : v.vehicle_image}
+                                alt={v.vehicle_type}
+                                className="w-full h-36 object-cover group-hover:scale-105 transition-transform duration-500"
+                            />
+                        ) : (
+                            <div className="w-full h-36 bg-slate-50 flex items-center justify-center text-5xl group-hover:scale-110 transition-transform">
                                 {v.vehicle_type === 'Car' ? '🚗' : v.vehicle_type === 'Bike' ? '🏍️' : '🚐'}
                             </div>
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl transition-all ${bookingData.vehicle?.vehicle_id === v.vehicle_id ? 'bg-gold-500 text-white' : 'bg-slate-100 text-slate-300'}`}>✓</div>
-                        </div>
-                        <h4 className="text-xl font-black text-slate-900 group-hover:text-gold-600 transition-colors uppercase tracking-tight">{v.vehicle_type}</h4>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1 mb-6">Plate: {v.vehicle_number}</p>
-                        <div className="pt-6 border-t border-slate-100 flex justify-between items-end">
-                            <div className="flex flex-col">
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-2">Daily</span>
-                                <span className="text-lg font-black text-slate-900 tracking-tighter">Rs. {v.vehicle_price_per_day.toLocaleString()}</span>
+                        )}
+                        <div className="p-6">
+                            <div className="flex justify-between items-start mb-4">
+                                <h4 className="text-xl font-black text-slate-900 group-hover:text-gold-600 transition-colors uppercase tracking-tight">{v.vehicle_type}</h4>
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl transition-all ${bookingData.vehicle?.vehicle_id === v.vehicle_id ? 'bg-gold-500 text-white' : 'bg-slate-100 text-slate-300'}`}>✓</div>
                             </div>
-                            <div className="text-right flex flex-col items-end">
-                                <span className="text-[10px] font-black text-gold-500 uppercase tracking-widest leading-none mb-2">Total ({bookingData.nights} d)</span>
-                                <span className="text-sm font-bold text-slate-400">Rs. {(v.vehicle_price_per_day * bookingData.nights).toLocaleString()}</span>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Plate: {v.vehicle_number}</p>
+                            <div className="pt-4 border-t border-slate-100 flex justify-between items-end">
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-2">Daily</span>
+                                    <span className="text-lg font-black text-slate-900 tracking-tighter">Rs. {v.vehicle_price_per_day.toLocaleString()}</span>
+                                </div>
+                                <div className="text-right flex flex-col items-end">
+                                    <span className="text-[10px] font-black text-gold-500 uppercase tracking-widest leading-none mb-2">Total ({bookingData.nights} d)</span>
+                                    <span className="text-sm font-bold text-slate-400">Rs. {(v.vehicle_price_per_day * bookingData.nights).toLocaleString()}</span>
+                                </div>
                             </div>
                         </div>
                     </div>

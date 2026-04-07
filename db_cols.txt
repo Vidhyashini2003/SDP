@@ -1,0 +1,4 @@
+﻿Γ£à Database connected successfully
+ROOM:room_id,room_number,room_type,room_description,room_price_per_day,room_status,room_image
+ACTIVITY:activity_id,activity_name,activity_description,activity_price_per_hour,activity_duration,activity_time,activity_status,activity_image
+VEHICLE:vehicle_id,vehicle_type,vehicle_number,vehicle_status,vehicle_image,vehicle_price_per_day,vehicle_price_per_km,waiting_time_price_per_hour

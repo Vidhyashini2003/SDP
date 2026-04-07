@@ -1,0 +1,392 @@
+commit 80a7d7fe2db4b2faaad12096268cf761770226f8
+Author: Vidhyashini <vidhya142003@gmail.com>
+Date:   Fri Mar 13 16:54:39 2026 +0530
+
+    guest updated
+
+ backend/.env.example                               |  14 -
+ backend/all_users.txt                              | Bin 0 -> 616 bytes
+ backend/check_activity_temp.js                     |  19 +
+ backend/check_booking.js                           |  29 +
+ backend/check_cols.js                              |  23 +
+ backend/check_cols_fs.js                           |  26 +
+ backend/check_db.js                                |  34 +
+ backend/cols.txt                                   |   4 +
+ backend/columns.txt                                | Bin 0 -> 492 bytes
+ backend/controllers/adminController.js             |  30 +-
+ backend/controllers/authController.js              |  36 +-
+ backend/controllers/bookingController.js           | 395 ++++++++-
+ backend/controllers/damageController.js            |   7 +-
+ backend/controllers/driverController.js            |   9 +-
+ backend/controllers/guestController.js             | 166 +++-
+ backend/controllers/notificationController.js      |   6 +-
+ backend/controllers/orderController.js             | 245 +++++-
+ backend/controllers/receptionistController.js      |  20 +-
+ backend/controllers/reportController.js            | 149 +++-
+ backend/debug_vehicle.js                           |  66 ++
+ backend/migrate.js                                 |  35 +
+ backend/migrations/add_booking_links.sql           | 244 ++++++
+ backend/migrations/add_meal_type.sql               |  13 +
+ backend/output.txt                                 | Bin 0 -> 766 bytes
+ backend/output2.txt                                | Bin 0 -> 120 bytes
+ backend/output3.txt                                | Bin 0 -> 808 bytes
+ backend/output4.txt                                | Bin 0 -> 560 bytes
+ backend/output_debug.txt                           | Bin 0 -> 4154 bytes
+ backend/output_debug_v2.txt                        |  31 +
+ backend/package-lock.json                          |  72 ++
+ backend/package.json                               |   1 +
+ backend/routes/bookings.js                         |   7 +-
+ backend/routes/chef.js                             |  48 ++
+ backend/routes/guest.js                            |   3 +
+ backend/routes/kitchen.js                          |  22 -
+ backend/routes/reports.js                          |   1 +
+ backend/schema_output.txt                          | 380 ++++++++
+ backend/scripts/add_admin.js                       |  53 ++
+ backend/scripts/add_category.js                    |  44 +
+ backend/scripts/add_meal_type.js                   |  53 ++
+ backend/scripts/add_menu_images.js                 |  43 +
+ backend/scripts/check_menu_schema.js               |  29 +
+ backend/scripts/check_schema.js                    |  26 +
+ backend/scripts/check_tables.js                    |  44 +
+ backend/scripts/debug_chef_error.js                |  44 +
+ backend/scripts/fix_order_status_enum.js           |  29 +
+ backend/scripts/show_columns.js                    |  19 +
+ backend/scripts/test_menu_enhancements.js          |  68 ++
+ backend/scripts/test_reports_fix.js                |  40 +
+ backend/scripts/test_staff_fix.js                  |  40 +
+ backend/scripts/test_staff_history.js              |  47 +
+ backend/scripts/test_user_history.js               |  42 +
+ backend/scripts/update_meal_types.js               |  34 +
+ backend/scripts/update_prices.js                   |  46 +
+ backend/scripts/verify_admin.js                    |  33 +
+ backend/scripts/verify_bulk_orders.js              |  37 +
+ backend/scripts/verify_prices.js                   |  26 +
+ backend/seed_user_data.js                          |  70 ++
+ backend/server.js                                  |  13 +-
+ backend/test_booking.js                            |  62 ++
+ backend/test_db.js                                 |  13 +
+ backend/tmp_check_schema.js                        |  14 +
+ backend/tmp_check_schema_all.js                    |  18 +
+ backend/tmp_check_schema_plain.js                  |  20 +
+ backend/tmp_final_chef_fix.js                      |  53 ++
+ backend/tmp_final_role_fix.js                      |  34 +
+ backend/tmp_fix_chief_role.js                      |  26 +
+ backend/tmp_migrate_chief.js                       |  57 ++
+ backend/update_room_prices.sql                     |  10 +
+ backend/uploads/menu/chicken_bun.png               | Bin 0 -> 123651 bytes
+ backend/uploads/menu/dosa.png                      | Bin 0 -> 108498 bytes
+ backend/uploads/menu/fried_rice.png                | Bin 0 -> 102637 bytes
+ .../uploads/menu/item-1773380955215-346926285.jpeg | Bin 0 -> 11843 bytes
+ .../uploads/menu/item-1773382738421-68257658.jpeg  | Bin 0 -> 8151 bytes
+ .../uploads/menu/item-1773383266702-388648044.jpeg | Bin 0 -> 11144 bytes
+ .../uploads/menu/item-1773386124776-130487362.jpeg | Bin 0 -> 8533 bytes
+ .../uploads/menu/item-1773390641585-457569982.jpeg | Bin 0 -> 10209 bytes
+ .../uploads/menu/item-1773390765656-729998461.jpeg | Bin 0 -> 8943 bytes
+ .../uploads/menu/item-1773390873843-843325149.jpeg | Bin 0 -> 10864 bytes
+ .../uploads/menu/item-1773390959268-737687805.jpeg | Bin 0 -> 11162 bytes
+ .../uploads/menu/item-1773390980934-822359648.jpeg | Bin 0 -> 13328 bytes
+ .../uploads/menu/item-1773391005409-708114011.jpeg | Bin 0 -> 11944 bytes
+ .../uploads/menu/item-1773391030953-135103973.jpeg | Bin 0 -> 11888 bytes
+ .../uploads/menu/item-1773391064215-252366285.jpeg | Bin 0 -> 10978 bytes
+ .../uploads/menu/item-1773391099485-417345170.jpeg | Bin 0 -> 14959 bytes
+ backend/uploads/menu/kothu_rotti.png               | Bin 0 -> 113199 bytes
+ backend/uploads/menu/pol_rotti_sambol.png          | Bin 0 -> 115514 bytes
+ backend/utils/bookingValidation.js                 | 103 +++
+ frontend/src/App.jsx                               |  48 +-
+ .../BookingWizard/Step1RoomSelection.jsx           | 206 +++++
+ .../components/BookingWizard/Step2AddExtras.jsx    | 615 +++++++++++++
+ .../BookingWizard/Step3ReviewCheckout.jsx          | 187 ++++
+ frontend/src/components/BookingWizard/index.jsx    | 238 ++++++
+ frontend/src/components/DemoPaymentGateway.jsx     | 232 +++++
+ frontend/src/components/GuestLayout.jsx            |  13 +-
+ frontend/src/components/Sidebar.jsx                |   2 +-
+ frontend/src/context/AuthContext.jsx               |   8 +-
+ frontend/src/pages/Home.jsx                        |   2 +-
+ frontend/src/pages/Login.jsx                       |   2 +-
+ frontend/src/pages/Register.jsx                    | 151 +++-
+ frontend/src/pages/admin/Reports.jsx               | 212 ++++-
+ frontend/src/pages/admin/StaffManagement.jsx       |  65 +-
+ frontend/src/pages/auth/CheckEmail.jsx             |  82 ++
+ frontend/src/pages/{kitchen => chef}/Damages.jsx   |  83 +-
+ frontend/src/pages/{kitchen => chef}/Dashboard.jsx |  47 +-
+ frontend/src/pages/{kitchen => chef}/History.jsx   |  68 +-
+ frontend/src/pages/chef/Menu.jsx                   | 314 +++++++
+ frontend/src/pages/chef/Orders.jsx                 | 308 +++++++
+ frontend/src/pages/common/StaffProfile.jsx         |  41 +-
+ frontend/src/pages/guest/ActivityBooking.jsx       | 396 ++++++---
+ frontend/src/pages/guest/Bookings.jsx              | 951 ++++++++++-----------
+ frontend/src/pages/guest/Dashboard.jsx             | 304 ++++---
+ frontend/src/pages/guest/ExtendRoomBooking.jsx     | 214 +++++
+ frontend/src/pages/guest/FoodOrders.jsx            | 600 ++++++++-----
+ frontend/src/pages/guest/Notifications.jsx         |  45 +-
+ frontend/src/pages/guest/Profile.jsx               |  49 +-
+ frontend/src/pages/guest/RoomBooking.jsx           | 311 +------
+ frontend/src/pages/guest/VehicleHire.jsx           | 141 ++-
+ frontend/src/pages/kitchen/Menu.jsx                | 162 ----
+ frontend/src/pages/kitchen/Orders.jsx              | 229 -----
+ frontend/src/pages/receptionist/Bookings.jsx       |   2 +-
+ tmp/check_activity_cols.js                         |  19 +
+ tmp/fix_chief_role.js                              |  34 +
+ tmp/reproduce_error.js                             |  38 +
+ tmp/test_activity_insert.js                        |  48 ++
+ 125 files changed, 7827 insertions(+), 2065 deletions(-)
+
+commit 10c8dca921f6db664beaea8a35f92d1aae34a7f5
+Author: Vidhyashini <vidhya142003@gmail.com>
+Date:   Fri Jan 30 12:18:04 2026 +0530
+
+    password validations
+
+ backend/controllers/authController.js        | 38 ++++++++++++++++++++++++++++
+ frontend/src/GuestRoutes.jsx                 | 29 ---------------------
+ frontend/src/pages/Register.jsx              | 20 ++++++++++++---
+ frontend/src/pages/ResetPassword.jsx         | 17 +++++++++++++
+ frontend/src/pages/common/ChangePassword.jsx | 15 ++++++++---
+ 5 files changed, 83 insertions(+), 36 deletions(-)
+
+commit 7b1568262c02c0259567c1b6306a1f51d8437659
+Author: Vidhyashini <vidhya142003@gmail.com>
+Date:   Tue Jan 27 19:49:44 2026 +0530
+
+    admin user management
+
+ backend/add_cancel_reason.js                       |  26 --
+ backend/check_driver_cols.js                       |  15 --
+ backend/check_driver_schema.js                     |  16 --
+ backend/check_driver_schema_quick.js               |  14 -
+ backend/check_driver_status.js                     |  21 --
+ backend/check_marketing_schema.js                  |  25 --
+ backend/check_payment_tables.js                    |  57 ----
+ backend/check_schema.js                            |  30 ---
+ backend/check_user_data.js                         |  25 --
+ backend/clear_vehicle_bookings.js                  |  28 --
+ backend/controllers/adminController.js             | 142 ++++++----
+ backend/controllers/bookingController.js           |  15 +-
+ backend/controllers/guestController.js             |   9 +-
+ backend/controllers/orderController.js             |   6 +-
+ backend/controllers/receptionistController.js      |  89 ++++--
+ backend/create_admin_user.js                       |  28 --
+ backend/driver_schema_dump.txt                     |   8 -
+ backend/drop_feedback_table.js                     |  23 --
+ backend/dump_driver_schema.js                      |  19 --
+ backend/fix_driver_login.js                        |  47 ----
+ backend/fix_payment_table.js                       |  86 ------
+ backend/force_drop_vehicle.js                      |  36 ---
+ backend/force_reset_pass.js                        |  22 --
+ backend/migrate_driver_schema.js                   |  37 ---
+ backend/migrations/1_create_users_table.js         |  52 ----
+ backend/migrations/2_migrate_data.js               | 104 -------
+ backend/migrations/3_cleanup_tables.js             |  61 -----
+ backend/migrations/4_remove_admin_table.js         |  71 -----
+ backend/migrations/5_secure_auth_schema.js         |  57 ----
+ backend/migrations/6_make_password_nullable.js     |  25 --
+ backend/migrations/add_activity_mock_data.sql      |  57 ----
+ backend/migrations/add_admin_mock_data.sql         |  11 -
+ .../migrations/add_booking_columns_to_payment.sql  |  10 -
+ .../migrations/add_cancellation_reason_fields.sql  |  24 --
+ backend/migrations/add_driver_address_column.sql   |   4 -
+ backend/migrations/add_driver_mock_data.sql        |  15 --
+ backend/migrations/add_menu_items.sql              |  20 --
+ backend/migrations/add_payment_columns.sql         |   9 -
+ backend/migrations/add_vehicle_mock_data.sql       |  15 --
+ backend/migrations/alter_admin_table.sql           |  19 --
+ backend/migrations/alter_driver_table.sql          |  13 -
+ backend/migrations/create_damage_table.sql         |  11 -
+ backend/migrations/create_food_tables.sql          |  23 --
+ backend/migrations/fix_admin_password.sql          |  12 -
+ backend/migrations/recreate_admin_table.sql        |  26 --
+ backend/migrations/remove_shift_time.sql           |   2 -
+ backend/migrations/reset_guest_password.sql        |   1 -
+ backend/migrations/schema.sql                      | 298 ---------------------
+ backend/remove_duplicate_columns.js                |  78 ------
+ backend/reproduce_driver_update.js                 |  76 ------
+ backend/reproduce_driver_upsert.js                 |  80 ------
+ backend/scripts/addDrivers.js                      |  86 ------
+ backend/scripts/addGuests.js                       |  56 ----
+ backend/scripts/addKitchenStaff.js                 |  57 ----
+ backend/scripts/addReceptionists.js                |  67 -----
+ backend/scripts/add_dining_option.js               |  25 --
+ backend/scripts/add_item_status.js                 |  32 ---
+ backend/scripts/add_reset_token_columns.js         |  25 --
+ backend/scripts/api_test_placeholder.js            |  30 ---
+ backend/scripts/apply_cancel_reason_migration.js   |  61 -----
+ backend/scripts/check_and_migrate_schema.js        |  68 -----
+ backend/scripts/check_db_structure.js              |  41 ---
+ backend/scripts/check_dining_column.js             |  20 --
+ backend/scripts/check_drivers_login.js             |  28 --
+ backend/scripts/check_enum.js                      |  16 --
+ backend/scripts/check_phone_nullability.js         |  34 ---
+ backend/scripts/check_rb_columns.js                |  14 -
+ backend/scripts/compare_tables.js                  |  20 --
+ backend/scripts/create_notifications_table.js      |  35 ---
+ backend/scripts/db_output.json                     |  32 ---
+ backend/scripts/debug_booking_display.js           |  48 ----
+ backend/scripts/debug_dining_option.js             |  19 --
+ backend/scripts/debug_login.js                     |  16 --
+ backend/scripts/debug_orders.js                    |  33 ---
+ backend/scripts/debug_orders_dummy.js              |  28 --
+ backend/scripts/debug_unified_login.js             |  44 ---
+ backend/scripts/drop_license_number.js             |  24 --
+ backend/scripts/ensure_mock_driver.js              |  52 ----
+ backend/scripts/fix_admin_password.js              |  29 --
+ backend/scripts/fix_driver_login.js                |  82 ------
+ backend/scripts/fix_missing_role_entries.js        |  75 ------
+ backend/scripts/fix_orders.js                      |  27 --
+ backend/scripts/generate_admin_sql.js              |  24 --
+ backend/scripts/hash_admin_password.js             |  20 --
+ backend/scripts/hash_legacy_passwords.js           |  57 ----
+ backend/scripts/list_all_guests.js                 |  25 --
+ backend/scripts/remove_payment_columns.js          |  40 ---
+ backend/scripts/remove_payment_method.js           |  48 ----
+ backend/scripts/reset_all_rooms.js                 |  15 --
+ backend/scripts/run_add_driver_address.js          |  41 ---
+ backend/scripts/run_migration_remove_shift.js      |  39 ---
+ backend/scripts/seed_kitchen_test.sql              |  20 --
+ backend/scripts/simulate_guest_query.js            |  59 ----
+ backend/scripts/test-db.js                         |  30 ---
+ backend/scripts/test_availability_api.js           | 121 ---------
+ backend/scripts/test_booking_detection.js          |  78 ------
+ backend/scripts/update_activity_duration.js        |  16 --
+ backend/scripts/update_activity_name.js            |  16 --
+ backend/scripts/update_driver_id.js                |  54 ----
+ backend/scripts/verify_activity_api.js             |  25 --
+ backend/scripts/verify_cancel_flow.js              |  76 ------
+ backend/scripts/verify_damage_flow.js              |  44 ---
+ backend/scripts/verify_db_column.js                |  19 --
+ backend/scripts/verify_fix_e2e.js                  |  91 -------
+ backend/scripts/verify_flow.js                     |  44 ---
+ backend/scripts/verify_food_order.js               |  64 -----
+ backend/scripts/verify_guest_id.js                 |  31 ---
+ backend/scripts/verify_hashes.js                   |  20 --
+ backend/scripts/verify_order_schema.js             |  66 -----
+ backend/scripts/verify_receptionist_api.js         |  35 ---
+ backend/scripts/verify_refund_flow.js              |  67 -----
+ backend/scripts/verify_room_counts.js              |  29 --
+ backend/scripts/verify_staff_update.js             |  38 ---
+ backend/test_dashboard.js                          |  38 ---
+ backend/test_driver_api_flow.js                    |  77 ------
+ backend/test_staff_api.ps1                         |  77 ------
+ backend/update_activity_times.js                   |  25 --
+ backend/verify_payment_table.js                    |  75 ------
+ frontend/src/assets/royal_hotel_interior.jpg       | Bin 0 -> 873879 bytes
+ frontend/src/components/GuestLayout.jsx            |   5 +-
+ frontend/src/pages/ForgotPassword.jsx              |   8 +-
+ frontend/src/pages/Home.jsx                        |   2 +-
+ frontend/src/pages/Login.jsx                       |   8 +-
+ frontend/src/pages/Register.jsx                    |  10 +-
+ frontend/src/pages/ResetPassword.jsx               |   8 +-
+ frontend/src/pages/admin/CustomerManagement.jsx    |   4 +-
+ frontend/src/pages/admin/Dashboard.jsx             | 185 ++++++-------
+ frontend/src/pages/auth/ActivateAccount.jsx        |  81 ++++--
+ frontend/src/pages/driver/Trips.jsx                |   4 +
+ frontend/src/pages/receptionist/Bookings.jsx       | 278 +++++++++++++------
+ 130 files changed, 545 insertions(+), 4914 deletions(-)
+
+commit 6c3ed8615f9c816f40d79d87a889123f26012e90
+Author: Vidhyashini <vidhya142003@gmail.com>
+Date:   Tue Jan 27 15:16:30 2026 +0530
+
+    manage availability
+
+ backend/check_payment_tables.js                    |  57 ++++
+ backend/controllers/adminController.js             |  31 +-
+ backend/controllers/receptionistController.js      | 162 ++++++++++
+ backend/fix_payment_table.js                       |  86 ++++++
+ .../migrations/add_booking_columns_to_payment.sql  |  10 +
+ .../migrations/add_cancellation_reason_fields.sql  |  24 ++
+ backend/remove_duplicate_columns.js                |  78 +++++
+ backend/routes/admin.js                            |   4 +
+ backend/routes/receptionist.js                     |   8 +
+ backend/scripts/apply_cancel_reason_migration.js   |  61 ++++
+ backend/scripts/check_and_migrate_schema.js        |  68 +++++
+ backend/scripts/check_db_structure.js              |  41 +++
+ backend/scripts/test_availability_api.js           | 121 ++++++++
+ backend/scripts/test_booking_detection.js          |  78 +++++
+ backend/test_dashboard.js                          |  38 +++
+ backend/verify_payment_table.js                    |  75 +++++
+ frontend/src/App.jsx                               |   8 +-
+ .../src/pages/receptionist/ManageAvailability.jsx  | 327 +++++++++++++++++++++
+ 18 files changed, 1272 insertions(+), 5 deletions(-)
+
+commit 7a8fecbd60e1eea93fc6935f15f6fb783f5c0517
+Author: Vidhyashini <vidhya142003@gmail.com>
+Date:   Tue Jan 27 12:52:28 2026 +0530
+
+    Report generation in Admin
+
+ backend/check_driver_cols.js                       |  15 +-
+ backend/check_driver_schema_quick.js               |  14 +
+ backend/check_driver_status.js                     |  21 ++
+ backend/controllers/adminController.js             |  33 ++-
+ backend/controllers/authController.js              |  32 ++-
+ backend/controllers/bookingController.js           |  61 ++++-
+ backend/controllers/damageController.js            |  24 +-
+ backend/controllers/driverController.js            |  23 ++
+ backend/controllers/guestController.js             |  63 ++++-
+ backend/controllers/notificationController.js      |  71 +++++
+ backend/controllers/orderController.js             |  49 +++-
+ backend/controllers/reportController.js            | 155 +++++++++++
+ backend/driver_schema_dump.txt                     |   8 +
+ backend/dump_driver_schema.js                      |  19 ++
+ backend/fix_driver_login.js                        |  47 ++++
+ backend/force_reset_pass.js                        |  22 ++
+ backend/migrations/5_secure_auth_schema.js         |  20 +-
+ backend/migrations/add_driver_address_column.sql   |   4 +
+ backend/reproduce_driver_update.js                 |  76 ++++++
+ backend/reproduce_driver_upsert.js                 |  80 ++++++
+ backend/routes/guest.js                            |   2 +-
+ backend/routes/notifications.js                    |  17 +-
+ backend/routes/reports.js                          |  12 +
+ backend/scripts/check_drivers_login.js             |  28 ++
+ backend/scripts/create_notifications_table.js      |  35 +++
+ backend/scripts/debug_booking_display.js           |  48 ++++
+ backend/scripts/ensure_mock_driver.js              |  52 ++++
+ backend/scripts/fix_driver_login.js                |  82 ++++++
+ backend/scripts/fix_missing_role_entries.js        |  75 ++++++
+ backend/scripts/list_all_guests.js                 |  25 ++
+ backend/scripts/remove_payment_columns.js          |  40 +++
+ backend/scripts/remove_payment_method.js           |  48 ++++
+ backend/scripts/reset_all_rooms.js                 |  15 ++
+ backend/scripts/run_add_driver_address.js          |  41 +++
+ backend/scripts/simulate_guest_query.js            |  59 +++++
+ backend/scripts/update_driver_id.js                |  54 ++++
+ backend/scripts/verify_room_counts.js              |  29 +++
+ backend/server.js                                  |   1 +
+ backend/test_driver_api_flow.js                    |  77 ++++++
+ frontend/package-lock.json                         | 227 ++++++++++++++++
+ frontend/package.json                              |   4 +-
+ frontend/src/App.jsx                               |  28 +-
+ frontend/src/components/Navbar.jsx                 |   2 +-
+ frontend/src/components/Sidebar.jsx                |  34 ++-
+ frontend/src/pages/ForgotPassword.jsx              |  31 +--
+ frontend/src/pages/Login.jsx                       |  51 ++--
+ frontend/src/pages/Register.jsx                    | 250 +++++++++---------
+ frontend/src/pages/ResetPassword.jsx               |  29 ++-
+ frontend/src/pages/admin/CustomerManagement.jsx    |   4 +-
+ frontend/src/pages/admin/Dashboard.jsx             |   8 +-
+ frontend/src/pages/admin/Reports.jsx               | 289 +++++++++++++++++++++
+ frontend/src/pages/admin/StaffManagement.jsx       |  12 +-
+ frontend/src/pages/auth/ActivateAccount.jsx        |   8 +-
+ frontend/src/pages/common/ChangePassword.jsx       |  85 +++---
+ frontend/src/pages/common/Notifications.jsx        | 141 ++++++++++
+ frontend/src/pages/driver/Dashboard.jsx            |  16 +-
+ frontend/src/pages/driver/HireRequests.jsx         |   2 +-
+ frontend/src/pages/driver/Trips.jsx                |   2 +-
+ frontend/src/pages/guest/ActivityBooking.jsx       |   9 +-
+ frontend/src/pages/guest/Bookings.jsx              | 277 +++++++++++++++++---
+ frontend/src/pages/guest/Dashboard.jsx             |   6 +-
+ frontend/src/pages/guest/FoodOrders.jsx            | 114 ++++----
+ frontend/src/pages/guest/Notifications.jsx         | 237 +++++++++--------
+ frontend/src/pages/guest/Profile.jsx               |  99 +------
+ frontend/src/pages/guest/RoomBooking.jsx           |  20 +-
+ frontend/src/pages/guest/VehicleHire.jsx           |  10 +-
+ frontend/src/pages/kitchen/Damages.jsx             |   6 +-
+ frontend/src/pages/kitchen/History.jsx             |   8 +-
+ frontend/src/pages/kitchen/Menu.jsx                |   8 +-
+ frontend/src/pages/kitchen/Orders.jsx              |   8 +-
+ frontend/src/pages/receptionist/Activities.jsx     |   2 +-
+ frontend/src/pages/receptionist/Bookings.jsx       |   4 +-
+ frontend/src/pages/receptionist/Dashboard.jsx      |   8 +-
+ frontend/src/pages/receptionist/Refunds.jsx        | 134 +++++-----
+ .../src/pages/receptionist/VehicleAvailability.jsx |   2 +-
+ 75 files changed, 3004 insertions(+), 748 deletions(-)

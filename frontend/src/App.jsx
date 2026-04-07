@@ -49,6 +49,7 @@ import ChefHistory from './pages/chef/History';
 import StaffProfile from './pages/common/StaffProfile';
 import ChangePassword from './pages/common/ChangePassword';
 import CommonNotifications from './pages/common/Notifications';
+import ResourceManagement from './pages/common/ResourceManagement';
 
 // Layouts
 const PublicLayout = () => (
@@ -78,6 +79,7 @@ const adminItems = [
     { name: 'Staff Management', path: '/admin/staff', icon: ClipboardDocumentListIcon },
     { name: 'Customer Management', path: '/admin/customers', icon: UserIcon },
     { name: 'Manage Availability', path: '/admin/availability', icon: TruckIcon },
+    { name: 'Resource Management', path: '/admin/resources', icon: BuildingOfficeIcon },
     { name: 'Reports', path: '/admin/reports', icon: ClipboardDocumentListIcon },
     { name: 'Notifications', path: '/admin/notifications', icon: BellIcon }, // Added
 ];
@@ -87,6 +89,7 @@ const receptionistItems = [
     { name: 'Manage Bookings', path: '/receptionist/bookings', icon: BuildingOfficeIcon },
     { name: 'Activity Bookings', path: '/receptionist/activities', icon: TicketIcon },
     { name: 'Manage Availability', path: '/receptionist/availability', icon: TruckIcon },
+    { name: 'Resource Management', path: '/receptionist/resources', icon: BuildingOfficeIcon },
     { name: 'Refund Requests', path: '/receptionist/refunds', icon: CurrencyDollarIcon },
     { name: 'Damages', path: '/receptionist/damages', icon: ExclamationCircleIcon },
     { name: 'Notifications', path: '/receptionist/notifications', icon: BellIcon }, // Added
@@ -156,6 +159,7 @@ function App() {
                         <Route path="staff" element={<StaffManagement />} />
                         <Route path="customers" element={<CustomerManagement />} />
                         <Route path="availability" element={<ManageAvailability />} />
+                        <Route path="resources" element={<ResourceManagement />} />
                         <Route path="reports" element={<AdminReports />} />
                         <Route path="notifications" element={<CommonNotifications />} /> {/* Added */}
                         <Route path="profile" element={<StaffProfile />} />
@@ -173,6 +177,7 @@ function App() {
                         <Route path="bookings" element={<ReceptionistBookings />} />
                         <Route path="activities" element={<ReceptionistActivities />} />
                         <Route path="availability" element={<ManageAvailability />} />
+                        <Route path="resources" element={<ResourceManagement />} />
                         <Route path="refunds" element={<ReceptionistRefunds />} />
                         <Route path="damages" element={<ReceptionistDamages />} />
                         <Route path="notifications" element={<CommonNotifications />} /> {/* Added */}

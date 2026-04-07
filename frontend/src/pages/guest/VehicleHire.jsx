@@ -245,41 +245,56 @@ const VehicleHire = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     {vehicles.length > 0 ? (
                         vehicles.map((vehicle) => (
-                            <div key={vehicle.vehicle_id} className="bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-shadow">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h4 className="font-bold text-slate-900 text-lg">{vehicle.vehicle_type}</h4>
-                                    <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">
-                                        Available
-                                    </span>
-                                </div>
+                            <div key={vehicle.vehicle_id} className="bg-white border border-slate-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow">
+                                {/* Vehicle Image */}
+                                {vehicle.vehicle_image ? (
+                                    <img
+                                        src={vehicle.vehicle_image.startsWith('/') ? `${axios.defaults.baseURL}${vehicle.vehicle_image}` : vehicle.vehicle_image}
+                                        alt={vehicle.vehicle_type}
+                                        className="w-full h-40 object-cover"
+                                    />
+                                ) : (
+                                    <div className="w-full h-40 bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center text-5xl">
+                                        {vehicle.vehicle_type?.toLowerCase().includes('car') ? '🚗' :
+                                         vehicle.vehicle_type?.toLowerCase().includes('bike') ? '🏍️' : '🚐'}
+                                    </div>
+                                )}
+                                <div className="p-5">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h4 className="font-bold text-slate-900 text-lg">{vehicle.vehicle_type}</h4>
+                                        <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">
+                                            Available
+                                        </span>
+                                    </div>
 
-                                <div className="space-y-2 mb-4 text-sm text-slate-700">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-slate-500">🚗</span>
-                                        <span>{vehicle.vehicle_number}</span>
+                                    <div className="space-y-2 mb-4 text-sm text-slate-700">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-slate-500">🚗</span>
+                                            <span>{vehicle.vehicle_number}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-slate-500">👥</span>
+                                            <span>{getPassengerCount(vehicle.vehicle_type)} passengers</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-slate-500">💰</span>
+                                            <span>Per Day: <span className="font-semibold text-gold-600">Rs. {vehicle.vehicle_price_per_day}</span></span>
+                                        </div>
+                                        <div className="flex items-center gap-2 pt-2 border-t border-slate-100 mt-2">
+                                            <span className="font-bold text-slate-900">Total Est:</span>
+                                            <span className="font-bold text-green-600">Rs. {vehicle.vehicle_price_per_day * searchParams.vb_days}</span>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-slate-500">👥</span>
-                                        <span>{getPassengerCount(vehicle.vehicle_type)} passengers</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-slate-500">💰</span>
-                                        <span>Per Day: <span className="font-semibold text-gold-600">Rs. {vehicle.vehicle_price_per_day}</span></span>
-                                    </div>
-                                    <div className="flex items-center gap-2 pt-2 border-t border-slate-100 mt-2">
-                                        <span className="font-bold text-slate-900">Total Est:</span>
-                                        <span className="font-bold text-green-600">Rs. {vehicle.vehicle_price_per_day * searchParams.vb_days}</span>
-                                    </div>
-                                </div>
 
-                                <button
-                                    type="button"
-                                    onClick={(e) => { e.preventDefault(); handleRequestHire(vehicle); }}
-                                    disabled={requesting === vehicle.vehicle_id}
-                                    className="w-full py-3 bg-gold-600 text-white rounded-lg hover:bg-gold-700 transition-colors font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {requesting === vehicle.vehicle_id ? 'Sending Request...' : 'Request Hire'}
-                                </button>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.preventDefault(); handleRequestHire(vehicle); }}
+                                        disabled={requesting === vehicle.vehicle_id}
+                                        className="w-full py-3 bg-gold-600 text-white rounded-lg hover:bg-gold-700 transition-colors font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {requesting === vehicle.vehicle_id ? 'Sending Request...' : 'Request Hire'}
+                                    </button>
+                                </div>
                             </div>
                         ))
                     ) : (

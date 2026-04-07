@@ -445,3 +445,146 @@ exports.updateActivityStatus = async (req, res) => {
     }
 };
 
+// --- Room CRUD Management (for Resource Management page) ---
+
+exports.createRoom = async (req, res) => {
+    try {
+        const { room_type, room_price_per_day, room_status } = req.body;
+        const room_image = req.file ? `/uploads/rooms/${req.file.filename}` : null;
+        await db.query(
+            'INSERT INTO room (room_type, room_price_per_day, room_status, room_image) VALUES (?, ?, ?, ?)',
+            [room_type, room_price_per_day, room_status || 'Available', room_image]
+        );
+        res.json({ message: 'Room created successfully' });
+    } catch (error) {
+        console.error('Error creating room:', error);
+        res.status(500).json({ error: 'Failed to create room' });
+    }
+};
+
+exports.updateRoom = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { room_type, room_price_per_day, room_status } = req.body;
+        const room_image = req.file ? `/uploads/rooms/${req.file.filename}` : req.body.room_image;
+
+        await db.query(
+            'UPDATE room SET room_type = ?, room_price_per_day = ?, room_status = ?, room_image = ? WHERE room_id = ?',
+            [room_type, room_price_per_day, room_status, room_image, id]
+        );
+
+        // Bulk update: If image changed, propagate to all rooms of same type
+        if (req.file) {
+            await db.query(
+                'UPDATE room SET room_image = ? WHERE room_type = ? AND room_id != ?',
+                [room_image, room_type, id]
+            );
+        }
+
+        res.json({ message: 'Room updated successfully' });
+    } catch (error) {
+        console.error('Error updating room:', error);
+        res.status(500).json({ error: 'Failed to update room' });
+    }
+};
+
+exports.deleteRoom = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await db.query('DELETE FROM room WHERE room_id = ?', [id]);
+        res.json({ message: 'Room deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting room:', error);
+        res.status(500).json({ error: 'Failed to delete room' });
+    }
+};
+
+// --- Activity CRUD Management ---
+
+exports.createActivity = async (req, res) => {
+    try {
+        const { activity_name, activity_price_per_hour, activity_status } = req.body;
+        const activity_image = req.file ? `/uploads/activities/${req.file.filename}` : null;
+        await db.query(
+            'INSERT INTO activity (activity_name, activity_price_per_hour, activity_status, activity_image) VALUES (?, ?, ?, ?)',
+            [activity_name, activity_price_per_hour, activity_status || 'Available', activity_image]
+        );
+        res.json({ message: 'Activity created successfully' });
+    } catch (error) {
+        console.error('Error creating activity:', error);
+        res.status(500).json({ error: 'Failed to create activity' });
+    }
+};
+
+exports.updateActivity = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { activity_name, activity_price_per_hour, activity_status } = req.body;
+        const activity_image = req.file ? `/uploads/activities/${req.file.filename}` : req.body.activity_image;
+
+        await db.query(
+            'UPDATE activity SET activity_name = ?, activity_price_per_hour = ?, activity_status = ?, activity_image = ? WHERE activity_id = ?',
+            [activity_name, activity_price_per_hour, activity_status, activity_image, id]
+        );
+        res.json({ message: 'Activity updated successfully' });
+    } catch (error) {
+        console.error('Error updating activity:', error);
+        res.status(500).json({ error: 'Failed to update activity' });
+    }
+};
+
+exports.deleteActivity = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await db.query('DELETE FROM activity WHERE activity_id = ?', [id]);
+        res.json({ message: 'Activity deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting activity:', error);
+        res.status(500).json({ error: 'Failed to delete activity' });
+    }
+};
+
+// --- Vehicle CRUD Management ---
+
+exports.createVehicle = async (req, res) => {
+    try {
+        const { vehicle_type, vehicle_price_per_day, vehicle_status } = req.body;
+        const vehicle_image = req.file ? `/uploads/vehicles/${req.file.filename}` : null;
+        await db.query(
+            'INSERT INTO vehicle (vehicle_type, vehicle_price_per_day, vehicle_status, vehicle_image) VALUES (?, ?, ?, ?)',
+            [vehicle_type, vehicle_price_per_day, vehicle_status || 'Available', vehicle_image]
+        );
+        res.json({ message: 'Vehicle created successfully' });
+    } catch (error) {
+        console.error('Error creating vehicle:', error);
+        res.status(500).json({ error: 'Failed to create vehicle' });
+    }
+};
+
+exports.updateVehicle = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { vehicle_type, vehicle_price_per_day, vehicle_status } = req.body;
+        const vehicle_image = req.file ? `/uploads/vehicles/${req.file.filename}` : req.body.vehicle_image;
+
+        await db.query(
+            'UPDATE vehicle SET vehicle_type = ?, vehicle_price_per_day = ?, vehicle_status = ?, vehicle_image = ? WHERE vehicle_id = ?',
+            [vehicle_type, vehicle_price_per_day, vehicle_status, vehicle_image, id]
+        );
+        res.json({ message: 'Vehicle updated successfully' });
+    } catch (error) {
+        console.error('Error updating vehicle:', error);
+        res.status(500).json({ error: 'Failed to update vehicle' });
+    }
+};
+
+exports.deleteVehicle = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await db.query('DELETE FROM vehicle WHERE vehicle_id = ?', [id]);
+        res.json({ message: 'Vehicle deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting vehicle:', error);
+        res.status(500).json({ error: 'Failed to delete vehicle' });
+    }
+};

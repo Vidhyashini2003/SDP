@@ -222,29 +222,43 @@ const ActivityBooking = () => {
                                 setAvailableSlots([]);
                                 setSelectedSlot(null);
                             }}
-                            className={`p-6 rounded-xl border-2 transition-all cursor-pointer bg-white ${
+                            className={`rounded-xl border-2 transition-all cursor-pointer bg-white overflow-hidden ${
                                 selectedActivity?.activity_id === activity.activity_id
                                     ? 'border-gold-500 shadow-md transform scale-[1.01]'
                                     : 'border-slate-200 hover:border-gold-300 hover:shadow-sm'
                             }`}
                         >
-                            <h4 className="text-xl font-bold text-slate-900 mb-2">
-                                {activity.activity_name}
-                            </h4>
-                            <p className="text-sm text-slate-600 mb-4 line-clamp-2">
-                                {activity.activity_description || 'Enjoy this amazing activity'}
-                            </p>
-                            <div className="flex items-center justify-between">
-                                <p className="text-xl font-bold text-gold-600">
-                                    Rs. {activity.activity_price_per_hour?.toLocaleString()}/hour
+                            {/* Activity Image */}
+                            {activity.activity_image ? (
+                                <img
+                                    src={activity.activity_image.startsWith('/') ? `${axios.defaults.baseURL}${activity.activity_image}` : activity.activity_image}
+                                    alt={activity.activity_name}
+                                    className="w-full h-40 object-cover"
+                                />
+                            ) : (
+                                <div className="w-full h-40 bg-gradient-to-br from-blue-50 to-teal-50 flex items-center justify-center text-5xl">
+                                    🏊
+                                </div>
+                            )}
+                            <div className="p-6">
+                                <h4 className="text-xl font-bold text-slate-900 mb-2">
+                                    {activity.activity_name}
+                                </h4>
+                                <p className="text-sm text-slate-600 mb-4 line-clamp-2">
+                                    {activity.activity_description || 'Enjoy this amazing activity'}
                                 </p>
-                                <span className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-                                    selectedActivity?.activity_id === activity.activity_id
-                                        ? 'bg-gold-500 text-white'
-                                        : 'bg-slate-100 text-slate-600 group-hover:bg-gold-100'
-                                }`}>
-                                    {selectedActivity?.activity_id === activity.activity_id ? '✓ Selected' : 'Select'}
-                                </span>
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xl font-bold text-gold-600">
+                                        Rs. {activity.activity_price_per_hour?.toLocaleString()}/hour
+                                    </p>
+                                    <span className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
+                                        selectedActivity?.activity_id === activity.activity_id
+                                            ? 'bg-gold-500 text-white'
+                                            : 'bg-slate-100 text-slate-600 group-hover:bg-gold-100'
+                                    }`}>
+                                        {selectedActivity?.activity_id === activity.activity_id ? '✓ Selected' : 'Select'}
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     ))}

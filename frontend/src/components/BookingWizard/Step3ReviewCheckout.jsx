@@ -40,6 +40,21 @@ const Step3ReviewCheckout = ({
                         <span className="text-slate-700">Nights:</span>
                         <span className="font-semibold">{bookingData.nights}</span>
                     </div>
+                    {bookingData.numRooms && bookingData.numRooms > 1 && (
+                        <div className="flex justify-between">
+                            <span className="text-slate-700">Rooms:</span>
+                            <span className="font-semibold">{bookingData.numRooms}</span>
+                        </div>
+                    )}
+                    {(bookingData.adults || bookingData.kids > 0) && (
+                        <div className="flex justify-between">
+                            <span className="text-slate-700">Guests:</span>
+                            <span className="font-semibold">
+                                {bookingData.adults || 2} adult{(bookingData.adults || 2) !== 1 ? 's' : ''}
+                                {bookingData.kids > 0 ? `, ${bookingData.kids} child${bookingData.kids !== 1 ? 'ren' : ''}` : ''}
+                            </span>
+                        </div>
+                    )}
                     <div className="flex justify-between pt-2 border-t border-slate-300">
                         <span className="text-slate-700">Room Total:</span>
                         <span className="font-bold text-lg">Rs. {bookingData.roomAmount.toLocaleString()}</span>

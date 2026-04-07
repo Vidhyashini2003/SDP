@@ -14,6 +14,9 @@ const BookingWizard = () => {
         // Step 1
         checkIn: '',
         checkOut: '',
+        adults: 2,
+        kids: 0,
+        numRooms: 1,
         room: null,
         nights: 0,
         roomAmount: 0,
@@ -120,6 +123,9 @@ const BookingWizard = () => {
             setBookingData({
                 checkIn: '',
                 checkOut: '',
+                adults: 2,
+                kids: 0,
+                numRooms: 1,
                 room: null,
                 nights: 0,
                 roomAmount: 0,
