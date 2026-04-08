@@ -6,7 +6,7 @@ exports.getAssignedTrips = async (req, res) => {
     try {
         const driverId = req.user.id;
         const [trips] = await db.query(
-            `SELECT vb.*, CONCAT(u.first_name, ' ', u.last_name) as guest_name, u.phone as guest_phone, v.vehicle_number, v.vehicle_type
+            `SELECT vb.*, CONCAT(u.first_name, ' ', u.last_name) as guest_name, g.guest_phone, v.vehicle_number, v.vehicle_type
          FROM vehiclebooking vb
          JOIN Driver d ON vb.driver_id = d.driver_id
          JOIN Guest g ON vb.guest_id = g.guest_id

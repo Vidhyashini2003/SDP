@@ -106,7 +106,7 @@ exports.getDashboardStats = async (req, res) => {
 exports.getAllStaff = async (req, res) => {
     try {
         const [staff] = await db.query(
-            "SELECT role, user_id as id, CONCAT(first_name, ' ', last_name) as name, email, phone, account_status, created_at FROM Users WHERE role IN ('receptionist', 'chef', 'driver') ORDER BY created_at DESC"
+            "SELECT role, user_id as id, CONCAT(first_name, ' ', last_name) as name, email, account_status, created_at FROM Users WHERE role IN ('receptionist', 'chef', 'driver') ORDER BY created_at DESC"
         );
         res.json(staff);
     } catch (error) {
@@ -117,8 +117,8 @@ exports.getAllStaff = async (req, res) => {
 exports.getAllGuests = async (req, res) => {
     try {
         const [guests] = await db.query(`
-            SELECT u.user_id as id, CONCAT(u.first_name, ' ', u.last_name) as name, u.email, u.phone, u.account_status, u.created_at, 
-                   g.guest_nic_passport, g.nationality 
+            SELECT u.user_id as id, CONCAT(u.first_name, ' ', u.last_name) as name, u.email, u.account_status, u.created_at, 
+                   g.guest_nic_passport as nic, g.nationality, g.guest_phone as phone 
             FROM Users u 
             JOIN Guest g ON u.user_id = g.user_id 
             WHERE u.role = 'guest'
@@ -152,26 +152,26 @@ exports.inviteStaff = async (req, res) => {
         const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
 
         const [userRes] = await connection.query(
-            "INSERT INTO Users (first_name, last_name, email, phone, role, account_status) VALUES (?, ?, ?, ?, ?, 'Inactive')",
-            [firstName, lastName, email, phone, role]
+            "INSERT INTO Users (first_name, last_name, email, role, account_status) VALUES (?, ?, ?, ?, 'Inactive')",
+            [firstName, lastName, email, role]
         );
         const userId = userRes.insertId;
 
-        // 3. Insert into Role Table (Only if specific fields are provided, or insert nulls if table exists)
+        // 3. Insert into Role Table
         if (role === 'receptionist') {
             await connection.query(
-                "INSERT INTO Receptionist (user_id, receptionist_address) VALUES (?, ?)",
-                [userId, address]
+                "INSERT INTO receptionist (user_id, receptionist_street, receptionist_phone) VALUES (?, ?, ?)",
+                [userId, address, phone]
             );
         } else if (role === 'chef') {
             await connection.query(
-                "INSERT INTO KitchenStaff (user_id, staff_address) VALUES (?, ?)",
-                [userId, address]
+                "INSERT INTO chef (user_id, chef_street, chef_phone) VALUES (?, ?, ?)",
+                [userId, address, phone]
             );
         } else if (role === 'driver') {
             await connection.query(
-                "INSERT INTO Driver (user_id, driver_address) VALUES (?, ?)",
-                [userId, address]
+                "INSERT INTO driver (user_id, driver_street, driver_phone) VALUES (?, ?, ?)",
+                [userId, address, phone]
             );
         } else {
             await connection.rollback();
@@ -240,7 +240,7 @@ exports.updateStaff = async (req, res) => {
         const firstName = nameParts[0];
         const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
 
-        await db.query('UPDATE Users SET first_name = ?, last_name = ?, email = ?, phone = ? WHERE user_id = ?', [firstName, lastName, email, phone, id]);
+        await db.query('UPDATE Users SET first_name = ?, last_name = ?, email = ? WHERE user_id = ?', [firstName, lastName, email, id]);
 
         // Fetch User Role to know which table to update
         const [users] = await db.query('SELECT role FROM Users WHERE user_id = ?', [id]);
@@ -254,15 +254,24 @@ exports.updateStaff = async (req, res) => {
                 }
             } else if (role === 'driver') {
                 if (address !== undefined) {
-                    await db.query('UPDATE Driver SET driver_address = ? WHERE user_id = ?', [address, id]);
+                    await db.query('UPDATE driver SET driver_street = ? WHERE user_id = ?', [address, id]);
+                }
+                if (phone !== undefined) {
+                    await db.query('UPDATE driver SET driver_phone = ? WHERE user_id = ?', [phone, id]);
                 }
             } else if (role === 'receptionist') {
                 if (address !== undefined) {
-                    await db.query('UPDATE Receptionist SET receptionist_address = ? WHERE user_id = ?', [address, id]);
+                    await db.query('UPDATE receptionist SET receptionist_street = ? WHERE user_id = ?', [address, id]);
+                }
+                if (phone !== undefined) {
+                    await db.query('UPDATE receptionist SET receptionist_phone = ? WHERE user_id = ?', [phone, id]);
                 }
             } else if (role === 'chef') {
                 if (address !== undefined) {
-                    await db.query('UPDATE KitchenStaff SET staff_address = ? WHERE user_id = ?', [address, id]);
+                    await db.query('UPDATE chef SET chef_street = ? WHERE user_id = ?', [address, id]);
+                }
+                if (phone !== undefined) {
+                    await db.query('UPDATE chef SET chef_phone = ? WHERE user_id = ?', [phone, id]);
                 }
             }
         }

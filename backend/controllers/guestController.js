@@ -5,7 +5,7 @@ const notificationController = require('./notificationController');
 exports.getProfile = async (req, res) => {
     try {
         const [rows] = await db.query(
-            `SELECT g.*, u.first_name, u.last_name, CONCAT(u.first_name, ' ', u.last_name) as guest_name, u.email as guest_email, u.phone as guest_phone, u.role 
+            `SELECT g.*, u.first_name, u.last_name, CONCAT(u.first_name, ' ', u.last_name) as guest_name, u.email as guest_email, g.guest_phone, u.role 
              FROM Guest g 
              JOIN Users u ON g.user_id = u.user_id 
              WHERE u.user_id = ?`,
@@ -32,14 +32,14 @@ exports.updateProfile = async (req, res) => {
 
         // 1. Update Users Table (Common info)
         await connection.query(
-            'UPDATE Users SET first_name = ?, last_name = ?, phone = ? WHERE user_id = ?',
-            [first_name, last_name, guest_phone, userId]
+            'UPDATE Users SET first_name = ?, last_name = ? WHERE user_id = ?',
+            [first_name, last_name, userId]
         );
 
-        // 2. Update Guest Table (Specific info)
+        // 2. Update Guest Table (Specific info including phone)
         await connection.query(
-            'UPDATE Guest SET guest_nic_passport = ?, nationality = ? WHERE user_id = ?',
-            [guest_nic_passport, nationality, userId]
+            'UPDATE Guest SET guest_nic_passport = ?, nationality = ?, guest_phone = ? WHERE user_id = ?',
+            [guest_nic_passport, nationality, guest_phone, userId]
         );
 
         await connection.commit();

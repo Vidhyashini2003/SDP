@@ -36,7 +36,7 @@ exports.reportDamage = async (req, res) => {
 exports.getAllDamages = async (req, res) => {
     try {
         const [damages] = await db.query(
-            `SELECT d.*, CONCAT(u.first_name, ' ', u.last_name) as guest_name, u.phone as guest_phone 
+            `SELECT d.*, CONCAT(u.first_name, ' ', u.last_name) as guest_name, g.guest_phone 
              FROM damage d 
              JOIN Guest g ON d.guest_id = g.guest_id 
              JOIN Users u ON g.user_id = u.user_id

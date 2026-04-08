@@ -78,6 +78,8 @@ const CustomerManagement = () => {
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Phone</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">NIC/Passport</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Nationality</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Joined</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Actions</th>
@@ -93,6 +95,8 @@ const CustomerManagement = () => {
                                     </td>
                                     <td className="px-6 py-4 text-sm text-gray-500">{customer.email}</td>
                                     <td className="px-6 py-4 text-sm text-gray-500">{customer.phone || 'N/A'}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-500">{customer.nic || 'N/A'}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-500">{customer.nationality || 'N/A'}</td>
                                     <td className="px-6 py-4">
                                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(customer.account_status)}`}>
                                             {customer.account_status}
@@ -129,7 +133,7 @@ const CustomerManagement = () => {
                             ))
                         ) : (
                             <tr>
-                                <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
+                                <td colSpan="9" className="px-6 py-12 text-center text-gray-500">
                                     No customers found matching your search.
                                 </td>
                             </tr>

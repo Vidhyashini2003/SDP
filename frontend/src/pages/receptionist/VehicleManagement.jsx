@@ -11,6 +11,8 @@ const VehicleManagement = () => {
     const [formData, setFormData] = useState({
         vehicle_type: '',
         vehicle_price_per_day: '',
+        vehicle_price_per_km: '',
+        waiting_time_price_per_hour: '',
         vehicle_status: 'Available',
         vehicle_image: ''
     });
@@ -36,6 +38,8 @@ const VehicleManagement = () => {
             const data = new FormData();
             data.append('vehicle_type', formData.vehicle_type);
             data.append('vehicle_price_per_day', formData.vehicle_price_per_day);
+            data.append('vehicle_price_per_km', formData.vehicle_price_per_km);
+            data.append('waiting_time_price_per_hour', formData.waiting_time_price_per_hour);
             data.append('vehicle_status', formData.vehicle_status);
             if (imageFile) {
                 data.append('image', imageFile);
@@ -66,6 +70,8 @@ const VehicleManagement = () => {
         setFormData({
             vehicle_type: vehicle.vehicle_type,
             vehicle_price_per_day: vehicle.vehicle_price_per_day,
+            vehicle_price_per_km: vehicle.vehicle_price_per_km,
+            waiting_time_price_per_hour: vehicle.waiting_time_price_per_hour,
             vehicle_status: vehicle.vehicle_status,
             vehicle_image: vehicle.vehicle_image || ''
         });
@@ -85,7 +91,14 @@ const VehicleManagement = () => {
     };
 
     const resetForm = () => {
-        setFormData({ vehicle_type: '', vehicle_price_per_day: '', vehicle_status: 'Available', vehicle_image: '' });
+        setFormData({ 
+            vehicle_type: '', 
+            vehicle_price_per_day: '', 
+            vehicle_price_per_km: '',
+            waiting_time_price_per_hour: '',
+            vehicle_status: 'Available', 
+            vehicle_image: '' 
+        });
         setImageFile(null);
         setEditingItem(null);
         setIsAdding(false);
@@ -111,7 +124,7 @@ const VehicleManagement = () => {
                         {editingItem ? `Edit ${editingItem.vehicle_type}` : 'Add New Vehicle'}
                     </h3>
                     <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle Type</label>
                                 <input
@@ -120,16 +133,38 @@ const VehicleManagement = () => {
                                     value={formData.vehicle_type}
                                     onChange={e => setFormData({ ...formData, vehicle_type: e.target.value })}
                                     className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-gold-500"
-                                    placeholder="e.g. Scooter, Tuk-Tuk"
+                                    placeholder="e.g. Van, Car"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Price Per Day (Rs.)</label>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Price/Day (Rs.)</label>
                                 <input
                                     type="number"
                                     required
                                     value={formData.vehicle_price_per_day}
                                     onChange={e => setFormData({ ...formData, vehicle_price_per_day: e.target.value })}
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-gold-500"
+                                    placeholder="0.00"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Price/KM (Rs.)</label>
+                                <input
+                                    type="number"
+                                    required
+                                    value={formData.vehicle_price_per_km}
+                                    onChange={e => setFormData({ ...formData, vehicle_price_per_km: e.target.value })}
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-gold-500"
+                                    placeholder="0.00"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Waiting Fee/Hr (Rs.)</label>
+                                <input
+                                    type="number"
+                                    required
+                                    value={formData.waiting_time_price_per_hour}
+                                    onChange={e => setFormData({ ...formData, waiting_time_price_per_hour: e.target.value })}
                                     className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-gold-500"
                                     placeholder="0.00"
                                 />
@@ -193,6 +228,8 @@ const VehicleManagement = () => {
                             <th className="px-6 py-4 font-bold text-slate-600 uppercase text-[10px] tracking-widest">Vehicle</th>
                             <th className="px-6 py-4 font-bold text-slate-600 uppercase text-[10px] tracking-widest">Type</th>
                             <th className="px-6 py-4 font-bold text-slate-600 uppercase text-[10px] tracking-widest">Price/Day</th>
+                            <th className="px-6 py-4 font-bold text-slate-600 uppercase text-[10px] tracking-widest">Price/KM</th>
+                            <th className="px-6 py-4 font-bold text-slate-600 uppercase text-[10px] tracking-widest">Waiting/Hr</th>
                             <th className="px-6 py-4 font-bold text-slate-600 uppercase text-[10px] tracking-widest">Status</th>
                             <th className="px-6 py-4 font-bold text-slate-600 uppercase text-[10px] tracking-widest text-right">Actions</th>
                         </tr>
@@ -216,6 +253,8 @@ const VehicleManagement = () => {
                                 </td>
                                 <td className="px-6 py-4 font-bold text-slate-900">{vehicle.vehicle_type}</td>
                                 <td className="px-6 py-4 text-slate-600">Rs. {Number(vehicle.vehicle_price_per_day).toLocaleString()}</td>
+                                <td className="px-6 py-4 text-slate-600 font-medium">Rs. {Number(vehicle.vehicle_price_per_km).toLocaleString()}</td>
+                                <td className="px-6 py-4 text-slate-600 font-medium">Rs. {Number(vehicle.waiting_time_price_per_hour).toLocaleString()}</td>
                                 <td className="px-6 py-4">
                                     <span className={`px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${
                                         vehicle.vehicle_status === 'Available' ? 'bg-green-100 text-green-700 border border-green-200' :

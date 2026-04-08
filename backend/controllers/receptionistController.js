@@ -38,7 +38,7 @@ exports.updateRoomBookingStatus = async (req, res) => {
 exports.getAllGuests = async (req, res) => {
     try {
         const [guests] = await db.query(
-            `SELECT g.*, CONCAT(u.first_name, ' ', u.last_name) as guest_name, u.email as guest_email, u.phone as guest_phone, u.created_at
+            `SELECT g.*, CONCAT(u.first_name, ' ', u.last_name) as guest_name, u.email as guest_email, g.guest_phone, u.created_at
              FROM Guest g
              JOIN Users u ON g.user_id = u.user_id`
         );
@@ -54,7 +54,7 @@ exports.getAllRoomBookings = async (req, res) => {
         const [bookings] = await db.query(
             `SELECT rb.*, 
                     CONCAT(u.first_name, ' ', u.last_name) as guest_name, 
-                    u.phone as guest_phone, 
+                    g.guest_phone, 
                     g.guest_nic_passport,
                     g.nationality,
                     r.room_type, 
@@ -78,7 +78,7 @@ exports.getAllActivityBookings = async (req, res) => {
         const [bookings] = await db.query(
             `SELECT ab.*, 
                     CONCAT(u.first_name, ' ', u.last_name) as guest_name, 
-                    u.phone as guest_phone, 
+                    g.guest_phone, 
                     g.guest_nic_passport,
                     g.nationality,
                     a.activity_name, 
@@ -164,7 +164,7 @@ exports.getAllVehicleBookings = async (req, res) => {
         const [bookings] = await db.query(
             `SELECT vb.*, 
                     CONCAT(u.first_name, ' ', u.last_name) as guest_name, 
-                    u.phone as guest_phone,
+                    g.guest_phone,
                     g.guest_nic_passport,
                     g.nationality,
                     v.vehicle_type
@@ -185,7 +185,7 @@ exports.getAllFoodOrders = async (req, res) => {
         const [orders] = await db.query(
             `SELECT fo.*, 
                     CONCAT(u.first_name, ' ', u.last_name) as guest_name, 
-                    u.phone as guest_phone,
+                    g.guest_phone,
                     g.guest_nic_passport,
                     g.nationality,
                     p.payment_amount,
@@ -548,11 +548,11 @@ exports.deleteActivity = async (req, res) => {
 
 exports.createVehicle = async (req, res) => {
     try {
-        const { vehicle_type, vehicle_price_per_day, vehicle_status } = req.body;
+        const { vehicle_type, vehicle_price_per_day, vehicle_price_per_km, waiting_time_price_per_hour, vehicle_status } = req.body;
         const vehicle_image = req.file ? `/uploads/vehicles/${req.file.filename}` : null;
         await db.query(
-            'INSERT INTO vehicle (vehicle_type, vehicle_price_per_day, vehicle_status, vehicle_image) VALUES (?, ?, ?, ?)',
-            [vehicle_type, vehicle_price_per_day, vehicle_status || 'Available', vehicle_image]
+            'INSERT INTO vehicle (vehicle_type, vehicle_price_per_day, vehicle_price_per_km, waiting_time_price_per_hour, vehicle_status, vehicle_image) VALUES (?, ?, ?, ?, ?, ?)',
+            [vehicle_type, vehicle_price_per_day, vehicle_price_per_km, waiting_time_price_per_hour, vehicle_status || 'Available', vehicle_image]
         );
         res.json({ message: 'Vehicle created successfully' });
     } catch (error) {
@@ -564,12 +564,12 @@ exports.createVehicle = async (req, res) => {
 exports.updateVehicle = async (req, res) => {
     try {
         const { id } = req.params;
-        const { vehicle_type, vehicle_price_per_day, vehicle_status } = req.body;
+        const { vehicle_type, vehicle_price_per_day, vehicle_price_per_km, waiting_time_price_per_hour, vehicle_status } = req.body;
         const vehicle_image = req.file ? `/uploads/vehicles/${req.file.filename}` : req.body.vehicle_image;
 
         await db.query(
-            'UPDATE vehicle SET vehicle_type = ?, vehicle_price_per_day = ?, vehicle_status = ?, vehicle_image = ? WHERE vehicle_id = ?',
-            [vehicle_type, vehicle_price_per_day, vehicle_status, vehicle_image, id]
+            'UPDATE vehicle SET vehicle_type = ?, vehicle_price_per_day = ?, vehicle_price_per_km = ?, waiting_time_price_per_hour = ?, vehicle_status = ?, vehicle_image = ? WHERE vehicle_id = ?',
+            [vehicle_type, vehicle_price_per_day, vehicle_price_per_km, waiting_time_price_per_hour, vehicle_status, vehicle_image, id]
         );
         res.json({ message: 'Vehicle updated successfully' });
     } catch (error) {
