@@ -100,17 +100,19 @@ const StaffProfile = () => {
                         />
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
-                        <input
-                            type="text"
-                            name="phone"
-                            value={formData.phone}
-                            onChange={handleChange}
-                            className="w-full rounded-lg border-slate-300 focus:ring-gold-500 focus:border-gold-500"
-                            placeholder="+1 234 567 890"
-                        />
-                    </div>
+                    {formData.role !== 'admin' && (
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
+                            <input
+                                type="text"
+                                name="phone"
+                                value={formData.phone}
+                                onChange={handleChange}
+                                className="w-full rounded-lg border-slate-300 focus:ring-gold-500 focus:border-gold-500"
+                                placeholder="+1 234 567 890"
+                            />
+                        </div>
+                    )}
 
                     {(formData.role === 'receptionist' || formData.role === 'chef' || formData.role === 'driver') && (
                         <div>

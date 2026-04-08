@@ -105,11 +105,40 @@ exports.getDashboardStats = async (req, res) => {
 
 exports.getAllStaff = async (req, res) => {
     try {
-        const [staff] = await db.query(
-            "SELECT role, user_id as id, CONCAT(first_name, ' ', last_name) as name, email, account_status, created_at FROM Users WHERE role IN ('receptionist', 'chef', 'driver') ORDER BY created_at DESC"
-        );
+        const [staff] = await db.query(`
+            SELECT u.role, u.user_id as id, CONCAT(u.first_name, ' ', u.last_name) as name,
+                   u.email, u.account_status, u.created_at,
+                   r.receptionist_phone as phone,
+                   CONCAT_WS(', ', NULLIF(r.receptionist_no, ''), NULLIF(r.receptionist_street, ''), NULLIF(r.receptionist_city, ''), NULLIF(r.receptionist_district, '')) as address
+            FROM Users u
+            JOIN receptionist r ON u.user_id = r.user_id
+            WHERE u.role = 'receptionist'
+
+            UNION ALL
+
+            SELECT u.role, u.user_id as id, CONCAT(u.first_name, ' ', u.last_name) as name,
+                   u.email, u.account_status, u.created_at,
+                   c.chef_phone as phone,
+                   CONCAT_WS(', ', NULLIF(c.chef_no, ''), NULLIF(c.chef_street, ''), NULLIF(c.chef_city, ''), NULLIF(c.chef_district, '')) as address
+            FROM Users u
+            JOIN chef c ON u.user_id = c.user_id
+            WHERE u.role = 'chef'
+
+            UNION ALL
+
+            SELECT u.role, u.user_id as id, CONCAT(u.first_name, ' ', u.last_name) as name,
+                   u.email, u.account_status, u.created_at,
+                   d.driver_phone as phone,
+                   CONCAT_WS(', ', NULLIF(d.driver_no, ''), NULLIF(d.driver_street, ''), NULLIF(d.driver_city, ''), NULLIF(d.driver_district, '')) as address
+            FROM Users u
+            JOIN driver d ON u.user_id = d.user_id
+            WHERE u.role = 'driver'
+
+            ORDER BY created_at DESC
+        `);
         res.json(staff);
     } catch (error) {
+        console.error('Failed to fetch staff:', error);
         res.status(500).json({ error: 'Failed to fetch staff' });
     }
 };

@@ -74,7 +74,6 @@ const CustomerManagement = () => {
                 <table className="w-full text-left">
                     <thead className="bg-gray-50 border-b border-gray-100">
                         <tr>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">ID</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Phone</th>
@@ -89,7 +88,6 @@ const CustomerManagement = () => {
                         {filteredCustomers.length > 0 ? (
                             filteredCustomers.map((customer) => (
                                 <tr key={customer.id} className="hover:bg-gray-50 transition-colors">
-                                    <td className="px-6 py-4 text-sm text-gray-500">#{customer.id}</td>
                                     <td className="px-6 py-4">
                                         <div className="font-medium text-gray-900">{customer.name}</div>
                                     </td>
@@ -133,7 +131,7 @@ const CustomerManagement = () => {
                             ))
                         ) : (
                             <tr>
-                                <td colSpan="9" className="px-6 py-12 text-center text-gray-500">
+                                <td colSpan="8" className="px-6 py-12 text-center text-gray-500">
                                     No customers found matching your search.
                                 </td>
                             </tr>

@@ -187,9 +187,10 @@ const StaffManagement = () => {
                 <table className="w-full text-left">
                     <thead className="bg-gray-50 border-b border-gray-100">
                         <tr>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">ID</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Phone</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Address</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Role</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Created</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
@@ -200,11 +201,12 @@ const StaffManagement = () => {
                         {filteredStaff.length > 0 ? (
                             filteredStaff.map((member) => (
                                 <tr key={member.id} className="hover:bg-gray-50 transition-colors">
-                                    <td className="px-6 py-4 text-sm text-gray-500">#{member.id}</td>
                                     <td className="px-6 py-4">
                                         <div className="font-medium text-gray-900">{member.name}</div>
                                     </td>
                                     <td className="px-6 py-4 text-sm text-gray-500">{member.email}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-500">{member.phone || 'N/A'}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-500">{member.address || 'N/A'}</td>
                                     <td className="px-6 py-4">
                                         <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getRoleBadgeColor(member.role)}`}>
                                             {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
