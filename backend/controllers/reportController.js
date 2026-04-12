@@ -2,13 +2,7 @@ const db = require('../config/db');
 
 exports.getBookingReport = async (req, res) => {
     try {
-        const { startDate, endDate, type } = req.query; // type: 'All', 'Room', 'Activity', 'Vehicle'
-
-        let queries = [];
-        let params = [];
-
-        // Base/Common columns we want (normalized)
-        // Type, ID, GuestName, ServiceDetails, Date, Status, Amount, PaymentStatus
+        const { startDate, endDate, type } = req.query; 
 
         const dateFilter = (dateField) => {
             if (startDate && endDate) return `AND ${dateField} BETWEEN ? AND ?`;
@@ -18,114 +12,110 @@ exports.getBookingReport = async (req, res) => {
         };
 
         const addParams = () => {
-            if (startDate && endDate) params.push(startDate, endDate);
-            else if (startDate) params.push(startDate);
-            else if (endDate) params.push(endDate);
+            let p = [];
+            if (startDate && endDate) p.push(startDate, endDate);
+            else if (startDate) p.push(startDate);
+            else if (endDate) p.push(endDate);
+            return p;
         }
+        
+        let params = addParams();
 
-        // --- Room Bookings ---
-        if (type === 'All' || type === 'Room') {
-            let sql = `
-                SELECT 
-                    'Room' as type,
-                    rb.rb_id as id,
-                    CONCAT(u.first_name, ' ', u.last_name) as guest_name,
-                    CONCAT('Room ', r.room_number, ' (', r.room_type, ')') as service_details,
-                    rb.rb_checkin as booking_date,
-                    rb.rb_status as status,
-                    p.payment_amount as amount,
-                    p.payment_status as payment_status
-                FROM roombooking rb
-                JOIN Guest g ON rb.guest_id = g.guest_id
-                JOIN Users u ON g.user_id = u.user_id
-                JOIN Room r ON rb.room_id = r.room_id
-                LEFT JOIN payment p ON rb.rb_payment_id = p.payment_id
-                WHERE 1=1 ${dateFilter('rb.rb_checkin')}
-            `;
-            queries.push(sql);
-            addParams();
-        }
+        let sql = `
+            SELECT 
+                rb.rb_id as id,
+                CONCAT(u.first_name, ' ', u.last_name) as guest_name,
+                CONCAT('Room ', r.room_number, ' (', r.room_type, ')') as service_details,
+                rb.rb_checkin as booking_date,
+                rb.rb_checkout as checkout_date,
+                rb.rb_status as status,
+                p.payment_amount as amount,
+                p.payment_status as payment_status
+            FROM roombooking rb
+            JOIN Guest g ON rb.guest_id = g.guest_id
+            JOIN Users u ON g.user_id = u.user_id
+            JOIN Room r ON rb.room_id = r.room_id
+            LEFT JOIN payment p ON rb.rb_payment_id = p.payment_id
+            WHERE 1=1 ${dateFilter('rb.rb_checkin')}
+            ORDER BY rb.rb_checkin DESC
+        `;
 
-        // --- Activity Bookings ---
-        if (type === 'All' || type === 'Activity') {
-            let sql = `
-                SELECT 
-                    'Activity' as type,
-                    ab.ab_id as id,
-                    CONCAT(u.first_name, ' ', u.last_name) as guest_name,
-                    a.activity_name as service_details,
-                    ab.ab_start_time as booking_date,
-                    ab.ab_status as status,
-                    p.payment_amount as amount,
-                    p.payment_status as payment_status
-                FROM activitybooking ab
-                JOIN Guest g ON ab.guest_id = g.guest_id
-                JOIN Users u ON g.user_id = u.user_id
-                JOIN Activity a ON ab.activity_id = a.activity_id
-                LEFT JOIN payment p ON ab.ab_payment_id = p.payment_id
-                WHERE 1=1 ${dateFilter('ab.ab_start_time')}
-            `;
-            queries.push(sql);
-            addParams();
-        }
+        const [rooms] = await db.query(sql, params);
 
-        // --- Vehicle Bookings ---
-        if (type === 'All' || type === 'Vehicle') {
-            let sql = `
-                SELECT 
-                    'Vehicle' as type,
-                    vb.vb_id as id,
-                    CONCAT(u.first_name, ' ', u.last_name) as guest_name,
-                    CONCAT(v.vehicle_type, ' - ', v.vehicle_number) as service_details,
-                    vb.vb_date as booking_date,
-                    vb.vb_status as status,
-                    p.payment_amount as amount,
-                    p.payment_status as payment_status
-                FROM hirevehicle vb
-                JOIN Guest g ON vb.guest_id = g.guest_id
-                JOIN Users u ON g.user_id = u.user_id
-                JOIN Vehicle v ON vb.vehicle_id = v.vehicle_id
-                LEFT JOIN payment p ON vb.vb_payment_id = p.payment_id
-                WHERE 1=1 ${dateFilter('vb.vb_date')}
-            `;
-            queries.push(sql);
-            addParams();
-        }
-
-        // --- Food Orders ---
-        if (type === 'All' || type === 'Food') {
-            let sql = `
-                SELECT 
-                    'Food' as type,
-                    fo.order_id as id,
-                    CONCAT(u.first_name, ' ', u.last_name) as guest_name,
-                    CONCAT('Dining: ', fo.dining_option) as service_details,
-                    fo.created_at as booking_date,
-                    fo.order_status as status,
-                    p.payment_amount as amount,
-                    p.payment_status as payment_status
-                FROM foodorder fo
-                JOIN Guest g ON fo.guest_id = g.guest_id
-                JOIN Users u ON g.user_id = u.user_id
-                LEFT JOIN payment p ON fo.payment_id = p.payment_id
-                WHERE 1=1 ${dateFilter('fo.created_at')}
-            `;
-            queries.push(sql);
-            addParams();
-        }
-
-        if (queries.length === 0) {
+        if (rooms.length === 0) {
             return res.json([]);
         }
 
-        const finalQuery = queries.join(' UNION ALL ') + ' ORDER BY booking_date DESC';
+        const rbIds = rooms.map(r => r.id);
 
-        // Flatten params array if we did Union
-        // Note: For UNION ALL, we need params for EACH query part concatenated.
-        // My addParams() pushes to the same 'params' array sequentially, so it matches the order of queries.
+        let activities = [];
+        let foodOrders = [];
+        let vehicles = [];
 
-        const [results] = await db.query(finalQuery, params);
-        res.json(results);
+        if (!type || type === 'All' || type === 'Activity') {
+            [activities] = await db.query(`
+                SELECT 
+                    ab.rb_id,
+                    ab.ab_id as id,
+                    a.activity_name as details,
+                    ab.ab_start_time as date,
+                    ab.ab_status as status,
+                    p.payment_amount as amount
+                FROM activitybooking ab
+                JOIN Activity a ON ab.activity_id = a.activity_id
+                LEFT JOIN payment p ON ab.ab_payment_id = p.payment_id
+                WHERE ab.rb_id IN (?)
+            `, [rbIds]);
+        }
+
+        if (!type || type === 'All' || type === 'Food') {
+            [foodOrders] = await db.query(`
+                SELECT 
+                    fo.rb_id,
+                    fo.order_id as id,
+                    CONCAT('Dining: ', fo.dining_option) as details,
+                    fo.created_at as date,
+                    fo.order_status as status,
+                    p.payment_amount as amount
+                FROM foodorder fo
+                LEFT JOIN payment p ON fo.payment_id = p.payment_id
+                WHERE fo.rb_id IN (?)
+            `, [rbIds]);
+        }
+
+        if (!type || type === 'All' || type === 'Vehicle') {
+            [vehicles] = await db.query(`
+                SELECT 
+                    vb.rb_id,
+                    vb.vb_id as id,
+                    CONCAT(v.vehicle_type, ' - ', v.vehicle_number) as details,
+                    vb.vb_date as date,
+                    vb.vb_status as status,
+                    p.payment_amount as amount
+                FROM hirevehicle vb
+                JOIN Vehicle v ON vb.vehicle_id = v.vehicle_id
+                LEFT JOIN payment p ON vb.vb_payment_id = p.payment_id
+                WHERE vb.rb_id IN (?)
+            `, [rbIds]);
+        }
+
+        for (const room of rooms) {
+            room.type = 'Room';
+            room.activities = activities.filter(a => a.rb_id === room.id).map(a => ({...a, type: 'Activity'}));
+            room.food = foodOrders.filter(f => f.rb_id === room.id).map(f => ({...f, type: 'Food'}));
+            room.vehicles = vehicles.filter(v => v.rb_id === room.id).map(v => ({...v, type: 'Vehicle'}));
+        }
+
+        let finalRooms = rooms;
+        if (type === 'Activity') {
+            finalRooms = rooms.filter(r => r.activities.length > 0);
+        } else if (type === 'Food') {
+            finalRooms = rooms.filter(r => r.food.length > 0);
+        } else if (type === 'Vehicle') {
+            finalRooms = rooms.filter(r => r.vehicles.length > 0);
+        }
+
+        res.json(finalRooms);
 
     } catch (error) {
         console.error('Report Error:', error);

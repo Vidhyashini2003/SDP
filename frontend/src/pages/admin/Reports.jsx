@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from '../../config/axios';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -26,10 +26,14 @@ const Reports = () => {
     const [hType, setHType] = useState('All');
 
     useEffect(() => {
+        fetchReport();
+    }, [activeTab, startDate, endDate, type, role]);
+
+    useEffect(() => {
         if (showHistoryModal && selectedUser) {
             fetchUserHistory(selectedUser);
         }
-    }, [activeTab, startDate, endDate, type, role, hStartDate, hEndDate, hType]);
+    }, [showHistoryModal, selectedUser, hStartDate, hEndDate, hType]);
 
     const fetchReport = async () => {
         setLoading(true);
@@ -84,25 +88,49 @@ const Reports = () => {
         doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 22);
 
         if (activeTab === 'bookings') {
+            const tableData = [];
+            data.forEach(room => {
+                tableData.push([
+                    { content: 'Room Booking', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+                    { content: room.guest_name, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+                    { content: room.service_details, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+                    { content: new Date(room.booking_date).toLocaleDateString(), styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+                    { content: room.status, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+                    { content: room.amount ? `Rs. ${room.amount}` : '-', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }
+                ]);
+                
+                const processExtras = (extras, typeName) => {
+                    if (extras && extras.length > 0) {
+                        extras.forEach(ext => {
+                            tableData.push([
+                                `    - ${typeName}`,
+                                '',
+                                ext.details,
+                                new Date(ext.date).toLocaleDateString(),
+                                ext.status,
+                                ext.amount ? `Rs. ${ext.amount}` : '-'
+                            ]);
+                        });
+                    }
+                };
+
+                processExtras(room.activities, 'Activity');
+                processExtras(room.food, 'Food');
+                processExtras(room.vehicles, 'Vehicle');
+            });
+
             autoTable(doc, {
                 startY: 30,
-                head: [['Type', 'ID', 'Guest', 'Details', 'Date', 'Status', 'Amount']],
-                body: data.map(row => [
-                    row.type,
-                    row.id,
-                    row.guest_name,
-                    row.service_details,
-                    new Date(row.booking_date).toLocaleDateString(),
-                    row.status,
-                    row.amount ? `Rs. ${row.amount}` : '-'
-                ]),
+                head: [['Type', 'Guest', 'Details', 'Date', 'Status', 'Amount']],
+                body: tableData,
+                theme: 'grid',
+                headStyles: { fillColor: [41, 128, 185] }
             });
         } else {
             autoTable(doc, {
                 startY: 30,
-                head: [['ID', 'Name', 'Email', 'Role', 'Joined Date']],
+                head: [['Name', 'Email', 'Role', 'Joined Date']],
                 body: data.map(row => [
-                    row.user_id,
                     row.name,
                     row.email,
                     row.role,
@@ -117,22 +145,38 @@ const Reports = () => {
         if (data.length === 0) return;
 
         const headers = activeTab === 'bookings'
-            ? ['Type', 'ID', 'Guest', 'Details', 'Date', 'Status', 'Amount']
-            : ['ID', 'Name', 'Email', 'Role', 'Joined Date'];
+            ? ['Type', 'Guest', 'Details', 'Date', 'Status', 'Amount']
+            : ['Name', 'Email', 'Role', 'Joined Date'];
 
-        const rows = data.map(row => {
-            if (activeTab === 'bookings') {
-                return [
-                    row.type, row.id, row.guest_name, `"${row.service_details}"`,
-                    new Date(row.booking_date).toLocaleDateString(), row.status, row.amount
-                ];
-            } else {
-                return [
-                    row.user_id, row.name, row.email, row.role,
-                    new Date(row.created_at).toLocaleDateString()
-                ];
-            }
-        });
+        let rows = [];
+        if (activeTab === 'bookings') {
+            data.forEach(room => {
+                rows.push([
+                    'Room Booking', `"${room.guest_name}"`, `"${room.service_details}"`,
+                    new Date(room.booking_date).toLocaleDateString(), room.status, room.amount
+                ]);
+
+                const processExtras = (extras, typeName) => {
+                    if (extras && extras.length > 0) {
+                        extras.forEach(ext => {
+                            rows.push([
+                                `  -> ${typeName}`, '', `"${ext.details}"`,
+                                new Date(ext.date).toLocaleDateString(), ext.status, ext.amount || 0
+                            ]);
+                        });
+                    }
+                };
+
+                processExtras(room.activities, 'Activity');
+                processExtras(room.food, 'Food');
+                processExtras(room.vehicles, 'Vehicle');
+            });
+        } else {
+            rows = data.map(row => [
+                row.name, row.email, row.role,
+                new Date(row.created_at).toLocaleDateString()
+            ]);
+        }
 
         const csvContent = "data:text/csv;charset=utf-8,"
             + headers.join(",") + "\n"
@@ -301,17 +345,15 @@ const Reports = () => {
                         <thead className="bg-slate-50 border-b border-slate-200">
                             {activeTab === 'bookings' ? (
                                 <tr>
-                                    <th className="px-6 py-4 font-semibold text-slate-700">Type</th>
-                                    <th className="px-6 py-4 font-semibold text-slate-700">ID</th>
-                                    <th className="px-6 py-4 font-semibold text-slate-700">Guest</th>
-                                    <th className="px-6 py-4 font-semibold text-slate-700">Details</th>
-                                    <th className="px-6 py-4 font-semibold text-slate-700">Date</th>
-                                    <th className="px-6 py-4 font-semibold text-slate-700">Status</th>
-                                    <th className="px-6 py-4 font-semibold text-slate-700">Amount</th>
+                                    <th className="px-4 py-3 font-semibold text-slate-700">Type</th>
+                                    <th className="px-4 py-3 font-semibold text-slate-700">Guest</th>
+                                    <th className="px-4 py-3 font-semibold text-slate-700">Details</th>
+                                    <th className="px-4 py-3 font-semibold text-slate-700">Date</th>
+                                    <th className="px-4 py-3 font-semibold text-slate-700">Status</th>
+                                    <th className="px-4 py-3 font-semibold text-slate-700">Amount</th>
                                 </tr>
                             ) : (
                                 <tr>
-                                    <th className="px-6 py-4 font-semibold text-slate-700">ID</th>
                                     <th className="px-6 py-4 font-semibold text-slate-700">Name</th>
                                     <th className="px-6 py-4 font-semibold text-slate-700">Email</th>
                                     <th className="px-6 py-4 font-semibold text-slate-700">Role</th>
@@ -320,40 +362,61 @@ const Reports = () => {
                             )}
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {data.map((row, idx) => (
-                                activeTab === 'bookings' ? (
-                                    <tr key={idx} className="hover:bg-slate-50">
-                                        <td className="px-6 py-4 font-medium">{row.type}</td>
-                                        <td className="px-6 py-4 text-slate-500">#{row.id}</td>
-                                        <td className="px-6 py-4">{row.guest_name}</td>
-                                        <td className="px-6 py-4 text-slate-600">{row.service_details}</td>
-                                        <td className="px-6 py-4">{new Date(row.booking_date).toLocaleDateString()}</td>
-                                        <td className="px-6 py-4">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${row.status === 'Confirmed' ? 'bg-green-100 text-green-800' :
-                                                row.status === 'Cancelled' ? 'bg-red-100 text-red-800' :
-                                                    'bg-yellow-100 text-yellow-800'
-                                                }`}>
-                                                {row.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 font-medium text-slate-900">
-                                            {row.amount ? `Rs. ${row.amount}` : '-'}
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    <tr key={idx} className="hover:bg-slate-50 cursor-pointer transition-colors" onClick={() => openHistoryModal(row)}>
-                                        <td className="px-6 py-4 text-slate-500">#{row.user_id}</td>
-                                        <td className="px-6 py-4 font-medium">{row.name}</td>
-                                        <td className="px-6 py-4 text-slate-600">{row.email}</td>
-                                        <td className="px-6 py-4">
-                                            <span className="capitalize bg-slate-100 text-slate-700 px-2 py-1 rounded text-xs">
-                                                {row.role}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-slate-500">{new Date(row.created_at).toLocaleDateString()}</td>
-                                    </tr>
-                                )
-                            ))}
+                            {data.map((row, idx) => {
+                                if (activeTab === 'bookings') {
+                                    const renderStatus = (status) => (
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                            status === 'Confirmed' || status === 'Booked' || status === 'Delivered' || status === 'Completed' ? 'bg-green-100 text-green-700' :
+                                            status === 'Cancelled' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                                        }`}>
+                                            {status}
+                                        </span>
+                                    );
+
+                                    const renderExtraRow = (ext, typeName) => (
+                                        <tr key={`${typeName}-${ext.id}`} className="bg-slate-50/50 hover:bg-slate-100/50 border-t border-slate-100 text-xs">
+                                            <td className="px-4 py-2 pl-8 text-slate-500 font-medium flex items-center gap-2">
+                                                <div className="w-1 h-3 border-l-2 border-b-2 border-slate-300 rounded-bl"></div>
+                                                {typeName}
+                                            </td>
+                                            <td className="px-4 py-2"></td>
+                                            <td className="px-4 py-2 text-slate-600 truncate max-w-[200px]" title={ext.details}>{ext.details}</td>
+                                            <td className="px-4 py-2 text-slate-500">{new Date(ext.date).toLocaleDateString()}</td>
+                                            <td className="px-4 py-2">{renderStatus(ext.status)}</td>
+                                            <td className="px-4 py-2 font-medium text-slate-700">{ext.amount ? `Rs. ${ext.amount}` : '-'}</td>
+                                        </tr>
+                                    );
+
+                                    return (
+                                        <React.Fragment key={idx}>
+                                            <tr className="bg-white border-t-2 border-slate-200 shadow-sm hover:bg-slate-50 transition-colors">
+                                                <td className="px-4 py-4 font-semibold text-slate-800">Room Booking</td>
+                                                <td className="px-4 py-4 text-slate-900 font-medium">{row.guest_name}</td>
+                                                <td className="px-4 py-4 text-slate-700 font-medium">{row.service_details}</td>
+                                                <td className="px-4 py-4 text-slate-600">{new Date(row.booking_date).toLocaleDateString()}</td>
+                                                <td className="px-4 py-4">{renderStatus(row.status)}</td>
+                                                <td className="px-4 py-4 font-bold text-slate-900">{row.amount ? `Rs. ${row.amount}` : '-'}</td>
+                                            </tr>
+                                            {row.activities?.map(ext => renderExtraRow(ext, 'Activity'))}
+                                            {row.food?.map(ext => renderExtraRow(ext, 'Food Order'))}
+                                            {row.vehicles?.map(ext => renderExtraRow(ext, 'Vehicle Hire'))}
+                                        </React.Fragment>
+                                    );
+                                } else {
+                                    return (
+                                        <tr key={idx} className="hover:bg-slate-50 cursor-pointer transition-colors" onClick={() => openHistoryModal(row)}>
+                                            <td className="px-6 py-4 font-medium">{row.name}</td>
+                                            <td className="px-6 py-4 text-slate-600">{row.email}</td>
+                                            <td className="px-6 py-4">
+                                                <span className="capitalize bg-slate-100 text-slate-700 px-2 py-1 rounded text-xs">
+                                                    {row.role}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-slate-500">{new Date(row.created_at).toLocaleDateString()}</td>
+                                        </tr>
+                                    );
+                                }
+                            })}
                         </tbody>
                     </table>
                 )}

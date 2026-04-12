@@ -668,7 +668,7 @@ const GuestBookings = () => {
                                         )}
                                     </div>
 
-                                    {trip.rb_status?.toLowerCase() === 'checked-in' && (
+                                    {['confirmed', 'booked', 'checked-in', 'active'].includes(trip.rb_status?.toLowerCase()) && (
                                         <div className="mt-12 pt-10 border-t border-slate-100">
                                             <div className="flex items-center justify-center gap-4 mb-6">
                                                 <div className="h-[1px] w-12 bg-slate-200"></div>
