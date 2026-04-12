@@ -47,14 +47,12 @@ const ReceptionistActivities = () => {
 
     const formatTime = (timeString) => {
         if (!timeString) return '';
-        // ab_start_time is a datetime string like '2026-03-18 14:30:00'
-        // Extract the time portion (after the space) and return HH:MM
-        const parts = timeString.split(' ');
-        if (parts.length > 1) {
-            return parts[1].substring(0, 5);
+        try {
+            return new Date(timeString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        } catch (error) {
+            // Fallback for non-ISO time strings
+            return String(timeString);
         }
-        // If it's a pure time string like 'HH:mm:ss'
-        return timeString.substring(0, 5);
     };
 
     if (loading) return <div className="p-8 text-center text-slate-600">Loading activities...</div>;

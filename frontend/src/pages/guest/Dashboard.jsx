@@ -8,7 +8,8 @@ import {
     TicketIcon, 
     TruckIcon,
     ClipboardDocumentListIcon,
-    SparklesIcon
+    SparklesIcon,
+    InformationCircleIcon
 } from '@heroicons/react/24/outline';
 
 const GuestDashboard = () => {
@@ -239,6 +240,39 @@ const GuestDashboard = () => {
                             </div>
                         </div>
                     )}
+                </div>
+            </div>
+
+            {/* Cancellation Policy */}
+            <div className="bg-slate-50 rounded-[2rem] p-8 border border-slate-100 mt-4">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2 bg-white rounded-xl shadow-sm text-slate-400">
+                        <InformationCircleIcon className="w-5 h-5" />
+                    </div>
+                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">Cancellation & Refund Policy</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="flex items-start gap-4">
+                        <div className="w-1.5 h-1.5 rounded-full bg-slate-400 mt-2 shrink-0"></div>
+                        <p className="text-sm font-medium text-slate-600 leading-relaxed">
+                            <span className="font-bold text-slate-900 block mb-1">Rooms & Vehicles</span> 
+                            Cancellations made at least 24 hours prior to the check-in date are eligible for a refund option.
+                        </p>
+                    </div>
+                    <div className="flex items-start gap-4">
+                        <div className="w-1.5 h-1.5 rounded-full bg-slate-400 mt-2 shrink-0"></div>
+                        <p className="text-sm font-medium text-slate-600 leading-relaxed">
+                            <span className="font-bold text-slate-900 block mb-1">Activities & Dining</span> 
+                            These bookings can be canceled, but they are strictly <span className="text-rose-500 font-bold">non-refundable</span>.
+                        </p>
+                    </div>
+                    <div className="flex items-start gap-4">
+                        <div className="w-1.5 h-1.5 rounded-full bg-slate-400 mt-2 shrink-0"></div>
+                        <p className="text-sm font-medium text-slate-600 leading-relaxed">
+                            <span className="font-bold text-slate-900 block mb-1">Refund Requests</span> 
+                            Guests must explicitly request a refund; otherwise, no refund will be issued by the hotel automatically.
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const guestController = require('../controllers/guestController');
 const orderController = require('../controllers/orderController');
+const quickrideController = require('../controllers/quickrideController');
 const { verifyToken, authorizeRole } = require('../config/auth');
 
 // Protect all guest routes
@@ -21,7 +22,17 @@ router.get('/menu', guestController.getMenu);
 router.get('/orders', guestController.getOrders);
 router.post('/orders', orderController.placeOrder);
 router.post('/orders/bulk', orderController.placeBulkOrder);
+router.put('/orders/:id/cancel', guestController.cancelFoodOrder);
+router.put('/orders/:orderId/items/:itemId/cancel', guestController.cancelFoodOrderItem);
 
-router.post('/bookings/vehicles/:id/pay', guestController.payVehicleBooking);
+router.put('/bookings/activities/:id/cancel', guestController.cancelActivityBooking);
+
+router.post('/bookings/vehicles/:id/pay', guestController.payhirevehicle);
+router.post('/bookings/arrivals/:id/pay', guestController.payArrivalTransport);
+
+// Quick Ride routes
+router.post('/quickrides', quickrideController.requestQuickRide);
+router.get('/quickrides', quickrideController.getGuestQuickRides);
+router.post('/quickrides/:id/pay', quickrideController.payQuickRide);
 
 module.exports = router;

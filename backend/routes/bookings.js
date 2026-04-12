@@ -18,7 +18,7 @@ router.post('/activities', authorizeRole('guest', 'receptionist'), bookingContro
 
 // Vehicles
 router.get('/vehicles/available', bookingController.getAvailableVehicles);
-router.post('/vehicles', authorizeRole('guest', 'receptionist'), bookingController.createVehicleBooking);
+router.post('/vehicles', authorizeRole('guest', 'receptionist'), bookingController.createhirevehicle);
 // Generic Cancel
 router.put('/:type/:id/cancel', authorizeRole('guest', 'receptionist', 'admin'), bookingController.cancelBooking);
 
@@ -27,5 +27,9 @@ router.post('/complete', authorizeRole('guest'), bookingController.completeBooki
 
 // Extend Room Time
 router.put('/rooms/:id/extend', authorizeRole('guest', 'receptionist'), bookingController.extendRoomBooking);
+
+// Arrival / Departure Transport
+router.post('/transport/arrival', authorizeRole('guest'), bookingController.createArrivalTransport);
+router.get('/transport/arrival', authorizeRole('guest'), bookingController.getGuestArrivalTransports);
 
 module.exports = router;

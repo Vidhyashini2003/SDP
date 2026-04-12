@@ -32,6 +32,7 @@ const GuestLayout = ({ children }) => {
         { icon: '📊', label: 'Dashboard', path: '/guest/bookings' },
         { icon: '📋', label: 'My Bookings', path: '/guest/my-bookings' },
         { icon: '🏨', label: 'Book Room', path: '/guest/rooms' },
+        { icon: '🚗', label: 'Quick Ride', path: '/guest/quick-ride' },
         { icon: '🔔', label: 'Notifications', path: '/guest/notifications' }
     ];
 

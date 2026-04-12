@@ -81,7 +81,7 @@ exports.getBookingReport = async (req, res) => {
                     vb.vb_status as status,
                     p.payment_amount as amount,
                     p.payment_status as payment_status
-                FROM vehiclebooking vb
+                FROM hirevehicle vb
                 JOIN Guest g ON vb.guest_id = g.guest_id
                 JOIN Users u ON g.user_id = u.user_id
                 JOIN Vehicle v ON vb.vehicle_id = v.vehicle_id
@@ -220,7 +220,7 @@ exports.getUserHistory = async (req, res) => {
                         'Vehicle' as type, vb.vb_id as id,
                         CONCAT(v.vehicle_type, ' - ', v.vehicle_number) as details,
                         vb.vb_date as date, vb.vb_status as status, p.payment_amount as amount
-                FROM vehiclebooking vb
+                FROM hirevehicle vb
                 JOIN Guest g ON vb.guest_id = g.guest_id
                 JOIN Vehicle v ON vb.vehicle_id = v.vehicle_id
                 LEFT JOIN payment p ON vb.vb_payment_id = p.payment_id
@@ -252,7 +252,7 @@ exports.getUserHistory = async (req, res) => {
                     'Vehicle Assignment' as type, vb.vb_id as id,
                     CONCAT(v.vehicle_type, ' - ', v.vehicle_number, ' (Guest: ', u.first_name, ' ', u.last_name, ')') as details,
                     vb.vb_date as date, vb.vb_status as status, p.payment_amount as amount
-                FROM vehiclebooking vb
+                FROM hirevehicle vb
                 JOIN Vehicle v ON vb.vehicle_id = v.vehicle_id
                 JOIN Guest g ON vb.guest_id = g.guest_id
                 JOIN Users u ON g.user_id = u.user_id

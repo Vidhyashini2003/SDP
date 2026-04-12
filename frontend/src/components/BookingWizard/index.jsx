@@ -25,6 +25,7 @@ const BookingWizard = () => {
         food: [],
         activities: [],
         vehicle: null,
+        arrivalTransport: null,
         diningOption: 'Delivery',
 
         // Step 3
@@ -112,6 +113,7 @@ const BookingWizard = () => {
                 food: bookingData.food.length > 0 ? bookingData.food : undefined,
                 activities: bookingData.activities.length > 0 ? bookingData.activities : undefined,
                 vehicle: bookingData.vehicle || undefined,
+                arrivalTransport: bookingData.arrivalTransport || undefined,
                 paymentMethod: bookingData.paymentMethod
             };
 
@@ -132,6 +134,7 @@ const BookingWizard = () => {
                 food: [],
                 activities: [],
                 vehicle: null,
+                arrivalTransport: null,
                 diningOption: 'Delivery',
                 paymentMethod: 'card'
             });

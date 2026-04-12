@@ -236,11 +236,15 @@ exports.createActivityBooking = async (req, res) => {
 
             const activityStart = new Date(start_time);
             const activityEnd = new Date(end_time);
+            
             const roomCheckIn = new Date(linkedBooking.rb_checkin);
+            roomCheckIn.setHours(0, 0, 0, 0); // start of check-in day
+
             const roomCheckOut = new Date(linkedBooking.rb_checkout);
+            roomCheckOut.setHours(23, 59, 59, 999); // end of check-out day
 
             console.log('DEBUG: activityStart:', activityStart, 'activityEnd:', activityEnd);
-            console.log('DEBUG: roomCheckIn:', roomCheckIn, 'roomCheckOut:', roomCheckOut);
+            console.log('DEBUG: roomCheckIn (bound):', roomCheckIn, 'roomCheckOut (bound):', roomCheckOut);
 
             if (activityStart < roomCheckIn || activityEnd > roomCheckOut) {
                 await connection.rollback();
@@ -327,7 +331,7 @@ exports.getAvailableVehicles = async (req, res) => {
             SELECT * FROM vehicle v
             WHERE v.vehicle_status = 'Available'
             AND v.vehicle_id NOT IN (
-                SELECT vehicle_id FROM vehiclebooking 
+                SELECT vehicle_id FROM hirevehicle 
                 WHERE vb_status NOT IN ('Cancelled', 'Completed') 
                 AND (
                     DATE_ADD(vb_date, INTERVAL vb_days DAY) > ? 
@@ -343,7 +347,7 @@ exports.getAvailableVehicles = async (req, res) => {
     }
 };
 
-exports.createVehicleBooking = async (req, res) => {
+exports.createhirevehicle = async (req, res) => {
     try {
         const { vehicle_id, vb_date, vb_days, rb_id } = req.body;
         const userId = req.user.id;
@@ -428,7 +432,7 @@ exports.createVehicleBooking = async (req, res) => {
 
             // We can do this calculation in SQL for robust checking
             const [overlaps] = await connection.query(`
-                SELECT vb_id FROM vehiclebooking 
+                SELECT vb_id FROM hirevehicle 
                 WHERE vehicle_id = ? 
                 AND vb_status NOT IN ('Cancelled', 'Completed')
                 AND (
@@ -443,11 +447,27 @@ exports.createVehicleBooking = async (req, res) => {
             }
 
             await connection.query(
-                'INSERT INTO vehiclebooking (guest_id, vehicle_id, vb_date, vb_days, vb_status, rb_id) VALUES (?, ?, ?, ?, ?, ?)',
+                'INSERT INTO hirevehicle (guest_id, vehicle_id, vb_date, vb_days, vb_status, rb_id) VALUES (?, ?, ?, ?, ?, ?)',
                 [guest_id, vehicle_id, vb_date, vb_days, 'Pending Approval', linkedBookingId]
             );
 
             await connection.commit();
+
+            try {
+                const [drivers] = await db.query("SELECT user_id FROM Driver WHERE user_id IS NOT NULL AND driver_status = 'Available'");
+                for (const d of drivers) {
+                    await notificationController.createNotification(
+                        d.user_id,
+                        'New Hire Request',
+                        'A new vehicle hire request is available for you to accept.',
+                        'Alert',
+                        '/driver/requests'
+                    );
+                }
+            } catch (notifyErr) {
+                console.error('Failed to notify drivers:', notifyErr);
+            }
+
             res.status(201).json({
                 message: 'Hire request sent successfully! Waiting for driver acceptance.',
                 linkedBooking: linkedBookingId
@@ -482,7 +502,7 @@ exports.cancelBooking = async (req, res) => {
                 statusField = 'ab_status';
                 break;
             case 'vehicle':
-                table = 'vehiclebooking';
+                table = 'hirevehicle';
                 idField = 'vb_id';
                 statusField = 'vb_status';
                 break;
@@ -548,7 +568,7 @@ exports.cancelBooking = async (req, res) => {
 // --- Complete Booking (Unified Flow) ---
 exports.completeBooking = async (req, res) => {
     try {
-        const { room, food, activities, vehicle, paymentMethod } = req.body;
+        const { room, food, activities, vehicle, arrivalTransport, paymentMethod } = req.body;
         const userId = req.user.id;
 
         // Validate room booking data
@@ -638,6 +658,7 @@ exports.completeBooking = async (req, res) => {
                     const activityStart = new Date(activity.start_time);
                     const activityEnd = new Date(activity.end_time);
                     const roomCheckIn = new Date(room.checkIn);
+                    roomCheckIn.setHours(0, 0, 0, 0);
                     // Allow activities through the end of checkout day
                     const roomCheckOut = new Date(room.checkOut);
                     roomCheckOut.setHours(23, 59, 59, 999);
@@ -659,7 +680,7 @@ exports.completeBooking = async (req, res) => {
             }
 
             // 5. Create Vehicle Booking (if requested)
-            let vehicleBookingId = null;
+            let hirevehicleId = null;
             if (vehicle && vehicle.vehicle_id) {
                 // Validate dates (allow ±1 day buffer)
                 const vehicleStart = new Date(vehicle.date);
@@ -683,13 +704,87 @@ exports.completeBooking = async (req, res) => {
 
                 // Create vehicle booking (pending driver acceptance)
                 const [vehicleResult] = await connection.query(
-                    'INSERT INTO vehiclebooking (guest_id, vehicle_id, vb_date, vb_days, vb_status, rb_id) VALUES (?, ?, ?, ?, ?, ?)',
+                    'INSERT INTO hirevehicle (guest_id, vehicle_id, vb_date, vb_days, vb_status, rb_id) VALUES (?, ?, ?, ?, ?, ?)',
                     [guest_id, vehicle.vehicle_id, vehicle.date, vehicle.days, 'Pending Approval', rb_id]
                 );
-                vehicleBookingId = vehicleResult.insertId;
+                hirevehicleId = vehicleResult.insertId;
+
+                // Waive arrival transport fee if matching vehicle type (for existing records)
+                await connection.query(
+                    `UPDATE hire_vehicle_for_arrival 
+                     SET final_amount = 0 
+                     WHERE guest_id = ? 
+                     AND (rb_id IS NULL OR rb_id = ?) 
+                     AND (vehicle_type_requested = ? OR vehicle_type_requested IS NULL)
+                     AND status != 'Cancelled'`,
+                    [guest_id, rb_id, vehicle.type]
+                );
+            }
+
+            // 6. Create Arrival Transport (if requested in this session)
+            let arrivalTransportId = null;
+            if (arrivalTransport) {
+                const { pickup_location, scheduled_at, flight_train_number, num_passengers, notes, vehicle_type_requested } = arrivalTransport;
+                
+                // Get vehicle price if a type is requested
+                let final_amount = 0;
+                if (vehicle_type_requested) {
+                    const [vPrice] = await connection.query(
+                        `SELECT vehicle_price_per_day FROM vehicle WHERE vehicle_type = ? AND vehicle_status = 'Available' LIMIT 1`,
+                        [vehicle_type_requested]
+                    );
+                    if (vPrice.length > 0) {
+                        final_amount = vPrice[0].vehicle_price_per_day;
+                    }
+                }
+
+                // Apply waiver if same vehicle type is hired in same booking
+                if (vehicle && vehicle.type && (vehicle.type === vehicle_type_requested || !vehicle_type_requested)) {
+                    final_amount = 0;
+                }
+
+                const [arrivalResult] = await connection.query(
+                    `INSERT INTO hire_vehicle_for_arrival 
+                     (guest_id, rb_id, request_type, pickup_location, scheduled_at, flight_train_number, num_passengers, notes, vehicle_type_requested, final_amount, status, payment_status)
+                     VALUES (?, ?, 'Transfer', ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Pending')`,
+                    [guest_id, rb_id, pickup_location, scheduled_at, flight_train_number || null, num_passengers || 1, notes || null, vehicle_type_requested || null, final_amount]
+                );
+                arrivalTransportId = arrivalResult.insertId;
             }
 
             await connection.commit();
+
+            try {
+                if (hirevehicleId || arrivalTransportId) {
+                    const [drivers] = await db.query("SELECT user_id FROM Driver WHERE user_id IS NOT NULL AND driver_status = 'Available'");
+                    
+                    if (hirevehicleId) {
+                        for (const d of drivers) {
+                            await notificationController.createNotification(
+                                d.user_id,
+                                'New Hire Request',
+                                'A new vehicle hire request is available for you to accept.',
+                                'Alert',
+                                '/driver/requests'
+                            );
+                        }
+                    }
+
+                    if (arrivalTransportId) {
+                        for (const d of drivers) {
+                            await notificationController.createNotification(
+                                d.user_id,
+                                'New Arrival Transfer',
+                                'A new arrival transfer request is available to accept.',
+                                'Alert',
+                                '/driver/requests'
+                            );
+                        }
+                    }
+                }
+            } catch(notifyErr) {
+                console.error("Failed to notify drivers:", notifyErr);
+            }
 
             // Return complete booking summary
             res.status(201).json({
@@ -701,7 +796,8 @@ exports.completeBooking = async (req, res) => {
                     extras: {
                         foodOrders: foodOrderIds,
                         activities: activityBookingIds,
-                        vehicle: vehicleBookingId
+                        vehicle: hirevehicleId,
+                        arrivalTransport: arrivalTransportId
                     }
                 }
             });
@@ -788,3 +884,93 @@ exports.extendRoomBooking = async (req, res) => {
         res.status(500).json({ error: 'Failed to extend room booking' });
     }
 };
+
+// --- Arrival / Departure Transport ---
+
+exports.createArrivalTransport = async (req, res) => {
+    try {
+        const { pickup_location, scheduled_at, flight_train_number, num_passengers, notes, vehicle_type_requested } = req.body;
+        const userId = req.user.id;
+
+        if (!pickup_location || !scheduled_at) {
+            return res.status(400).json({ error: 'Pickup location and scheduled date/time are required' });
+        }
+
+        const [guests] = await db.query('SELECT guest_id FROM Guest WHERE user_id = ?', [userId]);
+        if (guests.length === 0) return res.status(404).json({ error: 'Guest profile not found' });
+        const guest_id = guests[0].guest_id;
+
+        // Link to active room booking if exists
+        const [activeBookings] = await db.query(
+            `SELECT rb_id FROM roombooking WHERE guest_id = ? AND rb_status IN ('Booked', 'Checked-in') AND rb_checkout >= CURDATE() ORDER BY rb_checkin ASC LIMIT 1`,
+            [guest_id]
+        );
+        const rb_id = activeBookings.length > 0 ? activeBookings[0].rb_id : null;
+
+        // Get vehicle price if a type is requested
+        let final_amount = null;
+        if (vehicle_type_requested) {
+            const [vehicles] = await db.query(
+                `SELECT vehicle_price_per_day FROM vehicle WHERE vehicle_type = ? AND vehicle_status = 'Available' LIMIT 1`,
+                [vehicle_type_requested]
+            );
+            if (vehicles.length > 0) {
+                final_amount = vehicles[0].vehicle_price_per_day;
+            }
+        }
+
+        const [result] = await db.query(
+            `INSERT INTO hire_vehicle_for_arrival 
+             (guest_id, rb_id, request_type, pickup_location, scheduled_at, flight_train_number, num_passengers, notes, vehicle_type_requested, final_amount, status, payment_status)
+             VALUES (?, ?, 'Transfer', ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Pending')`,
+            [guest_id, rb_id, pickup_location, scheduled_at, flight_train_number || null, num_passengers || 1, notes || null, vehicle_type_requested || null, final_amount]
+        );
+
+        try {
+            const [drivers] = await db.query("SELECT user_id FROM Driver WHERE user_id IS NOT NULL AND driver_status = 'Available'");
+            for (const d of drivers) {
+                await notificationController.createNotification(
+                    d.user_id,
+                    'New Arrival Transfer',
+                    `A new arrival transfer request from ${pickup_location} is available.`,
+                    'Alert',
+                    '/driver/requests'
+                );
+            }
+        } catch(notifyErr) {
+            console.error("Failed to notify drivers:", notifyErr);
+        }
+
+        res.status(201).json({
+            message: 'Arrival transport request submitted successfully',
+            transport_id: result.insertId,
+            final_amount
+        });
+    } catch (error) {
+        console.error('Error creating arrival transport:', error);
+        res.status(500).json({ error: 'Failed to create transport request' });
+    }
+};
+
+exports.getGuestArrivalTransports = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const [guests] = await db.query('SELECT guest_id FROM Guest WHERE user_id = ?', [userId]);
+        if (guests.length === 0) return res.status(404).json({ error: 'Guest profile not found' });
+        const guest_id = guests[0].guest_id;
+
+        const [rows] = await db.query(
+            `SELECT t.*, v.vehicle_type as assigned_vehicle_type, v.vehicle_price_per_day
+             FROM hire_vehicle_for_arrival t
+             LEFT JOIN vehicle v ON t.vehicle_id = v.vehicle_id
+             WHERE t.guest_id = ?
+             ORDER BY t.scheduled_at DESC`,
+            [guest_id]
+        );
+        res.json(rows);
+    } catch (error) {
+        console.error('Error fetching arrival transports:', error);
+        res.status(500).json({ error: 'Failed to fetch transport requests' });
+    }
+};
+

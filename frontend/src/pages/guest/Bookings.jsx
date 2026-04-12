@@ -60,7 +60,14 @@ const GuestBookings = () => {
     const confirmVehiclePayment = async () => {
         const { vehicle, amount } = paymentModal;
         try {
-            await axios.post(`/api/guest/bookings/vehicles/${vehicle.vb_id}/pay`, {
+            let endpoint = `/api/guest/bookings/vehicles/${vehicle.vb_id}/pay`;
+            if (vehicle.isArrivalTransport) {
+                endpoint = `/api/guest/bookings/arrivals/${vehicle.vb_id}/pay`;
+            } else if (vehicle.isQuickRide) {
+                endpoint = `/api/guest/quickrides/${vehicle.qr_id}/pay`;
+            }
+                
+            await axios.post(endpoint, {
                 payment_method: 'Card',
                 total_amount: amount
             });
@@ -68,6 +75,45 @@ const GuestBookings = () => {
             fetchGroupedBookings();
         } catch (error) {
             toast.error('Payment failed');
+        }
+    };
+
+    const handleCancelActivity = async (activityId) => {
+        if (!window.confirm('Are you sure you want to cancel this activity? As per our policy, activities are non-refundable. Do you want to proceed?')) {
+            return;
+        }
+        try {
+            await axios.put(`/api/guest/bookings/activities/${activityId}/cancel`);
+            toast.success('Activity cancelled successfully');
+            fetchGroupedBookings();
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'Failed to cancel activity');
+        }
+    };
+
+    const handleCancelFoodOrder = async (orderId) => {
+        if (!window.confirm('Are you sure you want to cancel this ENTIRE catering order? As per our policy, food orders are non-refundable. Do you want to proceed?')) {
+            return;
+        }
+        try {
+            await axios.put(`/api/guest/orders/${orderId}/cancel`);
+            toast.success('Food order cancelled successfully');
+            fetchGroupedBookings();
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'Failed to cancel order');
+        }
+    };
+
+    const handleCancelFoodItem = async (orderId, itemId) => {
+        if (!window.confirm('Are you sure you want to cancel this specific food item? As per our policy, it is non-refundable. Do you want to proceed?')) {
+            return;
+        }
+        try {
+            await axios.put(`/api/guest/orders/${orderId}/items/${itemId}/cancel`);
+            toast.success('Food item cancelled successfully');
+            fetchGroupedBookings();
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'Failed to cancel item');
         }
     };
 
@@ -168,15 +214,17 @@ const GuestBookings = () => {
             // Activities
             booking.activities.forEach(act => {
                 const p = parseFloat(act.total_price || 0);
-                items.push(['Activity', `${act.activity_name}\n${formatDate(act.booking_date)}`, '1', `Rs. ${p.toLocaleString()}`, checkPaid(act.ab_status)]);
+                items.push(['Activity', `${act.activity_name}\n${formatDate(act.ab_start_time, {hour:'2-digit', minute:'2-digit'})} -\n${formatDate(act.ab_end_time, {hour:'2-digit', minute:'2-digit'})}`, '1', `Rs. ${p.toLocaleString()}`, checkPaid(act.ab_status)]);
                 totalAmount += p;
             });
 
             // Food
             booking.foodOrders.forEach(order => {
-                const orderPrice = order.items.reduce((sum, item) => sum + (parseFloat(item.item_price) * parseInt(item.order_quantity || 0)), 0);
-                items.push(['Catering', `Order #${order.order_id}\n${order.items.map(i => i.item_name).join(', ')}`, 'Order', `Rs. ${orderPrice.toLocaleString()}`, checkPaid(order.payment_status || order.order_status)]);
-                totalAmount += orderPrice;
+                const orderPrice = order.items.filter(i => i.item_status !== 'Cancelled').reduce((sum, item) => sum + (parseFloat(item.item_price) * parseInt(item.order_quantity || 0)), 0);
+                if (orderPrice > 0 || order.items.length > 0) {
+                    items.push(['Catering', `Order #${order.order_id}\n${order.items.filter(i => i.item_status !== 'Cancelled').map(i => i.item_name).join(', ')}`, 'Order', `Rs. ${orderPrice.toLocaleString()}`, checkPaid(order.payment_status || order.order_status)]);
+                    totalAmount += orderPrice;
+                }
             });
 
             // Vehicles
@@ -185,6 +233,13 @@ const GuestBookings = () => {
                 items.push(['Transport', `${veh.vehicle_type} (${veh.vehicle_number})\n${veh.vb_days} Days Hiring`, 'Hire', `Rs. ${p.toLocaleString()}`, checkPaid(veh.vb_status)]);
                 totalAmount += p;
             });
+            if (booking.quickRides) {
+                booking.quickRides.forEach(qr => {
+                    const p = parseFloat(qr.total_amount || 0);
+                    items.push(['Quick Ride', `${qr.veh_type || qr.vehicle_type_requested}\nPickup: ${qr.pickup_location}`, 'Trip', `Rs. ${p.toLocaleString()}`, checkPaid(qr.status === 'Completed' && p > 0 ? (qr.payment_status === 'Paid' ? 'PAID' : 'PENDING') : 'PENDING')]);
+                    totalAmount += p;
+                });
+            }
         } else {
             // Handle individual types (backward compatibility)
             if (type === 'Room') {
@@ -373,7 +428,7 @@ const GuestBookings = () => {
                                                             <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
                                                                 <span className="text-slate-400">Catering Total</span>
                                                                 <span className="text-white">
-                                                                    Rs. {trip.foodOrders.reduce((sum, order) => sum + order.items.reduce((s, i) => s + (Number(i.item_price) * Number(i.order_quantity)), 0), 0).toLocaleString()}
+                                                                    Rs. {trip.foodOrders.reduce((sum, order) => sum + order.items.filter(i => i.item_status !== 'Cancelled').reduce((s, i) => s + (Number(i.item_price) * Number(i.order_quantity)), 0), 0).toLocaleString()}
                                                                 </span>
                                                             </div>
                                                         )}
@@ -395,10 +450,11 @@ const GuestBookings = () => {
                                                             <span className="text-lg font-black text-gold-500 underline underline-offset-4 decoration-2">Rs.</span>
                                                             <span className="text-4xl font-black tracking-tight">
                                                                 {(
-                                                                    Number(trip.total_price) +
-                                                                    trip.activities.reduce((sum, act) => sum + Number(act.total_price), 0) +
-                                                                    trip.foodOrders.reduce((sum, order) => sum + order.items.reduce((s, i) => s + (Number(i.item_price) * Number(i.order_quantity)), 0), 0) +
-                                                                    trip.vehicles.reduce((sum, veh) => sum + (Number(veh.vehicle_price_per_day) * Number(veh.vb_days)), 0)
+                                                                    Number(trip.total_price || 0) +
+                                                                    (trip.activities || []).reduce((sum, act) => sum + Number(act.total_price || 0), 0) +
+                                                                    (trip.foodOrders || []).reduce((sum, order) => sum + order.items.filter(i => i.item_status !== 'Cancelled').reduce((s, i) => s + (Number(i.item_price) * Number(i.order_quantity)), 0), 0) +
+                                                                    (trip.vehicles || []).reduce((sum, veh) => sum + (Number(veh.vehicle_price_per_day) * Number(veh.vb_days)), 0) +
+                                                                    (trip.quickRides || []).reduce((sum, qr) => sum + Number(qr.total_amount || 0), 0)
                                                                 ).toLocaleString()}
                                                             </span>
                                                         </div>
@@ -444,13 +500,23 @@ const GuestBookings = () => {
                                                         <div key={act.ab_id} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4 p-4 bg-slate-50 hover:bg-gold-500/5 rounded-2xl border border-transparent hover:border-gold-500/20 transition-all group">
                                                             <div>
                                                                 <p className="font-bold text-slate-800 text-sm">{act.activity_name}</p>
-                                                                <p className="text-[10px] font-black text-slate-400 uppercase mt-0.5">{formatDate(act.booking_date)}</p>
+                                                                <p className="text-[10px] font-black text-slate-400 uppercase mt-0.5 whitespace-pre-line tracking-wider">
+                                                                    {formatDate(act.ab_start_time, {hour:'2-digit', minute:'2-digit'})} {'\n'}To {formatDate(act.ab_end_time, {hour:'2-digit', minute:'2-digit'})}
+                                                                </p>
                                                             </div>
                                                             <div className="text-right min-w-[80px]">
                                                                 <span className="text-sm font-black text-slate-900">Rs. {act.total_price}</span>
                                                             </div>
-                                                            <div className="min-w-[100px] flex justify-center">
+                                                            <div className="min-w-[100px] flex flex-col items-center gap-2">
                                                                 {getStatusBadge(act.ab_status)}
+                                                                {['pending', 'booked', 'confirmed', 'reserved'].includes(act.ab_status?.toLowerCase()) && (
+                                                                    <button
+                                                                        onClick={() => handleCancelActivity(act.ab_id)}
+                                                                        className="text-[9px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600 border border-transparent hover:border-rose-200 px-2 py-1 rounded transition-colors"
+                                                                    >
+                                                                        Cancel
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     ))}
@@ -473,25 +539,48 @@ const GuestBookings = () => {
                                                                     <p className="text-[9px] font-black text-slate-400 uppercase leading-none mb-1">Status</p>
                                                                     {getStatusBadge(order.order_status)}
                                                                 </div>
+                                                                {['pending', 'ordered'].includes(order.order_status?.toLowerCase()) && (
+                                                                    <button
+                                                                        onClick={() => handleCancelFoodOrder(order.order_id)}
+                                                                        className="text-[9px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600 border border-transparent hover:border-rose-200 px-2 py-1 rounded transition-colors"
+                                                                    >
+                                                                        Cancel
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                             <ul className="space-y-2 mb-4">
                                                                 {order.items.map(item => (
-                                                                    <li key={item.order_item_id} className="flex justify-between items-center text-xs font-bold">
-                                                                        <span className="text-slate-500">{item.order_quantity}x {item.item_name}</span>
-                                                                        <span className="text-slate-900">Rs. {item.order_total_amount || (item.item_price * item.order_quantity)}</span>
+                                                                    <li key={item.order_item_id} className={`flex justify-between items-center text-xs font-bold ${item.item_status === 'Cancelled' ? 'opacity-40 line-through grayscale' : ''}`}>
+                                                                        <div className="flex flex-col">
+                                                                            <span className="text-slate-500">{item.order_quantity}x {item.item_name}</span>
+                                                                            {item.item_status === 'Cancelled' && (
+                                                                                <span className="text-[8px] text-rose-500 uppercase tracking-widest leading-none mt-1">Cancelled</span>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="flex items-center gap-3">
+                                                                            <span className="text-slate-900">Rs. {item.order_total_amount || (item.item_price * item.order_quantity)}</span>
+                                                                            {item.item_status !== 'Cancelled' && ['pending', 'ordered'].includes(order.order_status?.toLowerCase()) && (
+                                                                                <button
+                                                                                    onClick={() => handleCancelFoodItem(order.order_id, item.order_item_id)}
+                                                                                    className="text-[9px] text-rose-400 hover:text-rose-600 uppercase tracking-wider bg-rose-50 hover:bg-rose-100 p-1.5 rounded transition-colors"
+                                                                                    title="Cancel this item"
+                                                                                >
+                                                                                    ✕
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
                                                                     </li>
                                                                 ))}
                                                             </ul>
                                                             <div className="flex justify-between items-center pt-3 border-t border-dashed border-slate-100">
                                                                 <div className="flex flex-col">
                                                                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{order.dining_option}</span>
-                                                                    {order.scheduled_date && (
-                                                                        <span className="text-[9px] font-bold text-gold-600 uppercase">
-                                                                            {new Date(order.scheduled_date).toLocaleDateString()} • {order.meal_type}
-                                                                        </span>
-                                                                    )}
                                                                 </div>
-                                                                <span className="text-[10px] text-slate-400 font-bold">{formatDate(order.order_date, { hour: '2-digit', minute:'2-digit' })}</span>
+                                                                {order.scheduled_date && (
+                                                                    <span className="text-[10px] font-bold text-gold-600 uppercase whitespace-nowrap">
+                                                                        {formatDate(order.scheduled_date)} • {order.meal_type}
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     ))}
@@ -500,25 +589,31 @@ const GuestBookings = () => {
                                         )}
 
                                         {/* Vehicles */}
-                                        {trip.vehicles?.length > 0 && (
+                                        {(trip.vehicles?.length > 0 || trip.quickRides?.length > 0) && (
                                             <div className="space-y-4">
                                                 <div className="flex items-center gap-2 text-slate-900 mb-2">
                                                     <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
                                                     <h4 className="text-xs font-black uppercase tracking-widest">Travel & Mobility</h4>
                                                 </div>
                                                 <div className="space-y-2">
-                                                    {trip.vehicles.map(veh => (
+                                                    {trip.vehicles?.map(veh => (
                                                         <div key={veh.vb_id} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4 p-4 bg-slate-50 hover:bg-gold-500/5 rounded-2xl border border-transparent hover:border-gold-500/20 transition-all group">
                                                             <div>
-                                                                <p className="font-bold text-slate-800 text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]">{veh.vehicle_type}</p>
-                                                                <p className="text-[10px] font-black text-slate-500 uppercase">{veh.vehicle_number}</p>
+                                                                <div className="flex items-center gap-2">
+                                                                    <p className="font-bold text-slate-800 text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]">{veh.vehicle_type}</p>
+                                                                    {veh.isArrivalTransport && (
+                                                                        <span className="bg-indigo-100 text-indigo-700 text-[8px] font-black uppercase px-2 py-0.5 rounded-full tracking-tighter">Arrival</span>
+                                                                    )}
+                                                                </div>
+                                                                <p className="text-[10px] font-black text-slate-500 uppercase">{veh.vehicle_number || 'TBD'}</p>
                                                             </div>
                                                             <div className="text-right min-w-[100px] flex flex-col items-end">
-                                                                <span className="text-sm font-black text-slate-900">Rs. {veh.vehicle_price_per_day * veh.vb_days}</span>
+                                                                <p className="text-[9px] font-black text-slate-400 uppercase leading-none mb-1">Fee</p>
+                                                                <span className="text-sm font-black text-slate-900">Rs. {Number(veh.vehicle_price_per_day * veh.vb_days).toLocaleString()}</span>
                                                                 {veh.vb_status?.toLowerCase() === 'pending payment' && (
                                                                     <button 
                                                                         onClick={() => handleVehiclePayment(veh)}
-                                                                        className="mt-1 text-[9px] font-black uppercase tracking-widest bg-emerald-600 text-white px-2 py-1 rounded-md hover:bg-emerald-700 shadow-sm transition-transform active:scale-95"
+                                                                        className="mt-2 text-[9px] font-black uppercase tracking-widest bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 shadow-sm transition-transform active:scale-95 flex items-center gap-1.5"
                                                                     >
                                                                         Pay Now
                                                                     </button>
@@ -526,6 +621,38 @@ const GuestBookings = () => {
                                                             </div>
                                                             <div className="min-w-[100px] flex justify-center">
                                                                 {getStatusBadge(veh.vb_status)}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                    {trip.quickRides?.map(qr => (
+                                                        <div key={`qr-${qr.qr_id}`} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4 p-4 bg-slate-50 hover:bg-gold-500/5 rounded-2xl border border-transparent hover:border-blue-500/20 transition-all group">
+                                                            <div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <p className="font-bold text-slate-800 text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]">{qr.veh_type || qr.vehicle_type_requested}</p>
+                                                                    <span className="bg-blue-100 text-blue-700 text-[8px] font-black uppercase px-2 py-0.5 rounded-full tracking-tighter">Quick Ride</span>
+                                                                </div>
+                                                                <p className="text-[10px] font-black text-slate-500 uppercase mt-1">
+                                                                    <MapPinIcon className="w-3 h-3 inline mr-1 text-green-500"/>{qr.pickup_location}
+                                                                </p>
+                                                            </div>
+                                                            <div className="text-right min-w-[100px] flex flex-col items-end">
+                                                                <p className="text-[9px] font-black text-slate-400 uppercase leading-none mb-1">Total Fare</p>
+                                                                <span className="text-sm font-black text-slate-900">
+                                                                    {qr.total_amount ? `Rs. ${Number(qr.total_amount).toLocaleString()}` : 'Pending Fare'}
+                                                                </span>
+                                                                {qr.payment_status?.toLowerCase() === 'awaiting payment' && (
+                                                                    <button 
+                                                                        onClick={() => {
+                                                                            setPaymentModal({ isOpen: true, amount: Number(qr.total_amount), vehicle: { ...qr, isQuickRide: true } });
+                                                                        }}
+                                                                        className="mt-2 text-[9px] font-black uppercase tracking-widest bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 shadow-sm transition-transform active:scale-95 flex items-center gap-1.5"
+                                                                    >
+                                                                        Pay Now
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                            <div className="min-w-[100px] flex justify-center">
+                                                                {getStatusBadge(qr.status)}
                                                             </div>
                                                         </div>
                                                     ))}
@@ -541,32 +668,34 @@ const GuestBookings = () => {
                                         )}
                                     </div>
 
-                                    <div className="mt-12 pt-10 border-t border-slate-100">
-                                        <div className="flex items-center justify-center gap-4 mb-6">
-                                            <div className="h-[1px] w-12 bg-slate-200"></div>
-                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Enhance Your Stay</p>
-                                            <div className="h-[1px] w-12 bg-slate-200"></div>
+                                    {trip.rb_status?.toLowerCase() === 'checked-in' && (
+                                        <div className="mt-12 pt-10 border-t border-slate-100">
+                                            <div className="flex items-center justify-center gap-4 mb-6">
+                                                <div className="h-[1px] w-12 bg-slate-200"></div>
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Enhance Your Stay</p>
+                                                <div className="h-[1px] w-12 bg-slate-200"></div>
+                                            </div>
+                                            <div className="flex flex-wrap justify-center gap-4">
+                                                {[
+                                                    { label: 'Extend Stay', icon: <CalendarDaysIcon className="w-4 h-4" />, path: `/guest/extend-room?rb_id=${trip.rb_id}` },
+                                                    { label: 'Add Food', icon: <PlusCircleIcon className="w-4 h-4" />, path: `/guest/food-orders?rb_id=${trip.rb_id}` },
+                                                    { label: 'Quick Ride', icon: <MapPinIcon className="w-4 h-4" />, path: `/guest/quick-ride?rb_id=${trip.rb_id}` },
+                                                    { label: 'Book Activity', icon: <PlusCircleIcon className="w-4 h-4" />, path: `/guest/activities?rb_id=${trip.rb_id}` }
+                                                ].map(btn => (
+                                                    <button 
+                                                        key={btn.label}
+                                                        onClick={() => navigate(btn.path)}
+                                                        className="group flex flex-col items-center gap-3 p-5 min-w-[130px] bg-white hover:bg-gold-500 rounded-2xl border-2 border-gold-500 hover:border-gold-600 text-slate-600 hover:text-white transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-gold-500/20 active:scale-95"
+                                                    >
+                                                        <div className="w-10 h-10 flex items-center justify-center bg-slate-50 group-hover:bg-gold-400 rounded-xl transition-colors">
+                                                            {btn.icon}
+                                                        </div>
+                                                        <span className="text-[11px] font-black uppercase tracking-wider">{btn.label}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
-                                        <div className="flex flex-wrap justify-center gap-4">
-                                            {[
-                                                { label: 'Extend Stay', icon: <CalendarDaysIcon className="w-4 h-4" />, path: `/guest/extend-room?rb_id=${trip.rb_id}` },
-                                                { label: 'Add Food', icon: <PlusCircleIcon className="w-4 h-4" />, path: `/guest/food-orders?rb_id=${trip.rb_id}` },
-                                                { label: 'Hire Vehicle', icon: <MapPinIcon className="w-4 h-4" />, path: `/guest/vehicle-hire?rb_id=${trip.rb_id}` },
-                                                { label: 'Book Activity', icon: <PlusCircleIcon className="w-4 h-4" />, path: `/guest/activities?rb_id=${trip.rb_id}` }
-                                            ].map(btn => (
-                                                <button 
-                                                    key={btn.label}
-                                                    onClick={() => navigate(btn.path)}
-                                                    className="group flex flex-col items-center gap-3 p-5 min-w-[130px] bg-white hover:bg-gold-500 rounded-2xl border-2 border-gold-500 hover:border-gold-600 text-slate-600 hover:text-white transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-gold-500/20 active:scale-95"
-                                                >
-                                                    <div className="w-10 h-10 flex items-center justify-center bg-slate-50 group-hover:bg-gold-400 rounded-xl transition-colors">
-                                                        {btn.icon}
-                                                    </div>
-                                                    <span className="text-[11px] font-black uppercase tracking-wider">{btn.label}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

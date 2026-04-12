@@ -113,20 +113,38 @@ const Step3ReviewCheckout = ({
                 </div>
             )}
 
-            {/* Vehicle */}
-            {bookingData.vehicle && (
-                <div className="mb-6 p-6 bg-purple-50 rounded-lg border border-purple-200">
-                    <h3 className="text-xl font-bold text-slate-900 mb-4">🚗 Vehicle Hire</h3>
-                    <div className="space-y-2">
+            {/* Arrival Transport */}
+            {bookingData.arrivalTransport && (
+                <div className="mb-6 p-6 bg-slate-900 text-white rounded-lg border border-slate-800 shadow-lg shadow-slate-200">
+                    <h3 className="text-xl font-bold mb-4">✈️ Arrival Transport</h3>
+                    <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
-                            <span className="text-slate-700">Vehicle Type:</span>
-                            <span className="font-semibold">{bookingData.vehicle.type}</span>
+                            <span className="text-slate-400 font-medium uppercase tracking-widest text-[10px]">Pickup Location</span>
+                            <span className="font-bold">{bookingData.arrivalTransport.pickup_location}</span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="text-slate-700">Duration:</span>
-                            <span className="font-semibold">{bookingData.vehicle.days} days</span>
+                            <span className="text-slate-400 font-medium uppercase tracking-widest text-[10px]">Scheduled At</span>
+                            <span className="font-bold">
+                                {new Date(bookingData.arrivalTransport.scheduled_at).toLocaleDateString()} at {new Date(bookingData.arrivalTransport.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
                         </div>
-                        <p className="text-sm text-slate-600 italic">* Payment will be handled upon driver acceptance</p>
+                        <div className="flex justify-between">
+                            <span className="text-slate-400 font-medium uppercase tracking-widest text-[10px]">Vehicle Type</span>
+                            <span className="font-bold">{bookingData.arrivalTransport.vehicle_type_requested || 'Any Available'}</span>
+                        </div>
+                        {bookingData.arrivalTransport.estimatedPrice > 0 && !bookingData.vehicle && (
+                             <div className="pt-2 border-t border-slate-700 mt-2 flex justify-between items-center text-[10px] italic">
+                                 <span className="text-slate-400 font-bold">Estimated charge: Rs. {bookingData.arrivalTransport.estimatedPrice.toLocaleString()} </span>
+                                 <span className="text-gold-500 font-black">PAID TO DRIVER</span>
+                             </div>
+                        )}
+                        {bookingData.vehicle && bookingData.arrivalTransport && (
+                            <div className="pt-2 border-t border-slate-700 mt-2">
+                                <p className="text-[10px] text-green-400 italic font-bold text-center">
+                                    ✨ ARRIVAL PAYMENT WAIVED (Vehicle Hire Promotion)
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -137,8 +155,8 @@ const Step3ReviewCheckout = ({
                     <span className="text-2xl font-bold text-slate-900">TOTAL AMOUNT</span>
                     <span className="text-3xl font-bold text-gold-600">Rs. {getTotalAmount().toLocaleString()}</span>
                 </div>
-                <p className="text-sm text-slate-600 mt-2">
-                    * Vehicle hire cost not included (paid separately upon driver confirmation)
+                <p className="text-[10px] text-slate-600 mt-2 font-bold uppercase tracking-widest">
+                    * Vehicle hire & arrival transport costs not included (paid separately upon driver confirmation)
                 </p>
             </div>
 

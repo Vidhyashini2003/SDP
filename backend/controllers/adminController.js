@@ -23,7 +23,7 @@ exports.getDashboardStats = async (req, res) => {
             // 3. Booking Counts
             const [[{ rb_count }]] = await connection.query("SELECT COUNT(*) as rb_count FROM RoomBooking");
             const [[{ ab_count }]] = await connection.query("SELECT COUNT(*) as ab_count FROM ActivityBooking");
-            const [[{ vb_count }]] = await connection.query("SELECT COUNT(*) as vb_count FROM VehicleBooking");
+            const [[{ vb_count }]] = await connection.query("SELECT COUNT(*) as vb_count FROM hirevehicle");
             const total_bookings = rb_count + ab_count + vb_count;
 
             // 4. Financials (Revenue by Service Type) using 3NF Joins
@@ -48,7 +48,7 @@ exports.getDashboardStats = async (req, res) => {
             const [[vehicleRev]] = await connection.query(`
                 SELECT COUNT(p.payment_id) as txn_count, COALESCE(SUM(p.payment_amount), 0) as total_amount
                 FROM payment p
-                JOIN vehiclebooking vb ON p.payment_id = vb.vb_payment_id
+                JOIN hirevehicle vb ON p.payment_id = vb.vb_payment_id
                 WHERE p.payment_status = 'Success'
             `);
 
@@ -392,15 +392,74 @@ exports.getAllMenuItems = async (req, res) => {
 };
 
 exports.updateMenuItemStatus = async (req, res) => {
+    const connection = await db.getConnection();
     try {
         const { id } = req.params; // item_id
-        const { status } = req.body; // 'Available' or 'Unavailable'
+        const { status, reason } = req.body; // 'Available' or 'Unavailable'
 
-        await db.query('UPDATE menuitem SET item_availability = ? WHERE item_id = ?', [status, id]);
+        await connection.beginTransaction();
 
+        // When marking Unavailable, cancel all Pending food orders containing this item
+        if (status === 'Unavailable') {
+            // Find distinct food orders that are Pending and contain this menu item
+            const [affectedOrders] = await connection.query(
+                `SELECT DISTINCT fo.order_id, fo.payment_id, p.payment_amount,
+                        g.user_id as guest_user_id,
+                        CONCAT(u.first_name, ' ', u.last_name) as guest_name,
+                        mi.item_name
+                 FROM foodorder fo
+                 JOIN orderitem oi ON fo.order_id = oi.order_id
+                 JOIN menuitem mi ON oi.item_id = mi.item_id
+                 LEFT JOIN payment p ON fo.payment_id = p.payment_id
+                 JOIN Guest g ON fo.guest_id = g.guest_id
+                 JOIN Users u ON g.user_id = u.user_id
+                 WHERE oi.item_id = ? AND fo.order_status = 'Pending'`,
+                [id]
+            );
+
+            for (const order of affectedOrders) {
+                // Cancel the food order
+                await connection.query(
+                    'UPDATE foodorder SET order_status = "Cancelled" WHERE order_id = ?',
+                    [order.order_id]
+                );
+
+                // Create refund request if payment exists
+                if (order.payment_id && order.payment_amount) {
+                    await connection.query(
+                        'INSERT INTO refund (payment_id, refund_amount, refund_reason, refund_status) VALUES (?, ?, ?, "Pending")',
+                        [order.payment_id, order.payment_amount, `Food item "${order.item_name}" unavailable${reason ? ': ' + reason : ''}`]
+                    );
+                }
+
+                // Notify guest
+                if (order.guest_user_id) {
+                    try {
+                        await connection.query(
+                            'INSERT INTO notifications (user_id, title, message, type, is_read) VALUES (?, ?, ?, ?, FALSE)',
+                            [
+                                order.guest_user_id,
+                                '\uD83C\uDF7D\uFE0F Food Order Cancelled',
+                                `Your food order #${order.order_id} has been cancelled because "${order.item_name}" is currently unavailable${reason ? ' (' + reason + ')' : ''}. A refund request has been raised and will be processed shortly.`,
+                                'Cancellation'
+                            ]
+                        );
+                    } catch (notifyErr) {
+                        console.error('Failed to notify guest about food order cancellation:', notifyErr);
+                    }
+                }
+            }
+        }
+
+        await connection.query('UPDATE menuitem SET item_availability = ? WHERE item_id = ?', [status, id]);
+        await connection.commit();
         res.json({ message: 'Menu item status updated successfully' });
+
     } catch (error) {
+        await connection.rollback();
         console.error('Error updating menu item status:', error);
         res.status(500).json({ error: 'Failed to update menu item status' });
+    } finally {
+        connection.release();
     }
 };

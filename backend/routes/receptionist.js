@@ -37,7 +37,7 @@ router.put('/bookings/rooms/:id/status', receptionistController.updateRoomBookin
 router.get('/bookings/activities', receptionistController.getAllActivityBookings);
 router.put('/bookings/activities/:id/status', receptionistController.updateActivityBookingStatus);
 
-router.get('/bookings/vehicles', receptionistController.getAllVehicleBookings);
+router.get('/bookings/vehicles', receptionistController.getAllhirevehicles);
 router.get('/bookings/orders', receptionistController.getAllFoodOrders);
 
 // Vehicle Availability Management
@@ -75,6 +75,7 @@ router.put('/refunds/:id', receptionistController.processRefund);
 // Damages
 router.post('/damages', damageController.reportDamage);
 router.get('/damages', damageController.getAllDamages);
+router.get('/bookings/rooms/:rb_id/pending-payments', damageController.checkPendingPayments);
 
 module.exports = router;
 

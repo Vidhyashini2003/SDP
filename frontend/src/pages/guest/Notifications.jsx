@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import Card from '../../components/Card';
+import DemoPaymentGateway from '../../components/DemoPaymentGateway';
 
 const Notifications = () => {
     const { user } = useAuth();
@@ -11,6 +12,9 @@ const Notifications = () => {
     const [damages, setDamages] = useState([]);
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
+    
+    // Payment State
+    const [paymentModal, setPaymentModal] = useState({ isOpen: false, damage: null });
 
     useEffect(() => {
         if (user) {
@@ -33,14 +37,21 @@ const Notifications = () => {
         }
     };
 
-    const handlePay = async (damageId) => {
+    const initiatePayment = (damage) => {
+        setPaymentModal({ isOpen: true, damage });
+    };
+
+    const confirmPayment = async () => {
         try {
+            const damageId = paymentModal.damage.damage_id;
             await axios.post(`/api/notifications/damages/${damageId}/pay`);
-            toast.success('Payment successful');
-            fetchData(); // Refresh list
+            toast.success('Payment successful! Your charge has been settled.');
+            setPaymentModal({ isOpen: false, damage: null });
+            fetchData(); // Refresh list to remove the paid damage
         } catch (error) {
             console.error('Payment error:', error);
-            toast.error('Payment failed');
+            toast.error('Payment processing failed');
+            setPaymentModal({ isOpen: false, damage: null });
         }
     };
 
@@ -72,6 +83,7 @@ const Notifications = () => {
     if (loading) return <div className="p-8 text-center text-slate-600">Loading notifications...</div>;
 
     return (
+        <>
         <div className="p-8 max-w-6xl mx-auto space-y-8">
             <div>
                 <h1 className="text-2xl font-bold mb-2">Notifications Center</h1>
@@ -96,7 +108,7 @@ const Notifications = () => {
                                 <div className="text-right">
                                     <p className="text-lg font-bold text-red-600 mb-2">Rs. {Number(damage.charge_amount).toLocaleString()}</p>
                                     <button
-                                        onClick={() => handlePay(damage.damage_id)}
+                                        onClick={() => initiatePayment(damage)}
                                         className="bg-rose-600 hover:bg-rose-700 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-rose-600/20 active:scale-95"
                                     >
                                         Settle Charge
@@ -138,10 +150,19 @@ const Notifications = () => {
                                     <div className="flex gap-4 items-center">
                                         {notification.action_url && (
                                             <button
-                                                onClick={() => navigate(notification.action_url)}
+                                                onClick={() => {
+                                                    if (notification.title.includes('Damage') && pendingDamages.length > 0) {
+                                                        const match = notification.message.match(/Rs\.\s*([\d,]+)/);
+                                                        const amount = match ? Number(match[1].replace(/,/g, '')) : null;
+                                                        const matchDmg = pendingDamages.find(d => Number(d.charge_amount) === amount) || pendingDamages[0];
+                                                        if (matchDmg) initiatePayment(matchDmg);
+                                                        return;
+                                                    }
+                                                    navigate(notification.action_url);
+                                                }}
                                                 className="bg-gold-600 hover:bg-gold-700 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-gold-600/20 active:scale-95 flex items-center gap-2"
                                             >
-                                                {notification.action_url.includes('payment') || notification.action_url.includes('bookings') ? 'Proceed to Payment' : 'Review Details'}
+                                                {notification.action_url.includes('payment') || notification.action_url.includes('bookings') ? 'Proceed' : 'Review Details'}
                                                 <span className="text-sm">➔</span>
                                             </button>
                                         )}
@@ -167,6 +188,17 @@ const Notifications = () => {
                 </div>
             </div>
         </div>
+        
+        {/* Payment Gateway Modal */}
+        {paymentModal.damage && (
+            <DemoPaymentGateway 
+                isOpen={paymentModal.isOpen}
+                onClose={() => setPaymentModal({ isOpen: false, damage: null })}
+                amount={Number(paymentModal.damage.charge_amount)}
+                onPaymentSuccess={confirmPayment}
+            />
+        )}
+        </>
     );
 };
 

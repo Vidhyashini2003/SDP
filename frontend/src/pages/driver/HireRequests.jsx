@@ -21,12 +21,12 @@ const DriverHireRequests = () => {
         }
     };
 
-    const handleAccept = async (id) => {
+    const handleAccept = async (id, type) => {
         if (!confirm('Are you sure you want to accept this trip?')) return;
 
         try {
-            await axios.post(`/api/driver/requests/${id}/accept`);
-            toast.success('Trip accepted! Waiting for guest payment.');
+            await axios.post(`/api/driver/requests/${id}/accept?type=${type}`);
+            toast.success('Trip accepted! Waiting for confirmation.');
             fetchRequests(); // Refresh list
         } catch (error) {
             console.error('Error accepting trip:', error);
@@ -47,42 +47,84 @@ const DriverHireRequests = () => {
                     </div>
                 ) : (
                     requests.map((req) => (
-                        <div key={req.vb_id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col md:flex-row justify-between items-center gap-6 hover:shadow-md transition-shadow">
+                        <div key={`${req.request_type}-${req.id}`} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col md:flex-row justify-between items-center gap-6 hover:shadow-md transition-shadow">
                             <div className="flex-1">
                                 <div className="flex items-center gap-3 mb-2">
                                     <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-bold uppercase tracking-wide">
                                         Pending Approval
                                     </span>
-                                    <span className="text-sm text-slate-400 font-mono">#{req.vb_id}</span>
+                                    <span className="text-sm text-slate-400 font-mono">#{req.id}</span>
                                 </div>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3">
                                     <div>
                                         <p className="text-slate-500 text-xs uppercase font-semibold">Date</p>
-                                        <p className="font-medium text-slate-900">{new Date(req.vb_date).toLocaleDateString()}</p>
+                                        <p className="font-medium text-slate-900">{new Date(req.date).toLocaleDateString()}</p>
                                     </div>
-                                    <div>
-                                        <p className="text-slate-500 text-xs uppercase font-semibold">Duration</p>
-                                        <p className="font-medium text-slate-900">{req.vb_days} Days</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-slate-500 text-xs uppercase font-semibold">Guest</p>
-                                        <p className="font-medium text-slate-900">{req.guest_name}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-slate-500 text-xs uppercase font-semibold">Earnings</p>
-                                        <p className="font-medium text-green-600">Rs. {req.vb_days * req.vehicle_price_per_day}</p>
-                                    </div>
+                                    {req.request_type === 'hire' ? (
+                                        <>
+                                            <div>
+                                                <p className="text-slate-500 text-xs uppercase font-semibold">Duration</p>
+                                                <p className="font-medium text-slate-900">{req.duration} Days</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-slate-500 text-xs uppercase font-semibold">Guest</p>
+                                                <p className="font-medium text-slate-900">{req.guest_name}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-slate-500 text-xs uppercase font-semibold">Earnings</p>
+                                                <p className="font-medium text-green-600">Rs. {req.duration * req.price_per_day}</p>
+                                            </div>
+                                        </>
+                                    ) : req.request_type === 'arrival' ? (
+                                        <>
+                                            <div>
+                                                <p className="text-slate-500 text-xs uppercase font-semibold">Pickup At</p>
+                                                <p className="font-medium text-slate-900">{req.pickup_location}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-slate-500 text-xs uppercase font-semibold">Guest</p>
+                                                <p className="font-medium text-slate-900">{req.guest_name}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-slate-500 text-xs uppercase font-semibold">Earnings</p>
+                                                <p className="font-medium text-green-600">{req.price_per_day ? `Rs. ${req.price_per_day}` : 'Negotiable'}</p>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div>
+                                                <p className="text-slate-500 text-xs uppercase font-semibold">Pickup</p>
+                                                <p className="font-medium text-slate-900 text-xs overflow-hidden text-ellipsis whitespace-nowrap max-w-[150px]">{req.pickup_location}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-slate-500 text-xs uppercase font-semibold">Guest</p>
+                                                <p className="font-medium text-slate-900">{req.guest_name}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-slate-500 text-xs uppercase font-semibold">Earnings</p>
+                                                <p className="font-medium text-blue-600 text-xs">Metered (Per KM)</p>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-slate-600 bg-slate-50 p-2 rounded">
                                     <span>🚗</span>
-                                    <span className="font-medium">{req.vehicle_number}</span>
-                                    <span className="text-slate-400">|</span>
-                                    <span>{req.vehicle_type}</span>
+                                    {req.request_type === 'hire' ? (
+                                        <>
+                                            <span className="font-medium">{req.vehicle_number}</span>
+                                            <span className="text-slate-400">|</span>
+                                            <span>{req.vehicle_type}</span>
+                                        </>
+                                    ) : req.request_type === 'arrival' ? (
+                                        <span className="font-medium uppercase tracking-widest text-xs">Arrival Transfer ({req.vehicle_type || 'Any'})</span>
+                                    ) : (
+                                        <span className="font-medium uppercase tracking-widest text-xs text-blue-700">Quick Ride ({req.vehicle_type || 'Any'})</span>
+                                    )}
                                 </div>
                             </div>
 
                             <button
-                                onClick={() => handleAccept(req.vb_id)}
+                                onClick={() => handleAccept(req.id, req.request_type)}
                                 className="w-full md:w-auto px-6 py-3 bg-gold-600 hover:bg-gold-700 text-white font-bold rounded-lg transition-colors shadow-sm"
                             >
                                 Accept Request

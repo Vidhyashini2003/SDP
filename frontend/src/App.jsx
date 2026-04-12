@@ -21,7 +21,7 @@ import RoomBooking from './pages/guest/RoomBooking';
 import Profile from './pages/guest/Profile';
 import ActivityBooking from './pages/guest/ActivityBooking';
 import FoodOrders from './pages/guest/FoodOrders';
-import VehicleHire from './pages/guest/VehicleHire';
+import QuickRide from './pages/guest/QuickRide';
 import Notifications from './pages/guest/Notifications';
 import ExtendRoomBooking from './pages/guest/ExtendRoomBooking';
 
@@ -143,7 +143,8 @@ function App() {
                         <Route path="rooms" element={<RoomBooking />} />
                         <Route path="activities" element={<ActivityBooking />} />
                         <Route path="food-orders" element={<FoodOrders />} />
-                        <Route path="vehicle-hire" element={<VehicleHire />} />
+                        <Route path="quick-ride" element={<QuickRide />} />
+                        <Route path="vehicle-hire" element={<QuickRide />} />
                         <Route path="extend-room" element={<ExtendRoomBooking />} />
                         <Route path="notifications" element={<Notifications />} />
                         <Route index element={<Navigate to="my-bookings" replace />} />

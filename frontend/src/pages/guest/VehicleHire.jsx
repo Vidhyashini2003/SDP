@@ -21,6 +21,14 @@ const VehicleHire = () => {
     const [searchParamsUrl] = useSearchParams();
     const urlLinkedRbId = searchParamsUrl.get('rb_id');
 
+    const toLocalDateStr = (d) => {
+        const date = new Date(d);
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    };
+
     useEffect(() => {
         fetchActiveBookings();
     }, []);
@@ -99,7 +107,7 @@ const VehicleHire = () => {
     };
 
     // Get today's date for min attribute
-    const today = new Date().toISOString().split('T')[0];
+    const today = toLocalDateStr(new Date());
 
     // Restrict dates based on selected/linked booking
     const currentLinkedBooking = activeBookings.find(b => b.rb_id == (urlLinkedRbId ? parseInt(urlLinkedRbId, 10) : selectedBooking));
@@ -108,17 +116,13 @@ const VehicleHire = () => {
     let maxDate = '';
 
     if (currentLinkedBooking) {
-        const checkIn = new Date(currentLinkedBooking.rb_checkin);
-        const checkOut = new Date(currentLinkedBooking.rb_checkout);
-        
-        // Add 1 day buffer as allowed by backend
-        const bufferStart = new Date(checkIn);
-        bufferStart.setDate(bufferStart.getDate() - 1);
-        const bufferEnd = new Date(checkOut);
-        bufferEnd.setDate(bufferEnd.getDate() + 1);
+        const bufferStartDate = new Date(currentLinkedBooking.check_in_date);
+        bufferStartDate.setDate(bufferStartDate.getDate() - 1);
+        const bufferEndDate = new Date(currentLinkedBooking.check_out_date);
+        bufferEndDate.setDate(bufferEndDate.getDate() + 1);
 
-        const minS = bufferStart.toISOString().split('T')[0];
-        const maxS = bufferEnd.toISOString().split('T')[0];
+        const minS = toLocalDateStr(bufferStartDate);
+        const maxS = toLocalDateStr(bufferEndDate);
 
         minDate = minS > today ? minS : today;
         maxDate = maxS;
@@ -177,7 +181,7 @@ const VehicleHire = () => {
                     {activeBookings.length > 0 && !urlLinkedRbId && (
                         <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg inline-block">
                             <p className="text-sm text-slate-700">
-                                <span className="font-medium">📌 Linked to:</span> {activeBookings.find(b => b.rb_id == selectedBooking)?.room_type} ({new Date(activeBookings.find(b => b.rb_id == selectedBooking)?.rb_checkin).toLocaleDateString()} - {new Date(activeBookings.find(b => b.rb_id == selectedBooking)?.rb_checkout).toLocaleDateString()})
+                                <span className="font-medium">📌 Linked to:</span> {activeBookings.find(b => b.rb_id == selectedBooking)?.room_type} ({new Date(activeBookings.find(b => b.rb_id == selectedBooking)?.check_in_date).toLocaleDateString()} - {new Date(activeBookings.find(b => b.rb_id == selectedBooking)?.check_out_date).toLocaleDateString()})
                             </p>
                             {activeBookings.length > 1 && (
                                 <select

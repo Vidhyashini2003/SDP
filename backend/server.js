@@ -68,9 +68,13 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Something went wrong!', details: err.message });
 });
 
+// Initialize Background Chron Jobs
+const initCronJobs = require('./utils/cronJobs');
+initCronJobs();
+
 // Start server
 app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📍 API URL: http://localhost:${PORT}/api`);
-    // Server Ready
+    console.log(`📅 Background Cron Jobs initialized and scanning...`);
 });

@@ -33,6 +33,14 @@ const FoodOrders = () => {
         return 'Delicious food item';
     };
 
+    const toLocalDateStr = (d) => {
+        const date = new Date(d);
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    };
+
     useEffect(() => {
         fetchData();
     }, []);
@@ -57,7 +65,7 @@ const FoodOrders = () => {
                 setSelectedBooking(targetId);
                 const b = bookingsData.bookings.find(x => x.rb_id === targetId) || bookingsData.bookings[0];
                 if (b.check_in_date && !selectedDate) {
-                    setSelectedDate(new Date(b.check_in_date).toISOString().split('T')[0]);
+                    setSelectedDate(toLocalDateStr(b.check_in_date));
                 }
             }
 
@@ -230,7 +238,7 @@ const FoodOrders = () => {
                                         const bId = parseInt(e.target.value);
                                         setSelectedBooking(bId);
                                         const b = activeBookings.find(x => x.rb_id === bId);
-                                        if (b?.check_in_date) setSelectedDate(new Date(b.check_in_date).toISOString().split('T')[0]);
+                                        if (b?.check_in_date) setSelectedDate(toLocalDateStr(b.check_in_date));
                                     }}
                                     className="bg-transparent text-sm font-bold text-slate-800 outline-none cursor-pointer"
                                 >
@@ -270,12 +278,13 @@ const FoodOrders = () => {
                                 const end = new Date(currentLinkedBooking.check_out_date);
                                 const dates = [];
                                 let curr = new Date(start);
-                                while (curr <= end) {
-                                    dates.push(new Date(curr).toISOString().split('T')[0]);
+                                while (toLocalDateStr(curr) <= toLocalDateStr(end)) {
+                                    dates.push(toLocalDateStr(curr));
                                     curr.setDate(curr.getDate() + 1);
                                 }
                                 return dates.map(date => {
-                                    const d = new Date(date);
+                                    const [y, m, d] = date.split('-').map(Number);
+                                    const dispDate = new Date(y, m - 1, d);
                                     const isActive = selectedDate === date;
                                     return (
                                         <button
@@ -283,8 +292,8 @@ const FoodOrders = () => {
                                             onClick={() => setSelectedDate(date)}
                                             className={`flex-shrink-0 w-14 h-18 rounded-xl flex flex-col items-center justify-center transition-all ${isActive ? 'bg-gold-500 text-white shadow-lg' : 'bg-slate-800 text-slate-500 hover:bg-slate-700'}`}
                                         >
-                                            <span className="text-[10px] font-black uppercase">{d.toLocaleDateString(undefined, { month: 'short' })}</span>
-                                            <span className="text-lg font-black">{d.getDate()}</span>
+                                            <span className="text-[10px] font-black uppercase">{dispDate.toLocaleDateString(undefined, { month: 'short' })}</span>
+                                            <span className="text-lg font-black">{dispDate.getDate()}</span>
                                         </button>
                                     );
                                 });

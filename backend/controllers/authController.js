@@ -249,7 +249,7 @@ exports.updateProfile = async (req, res) => {
         await connection.beginTransaction();
         const userId = req.user.id; // Now this is user_id
         const role = req.user.role;
-        const { first_name, last_name, address, nationality } = req.body;
+        const { first_name, last_name, address_no, street, city, district, nationality } = req.body;
 
         // 1. Update Common Fields in Users Table (guest_phone handled in guestController)
         await connection.query(
@@ -258,7 +258,6 @@ exports.updateProfile = async (req, res) => {
         );
 
         console.log(`Updating profile for UserID: ${userId}, Role: ${role}`);
-        console.log('Update Data:', { address, nationality });
 
         // 2. Update Role Specific Fields (e.g. Address, Nationality)
         // We need to find the role record by user_id
@@ -266,28 +265,28 @@ exports.updateProfile = async (req, res) => {
 
         if (lowerRole === 'guest') {
             await connection.query(
-                'UPDATE Guest SET guest_nic_passport = ?, nationality = ? WHERE user_id = ?',
-                [address, nationality, userId]
+                'UPDATE Guest SET nationality = ? WHERE user_id = ?',
+                [nationality, userId]
             );
         } else if (lowerRole === 'receptionist') {
             await connection.query(
-                'UPDATE receptionist SET receptionist_street = ? WHERE user_id = ?',
-                [address, userId]
+                'UPDATE receptionist SET receptionist_no = ?, receptionist_street = ?, receptionist_city = ?, receptionist_district = ? WHERE user_id = ?',
+                [address_no, street, city, district, userId]
             );
         } else if (lowerRole === 'chef') {
             await connection.query(
-                'UPDATE chef SET chef_street = ? WHERE user_id = ?',
-                [address, userId]
+                'UPDATE chef SET chef_no = ?, chef_street = ?, chef_city = ?, chef_district = ? WHERE user_id = ?',
+                [address_no, street, city, district, userId]
             );
         } else if (lowerRole === 'driver') {
             const [res] = await connection.query(
-                'UPDATE driver SET driver_street = ? WHERE user_id = ?',
-                [address, userId]
+                'UPDATE driver SET driver_no = ?, driver_street = ?, driver_city = ?, driver_district = ? WHERE user_id = ?',
+                [address_no, street, city, district, userId]
             );
             if (res.affectedRows === 0) {
                 await connection.query(
-                    'INSERT INTO driver (user_id, driver_street) VALUES (?, ?)',
-                    [userId, address]
+                    'INSERT INTO driver (user_id, driver_no, driver_street, driver_city, driver_district) VALUES (?, ?, ?, ?, ?)',
+                    [userId, address_no, street, city, district]
                 );
             }
         }
@@ -449,11 +448,11 @@ exports.getMe = async (req, res) => {
         let params = [userId];
 
         if (role === 'receptionist') {
-            query += ", r.receptionist_phone as phone, CONCAT_WS(', ', NULLIF(r.receptionist_no, ''), NULLIF(r.receptionist_street, ''), NULLIF(r.receptionist_city, ''), NULLIF(r.receptionist_district, '')) as address FROM Users u LEFT JOIN receptionist r ON u.user_id = r.user_id WHERE u.user_id = ?";
+            query += ", r.receptionist_phone as phone, r.receptionist_no as address_no, r.receptionist_street as street, r.receptionist_city as city, r.receptionist_district as district, CONCAT_WS(', ', NULLIF(r.receptionist_no, ''), NULLIF(r.receptionist_street, ''), NULLIF(r.receptionist_city, ''), NULLIF(r.receptionist_district, '')) as address FROM Users u LEFT JOIN receptionist r ON u.user_id = r.user_id WHERE u.user_id = ?";
         } else if (role === 'chef') {
-            query += ", c.chef_phone as phone, CONCAT_WS(', ', NULLIF(c.chef_no, ''), NULLIF(c.chef_street, ''), NULLIF(c.chef_city, ''), NULLIF(c.chef_district, '')) as address FROM Users u LEFT JOIN chef c ON u.user_id = c.user_id WHERE u.user_id = ?";
+            query += ", c.chef_phone as phone, c.chef_no as address_no, c.chef_street as street, c.chef_city as city, c.chef_district as district, CONCAT_WS(', ', NULLIF(c.chef_no, ''), NULLIF(c.chef_street, ''), NULLIF(c.chef_city, ''), NULLIF(c.chef_district, '')) as address FROM Users u LEFT JOIN chef c ON u.user_id = c.user_id WHERE u.user_id = ?";
         } else if (role === 'driver') {
-            query += ", d.driver_phone as phone, CONCAT_WS(', ', NULLIF(d.driver_no, ''), NULLIF(d.driver_street, ''), NULLIF(d.driver_city, ''), NULLIF(d.driver_district, '')) as address FROM Users u LEFT JOIN driver d ON u.user_id = d.user_id WHERE u.user_id = ?";
+            query += ", d.driver_phone as phone, d.driver_no as address_no, d.driver_street as street, d.driver_city as city, d.driver_district as district, CONCAT_WS(', ', NULLIF(d.driver_no, ''), NULLIF(d.driver_street, ''), NULLIF(d.driver_city, ''), NULLIF(d.driver_district, '')) as address FROM Users u LEFT JOIN driver d ON u.user_id = d.user_id WHERE u.user_id = ?";
         } else if (role === 'guest') {
             query += ', g.guest_nic_passport, g.nationality, g.guest_phone as phone FROM Users u LEFT JOIN Guest g ON u.user_id = g.user_id WHERE u.user_id = ?';
         } else {

@@ -5,6 +5,8 @@ import { toast } from 'react-hot-toast';
 const DriverTrips = () => {
     const [trips, setTrips] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [fareFormOpen, setFareFormOpen] = useState(null); // stores qr_id of trip being billed
+    const [fareData, setFareData] = useState({ actual_km: '', waiting_hours: '' });
 
     useEffect(() => {
         fetchTrips();
@@ -21,14 +23,39 @@ const DriverTrips = () => {
         }
     };
 
-    const handleStatusUpdate = async (tripId, newStatus) => {
+    const handleStatusUpdate = async (tripId, newStatus, type = 'hire') => {
         try {
-            await axios.put(`/api/driver/trips/${tripId}/status`, { status: newStatus });
+            await axios.put(`/api/driver/trips/${tripId}/status?type=${type}`, { status: newStatus });
             toast.success(`Trip marked as ${newStatus}`);
-            fetchTrips();
+            if (type === 'quickride' && newStatus === 'Completed') {
+                setFareFormOpen(tripId);
+            } else {
+                fetchTrips();
+            }
         } catch (error) {
             console.error('Error updating status:', error);
             toast.error('Failed to update status');
+        }
+    };
+
+    const handleSetFare = async (tripId) => {
+        if(!fareData.actual_km || isNaN(fareData.actual_km)) {
+            toast.error("Please enter a valid actual KM.");
+            return;
+        }
+
+        try {
+            await axios.put(`/api/driver/quickrides/${tripId}/amount`, { 
+                actual_km: parseFloat(fareData.actual_km),
+                waiting_hours: parseFloat(fareData.waiting_hours) || 0
+            });
+            toast.success("Fare computed. Guest has been notified.");
+            setFareFormOpen(null);
+            setFareData({ actual_km: '', waiting_hours: '' });
+            fetchTrips();
+        } catch(error) {
+            console.error("Error setting fare:", error);
+            toast.error("Failed to set fare.");
         }
     };
 
@@ -45,18 +72,25 @@ const DriverTrips = () => {
                     </div>
                 ) : (
                     trips.map((trip) => (
-                        <div key={trip.vb_id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col lg:flex-row justify-between lg:items-center gap-4">
+                        <div key={`${trip.type}-${trip.vb_id}`} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col lg:flex-row justify-between lg:items-center gap-4">
 
                             <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-2">
-                                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${trip.vb_status === 'Booked' ? 'bg-gold-100 text-gold-700' :
+                                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                        (trip.vb_status === 'Booked' || trip.vb_status === 'Confirmed') ? 'bg-indigo-100 text-indigo-700' :
                                         trip.vb_status === 'In Progress' ? 'bg-orange-100 text-orange-700' :
                                             trip.vb_status === 'Completed' ? 'bg-green-100 text-green-700' :
                                                 trip.vb_status === 'Cancelled' ? 'bg-red-100 text-red-700' :
                                                     'bg-gray-100 text-gray-700'
                                         }`}>
-                                        {trip.vb_status}
+                                        {(trip.isArrival && trip.vb_status === 'Booked') ? 'Confirm Arrival' : trip.vb_status}
                                     </span>
+                                    {trip.isArrival && (
+                                        <span className="bg-gold-100 text-gold-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-tighter">Arrival Transfer</span>
+                                    )}
+                                    {trip.isQuickRide && (
+                                        <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-tighter">Quick Ride</span>
+                                    )}
                                     <span className="text-sm text-slate-500 font-mono">#{trip.vb_id}</span>
                                 </div>
 
@@ -82,19 +116,28 @@ const DriverTrips = () => {
                                     </div>
                                     <div>
                                         <span className="text-slate-500">Vehicle: </span>
-                                        <span className="font-medium text-slate-900">{trip.vehicle_number} ({trip.vehicle_type})</span>
+                                        <span className="font-medium text-slate-900">{trip.vehicle_number || 'TBD'} ({trip.vehicle_type})</span>
                                     </div>
-                                    <div>
-                                        <span className="text-slate-500">Duration: </span>
-                                        <span className="font-medium text-slate-900">{trip.vb_days} Days</span>
-                                    </div>
+                                    {!trip.isArrival && !trip.isQuickRide && (
+                                        <div>
+                                            <span className="text-slate-500">Duration: </span>
+                                            <span className="font-medium text-slate-900">{trip.vb_days} Days</span>
+                                        </div>
+                                    )}
+                                    {trip.isQuickRide && trip.total_amount && (
+                                       <div>
+                                            <span className="text-slate-500">Fare Computed: </span>
+                                            <span className="font-bold text-green-700">Rs. {Number(trip.total_amount).toLocaleString()}</span>
+                                            <span className="text-slate-500 ml-1 text-xs">({trip.payment_status})</span>
+                                       </div>
+                                    )}
                                 </div>
                             </div>
 
                             <div className="flex flex-row lg:flex-col gap-2 min-w-[140px]">
-                                {trip.vb_status === 'Booked' && (
+                                {(trip.vb_status === 'Booked' || trip.vb_status === 'Confirmed') && (
                                     <button
-                                        onClick={() => handleStatusUpdate(trip.vb_id, 'In Progress')}
+                                        onClick={() => handleStatusUpdate(trip.vb_id, 'In Progress', trip.type)}
                                         className="w-full py-2 px-4 bg-gold-500 hover:bg-gold-600 text-white font-bold rounded-lg transition-colors"
                                     >
                                         Start Trip
@@ -103,15 +146,41 @@ const DriverTrips = () => {
 
                                 {trip.vb_status === 'In Progress' && (
                                     <button
-                                        onClick={() => handleStatusUpdate(trip.vb_id, 'Completed')}
+                                        onClick={() => handleStatusUpdate(trip.vb_id, 'Completed', trip.type)}
                                         className="w-full py-2 px-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors"
                                     >
                                         Complete Trip
                                     </button>
                                 )}
 
-                                {trip.vb_status === 'Completed' && (
-                                    <div className="text-center py-2 px-4 bg-slate-50 text-slate-500 font-medium rounded-lg">
+                                {trip.vb_status === 'Completed' && trip.type === 'quickride' && (!trip.total_amount || fareFormOpen === trip.vb_id) && (
+                                    <div className="mt-2 space-y-2 p-2 border border-blue-200 bg-blue-50 rounded-lg">
+                                        <p className="text-xs font-bold text-blue-800 uppercase text-center mb-1">Set Fare</p>
+                                        <input 
+                                            type="number" 
+                                            placeholder="Actual KM" 
+                                            value={fareData.actual_km} 
+                                            onChange={e => setFareData({...fareData, actual_km: e.target.value})}
+                                            className="w-full px-2 py-1 text-sm border rounded focus:ring-1 outline-none"
+                                        />
+                                        <input 
+                                            type="number" 
+                                            placeholder="Waiting Hours (opt)" 
+                                            value={fareData.waiting_hours} 
+                                            onChange={e => setFareData({...fareData, waiting_hours: e.target.value})}
+                                            className="w-full px-2 py-1 text-sm border rounded focus:ring-1 outline-none"
+                                        />
+                                        <button 
+                                            onClick={() => handleSetFare(trip.vb_id)}
+                                            className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1.5 rounded transition"
+                                        >
+                                            Submit Fare
+                                        </button>
+                                    </div>
+                                )}
+
+                                {trip.vb_status === 'Completed' && (trip.type !== 'quickride' || trip.total_amount) && (
+                                    <div className="text-center py-2 px-4 bg-slate-50 text-slate-500 font-medium rounded-lg mt-auto">
                                         Trip Finished
                                     </div>
                                 )}

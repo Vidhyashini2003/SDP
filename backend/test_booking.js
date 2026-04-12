@@ -40,12 +40,12 @@ async function test() {
         );
         console.log('5. orderitem OK, id:', oi.insertId);
 
-        // Test vehiclebooking insert
+        // Test hirevehicle insert
         const [vb] = await connection.query(
-            'INSERT INTO vehiclebooking (guest_id, vehicle_id, vb_date, vb_days, vb_status) VALUES (?, ?, ?, ?, ?)',
+            'INSERT INTO hirevehicle (guest_id, vehicle_id, vb_date, vb_days, vb_status) VALUES (?, ?, ?, ?, ?)',
             [1, 1, '2026-04-01', 2, 'Pending Approval']
         );
-        console.log('6. vehiclebooking OK, id:', vb.insertId);
+        console.log('6. hirevehicle OK, id:', vb.insertId);
 
         await connection.rollback();
         console.log('\nALL INSERTS PASSED! Rolling back test data.');

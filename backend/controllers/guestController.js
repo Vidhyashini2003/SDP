@@ -75,9 +75,9 @@ exports.getMyBookings = async (req, res) => {
             [req.user.id]
         );
 
-        const [vehicleBookings] = await db.query(
+        const [hirevehicles] = await db.query(
             `SELECT vb.*, vb.vb_date as booking_date, v.vehicle_type, v.vehicle_number, v.vehicle_price_per_day 
-             FROM vehiclebooking vb 
+             FROM hirevehicle vb 
              JOIN vehicle v ON vb.vehicle_id = v.vehicle_id 
              JOIN Guest g ON vb.guest_id = g.guest_id
              WHERE g.user_id = ?
@@ -88,7 +88,7 @@ exports.getMyBookings = async (req, res) => {
         res.json({
             rooms: roomBookings,
             activities: activityBookings,
-            vehicles: vehicleBookings
+            vehicles: hirevehicles
         });
     } catch (error) {
         console.error("Booking Fetch Error:", error);
@@ -148,7 +148,7 @@ exports.getGroupedBookings = async (req, res) => {
             // 3. Fetch linked Vehicles
             const [vehicles] = await db.query(
                 `SELECT vb.*, vb.vb_date as booking_date, v.vehicle_type, v.vehicle_number, v.vehicle_price_per_day 
-                 FROM vehiclebooking vb 
+                 FROM hirevehicle vb 
                  JOIN vehicle v ON vb.vehicle_id = v.vehicle_id 
                  WHERE vb.rb_id IN (?)`,
                 [activeRoomIds]
@@ -157,6 +157,30 @@ exports.getGroupedBookings = async (req, res) => {
             vehicles.forEach(veh => {
                 if (groupedMap.has(veh.rb_id)) {
                     groupedMap.get(veh.rb_id).vehicles.push(veh);
+                }
+            });
+
+            // 3.5 Fetch linked Arrival Transports
+            const [arrivals] = await db.query(
+                `SELECT ha.*, ha.scheduled_at as booking_date, ha.vehicle_type_requested as vehicle_type, 
+                        v.vehicle_number, v.vehicle_price_per_day
+                 FROM hire_vehicle_for_arrival ha
+                 LEFT JOIN vehicle v ON ha.vehicle_id = v.vehicle_id 
+                 WHERE ha.rb_id IN (?)`,
+                [activeRoomIds]
+            );
+
+            arrivals.forEach(arr => {
+                if (groupedMap.has(arr.rb_id)) {
+                    groupedMap.get(arr.rb_id).vehicles.push({
+                        ...arr,
+                        isArrivalTransport: true,
+                        // map status fields for UI consistency
+                        vb_status: arr.payment_status === 'Paid' ? 'Confirmed' : (arr.driver_id ? 'Pending Payment' : 'Pending Approval'),
+                        vb_id: arr.transport_id, // map PK for common handling
+                        vehicle_price_per_day: arr.final_amount,
+                        vb_days: 1
+                    });
                 }
             });
 
@@ -176,7 +200,7 @@ exports.getGroupedBookings = async (req, res) => {
                 [activeRoomIds]
             );
 
-             // Group items internally first
+            // Group items internally first
             const ordersMap = new Map();
             foodOrderRows.forEach(row => {
                 if (!ordersMap.has(row.order_id)) {
@@ -206,6 +230,25 @@ exports.getGroupedBookings = async (req, res) => {
             finalOrders.forEach(order => {
                 if (groupedMap.has(order.rb_id)) {
                     groupedMap.get(order.rb_id).foodOrders.push(order);
+                }
+            });
+            // 5. Fetch linked Quick Rides
+            const [quickRides] = await db.query(
+                `SELECT qr.*, v.vehicle_number, v.vehicle_type as veh_type,
+                        CONCAT(u.first_name, ' ', u.last_name) as driver_name
+                 FROM quickride qr
+                 LEFT JOIN vehicle v ON qr.vehicle_id = v.vehicle_id
+                 LEFT JOIN Driver d ON qr.driver_id = d.driver_id
+                 LEFT JOIN Users u ON d.user_id = u.user_id
+                 WHERE qr.rb_id IN (?)
+                 ORDER BY qr.created_at DESC`,
+                [activeRoomIds]
+            );
+
+            quickRides.forEach(qr => {
+                if (groupedMap.has(qr.rb_id)) {
+                    groupedMap.get(qr.rb_id).quickRides = groupedMap.get(qr.rb_id).quickRides || [];
+                    groupedMap.get(qr.rb_id).quickRides.push(qr);
                 }
             });
         }
@@ -301,6 +344,88 @@ exports.cancelRoomBooking = async (req, res) => {
     }
 };
 
+// Cancel Activity Booking
+exports.cancelActivityBooking = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const [bookings] = await db.query(
+            'SELECT * FROM activitybooking WHERE ab_id = ? AND guest_id = (SELECT guest_id FROM Guest WHERE user_id = ?)',
+            [id, req.user.id]
+        );
+        if (bookings.length === 0) return res.status(404).json({ error: 'Activity booking not found' });
+
+        await db.query('UPDATE activitybooking SET ab_status = "Cancelled" WHERE ab_id = ?', [id]);
+        
+        res.json({ message: 'Activity cancelled successfully.' });
+    } catch (error) {
+        console.error('Cancel Activity Error:', error);
+        res.status(500).json({ error: 'Failed to cancel activity' });
+    }
+};
+
+// Cancel Food Order
+exports.cancelFoodOrder = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const [orders] = await db.query(
+            'SELECT * FROM foodorder WHERE order_id = ? AND guest_id = (SELECT guest_id FROM Guest WHERE user_id = ?)',
+            [id, req.user.id]
+        );
+        if (orders.length === 0) return res.status(404).json({ error: 'Food order not found' });
+
+        const order = orders[0];
+        if (['Preparing', 'Prepared', 'Delivered'].includes(order.order_status)) {
+            return res.status(400).json({ error: `Cannot cancel an order that is already ${order.order_status.toLowerCase()}` });
+        }
+
+        await db.query('UPDATE foodorder SET order_status = "Cancelled" WHERE order_id = ?', [id]);
+        // Note: keeping order items statuses in sync is good practice, though not strictly required
+        await db.query('UPDATE orderitem SET item_status = "Cancelled" WHERE order_id = ?', [id]);
+
+        res.json({ message: 'Food order cancelled successfully.' });
+    } catch (error) {
+        console.error('Cancel Food Order Error:', error);
+        res.status(500).json({ error: 'Failed to cancel food order' });
+    }
+};
+
+// Cancel Food Order Item
+exports.cancelFoodOrderItem = async (req, res) => {
+    const { orderId, itemId } = req.params;
+    try {
+        const [orders] = await db.query(
+            'SELECT fo.*, oi.item_status FROM foodorder fo JOIN orderitem oi ON fo.order_id = oi.order_id WHERE fo.order_id = ? AND oi.order_item_id = ? AND fo.guest_id = (SELECT guest_id FROM Guest WHERE user_id = ?)',
+            [orderId, itemId, req.user.id]
+        );
+        if (orders.length === 0) return res.status(404).json({ error: 'Order item not found' });
+
+        const order = orders[0];
+        if (['Preparing', 'Prepared', 'Delivered'].includes(order.order_status)) {
+            return res.status(400).json({ error: `Cannot cancel an item for an order that is already ${order.order_status.toLowerCase()}` });
+        }
+        if (order.item_status === 'Cancelled') {
+            return res.status(400).json({ error: 'Item is already cancelled' });
+        }
+
+        await db.query('UPDATE orderitem SET item_status = "Cancelled" WHERE order_item_id = ?', [itemId]);
+
+        // Check if all items in this order are cancelled
+        const [remainingItems] = await db.query(
+            'SELECT count(*) as count FROM orderitem WHERE order_id = ? AND item_status != "Cancelled"',
+            [orderId]
+        );
+        if (remainingItems[0].count === 0) {
+            // Cancel the whole order since all items are cancelled
+            await db.query('UPDATE foodorder SET order_status = "Cancelled" WHERE order_id = ?', [orderId]);
+        }
+
+        res.json({ message: 'Food item cancelled successfully.' });
+    } catch (error) {
+        console.error('Cancel Food Item Error:', error);
+        res.status(500).json({ error: 'Failed to cancel food item' });
+    }
+};
+
 // --- Restored Functions ---
 
 // createRoomBooking removed - migrating to bookingController.js
@@ -387,7 +512,7 @@ exports.getOrders = async (req, res) => {
 
 
 
-exports.payVehicleBooking = async (req, res) => {
+exports.payhirevehicle = async (req, res) => {
     try {
         const { id } = req.params; // vb_id
         const { total_amount } = req.body;
@@ -399,7 +524,7 @@ exports.payVehicleBooking = async (req, res) => {
 
             // Verify booking
             const [booking] = await connection.query(
-                `SELECT vb.* FROM vehiclebooking vb 
+                `SELECT vb.* FROM hirevehicle vb 
                  JOIN Guest g ON vb.guest_id = g.guest_id 
                  JOIN Users u ON g.user_id = u.user_id
                  WHERE vb.vb_id = ? AND u.user_id = ? AND vb.vb_status = 'Pending Payment'`,
@@ -420,14 +545,14 @@ exports.payVehicleBooking = async (req, res) => {
 
             // Update Booking
             await connection.query(
-                "UPDATE vehiclebooking SET vb_payment_id = ?, vb_status = 'Confirmed' WHERE vb_id = ?",
+                "UPDATE hirevehicle SET vb_payment_id = ?, vb_status = 'Confirmed' WHERE vb_id = ?",
                 [paymentId, id]
             );
 
             // Notify Driver
             const [driverUser] = await connection.query(
                 `SELECT u.user_id 
-                 FROM vehiclebooking vb 
+                 FROM hirevehicle vb 
                  JOIN Driver d ON vb.driver_id = d.driver_id 
                  JOIN Users u ON d.user_id = u.user_id 
                  WHERE vb.vb_id = ?`,
@@ -453,6 +578,72 @@ exports.payVehicleBooking = async (req, res) => {
         }
     } catch (error) {
         console.error('Error paying for booking:', error);
+        res.status(500).json({ error: 'Payment failed' });
+    }
+};
+
+exports.payArrivalTransport = async (req, res) => {
+    try {
+        const { id } = req.params; // transport_id
+        const { total_amount } = req.body;
+        const userId = req.user.id;
+
+        const connection = await db.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            // Verify booking
+            const [booking] = await connection.query(
+                `SELECT ha.* FROM hire_vehicle_for_arrival ha
+                 JOIN Guest g ON ha.guest_id = g.guest_id 
+                 WHERE ha.transport_id = ? AND g.user_id = ? AND ha.payment_status = 'Pending'`,
+                [id, userId]
+            );
+
+            if (booking.length === 0) {
+                await connection.rollback();
+                return res.status(404).json({ error: 'Transport request not found or already paid' });
+            }
+
+            // Create Payment
+            const [paymentResult] = await connection.query(
+                'INSERT INTO payment (payment_amount, payment_status) VALUES (?, ?)',
+                [total_amount, 'Success']
+            );
+            
+            // Update Arrival Transport
+            await connection.query(
+                "UPDATE hire_vehicle_for_arrival SET payment_status = 'Paid', status = 'Accepted' WHERE transport_id = ?",
+                [id]
+            );
+
+            // Notify Driver
+            if (booking[0].driver_id) {
+                const [driverUser] = await connection.query(
+                    `SELECT user_id FROM Driver WHERE driver_id = ?`,
+                    [booking[0].driver_id]
+                );
+
+                if (driverUser.length > 0) {
+                    await notificationController.createNotification(
+                        driverUser[0].user_id,
+                        'Arrival Transport Confirmed',
+                        `Payment received for arrival transport #${id}. Please be ready for pickup.`,
+                        'Booking'
+                    );
+                }
+            }
+
+            await connection.commit();
+            res.json({ message: 'Payment successful! Arrival transport confirmed.' });
+        } catch (err) {
+            await connection.rollback();
+            throw err;
+        } finally {
+            connection.release();
+        }
+    } catch (error) {
+        console.error('Error paying for arrival transport:', error);
         res.status(500).json({ error: 'Payment failed' });
     }
 };

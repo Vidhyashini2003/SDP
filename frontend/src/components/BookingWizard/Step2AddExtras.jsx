@@ -140,7 +140,42 @@ const Step2AddExtras = ({
 
     // Activity functions
     const addActivity = (activity, date, slot) => {
-// ... (previous addActivity logic)
+        if (!activity || !date || !slot) {
+            alert('Please select an activity, date and time slot');
+            return;
+        }
+
+        // Check if this activity+date+slot is already booked
+        const alreadyAdded = bookingData.activities.some(
+            a => a.activity_id === activity.activity_id &&
+                 a.start_time === `${date}T${slot}:00`
+        );
+        if (alreadyAdded) {
+            alert('This activity is already added for this time slot');
+            return;
+        }
+
+        // Build start/end datetime (1 hour session)
+        const start_time = `${date}T${slot}:00`;
+        const [hours, minutes] = slot.split(':').map(Number);
+        const endHour = String(hours + 1).padStart(2, '0');
+        const end_time = `${date}T${endHour}:${String(minutes).padStart(2, '0')}:00`;
+
+        const price = parseFloat(activity.activity_price_per_hour) || 0;
+
+        setBookingData({
+            ...bookingData,
+            activities: [
+                ...bookingData.activities,
+                {
+                    activity_id: activity.activity_id,
+                    name: activity.activity_name,
+                    start_time,
+                    end_time,
+                    price
+                }
+            ]
+        });
     };
 
     const removeActivity = (index) => {
@@ -151,14 +186,20 @@ const Step2AddExtras = ({
     };
 
     // Vehicle functions
-    const selectVehicle = (vehicle) => {
+    const selectVehicle = (vehicle, date) => {
+        const start = new Date(date || bookingData.checkIn);
+        const end = new Date(bookingData.checkOut);
+        let calculatedDays = 1;
+        if (end > start) {
+            calculatedDays = Math.ceil(Math.abs(end - start) / (1000 * 60 * 60 * 24));
+        }
         setBookingData({
             ...bookingData,
             vehicle: {
                 vehicle_id: vehicle.vehicle_id,
                 type: vehicle.vehicle_type,
-                date: bookingData.checkIn,
-                days: bookingData.nights,
+                date: date || bookingData.checkIn,
+                days: calculatedDays,
                 price: vehicle.vehicle_price_per_day
             }
         });
@@ -255,6 +296,7 @@ const Step2AddExtras = ({
                             <VehicleTab
                                 availableVehicles={availableVehicles}
                                 bookingData={bookingData}
+                                setBookingData={setBookingData}
                                 selectVehicle={selectVehicle}
                                 removeVehicle={removeVehicle}
                             />
@@ -399,6 +441,7 @@ const FoodTab = ({ categorizeMenu, bookingData, addFoodItem, removeFoodItem, upd
         const dates = [];
         let curr = new Date(startDate);
         const last = new Date(endDate);
+        // Include checkout date — guests may order meals (e.g. breakfast) on departure day
         while (curr <= last) {
             dates.push(new Date(curr).toISOString().split('T')[0]);
             curr.setDate(curr.getDate() + 1);
@@ -518,7 +561,40 @@ const ActivitiesTab = ({ availableActivities, bookingData, addActivity, removeAc
     const [selectedAct, setSelectedAct] = useState(null);
     const [actDate, setActDate] = useState(bookingData.checkIn);
     const [actSlot, setActSlot] = useState('');
+    const [slotAvailability, setSlotAvailability] = useState([]); // [{time, isBooked}]
+    const [loadingSlots, setLoadingSlots] = useState(false);
+
     const timeSlots = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+
+    // Fetch slot availability whenever activity or date changes
+    useEffect(() => {
+        if (!selectedAct || !actDate) {
+            setSlotAvailability([]);
+            setActSlot('');
+            return;
+        }
+        const fetchSlots = async () => {
+            setLoadingSlots(true);
+            setActSlot(''); // reset selected slot when activity/date changes
+            try {
+                const res = await axios.get('/api/bookings/activities/slots', {
+                    params: { activity_id: selectedAct.activity_id, date: actDate }
+                });
+                setSlotAvailability(res.data || []);
+            } catch (err) {
+                console.error('Failed to fetch slots:', err);
+                setSlotAvailability([]);
+            } finally {
+                setLoadingSlots(false);
+            }
+        };
+        fetchSlots();
+    }, [selectedAct, actDate]);
+
+    const isSlotBooked = (slot) => {
+        const found = slotAvailability.find(s => s.time === slot);
+        return found ? found.isBooked : false;
+    };
 
     return (
         <div className="animate-in fade-in slide-in-from-left-4 duration-500 space-y-8">
@@ -561,17 +637,44 @@ const ActivitiesTab = ({ availableActivities, bookingData, addActivity, removeAc
                                 max={bookingData.checkOut}
                                 className="w-full p-4 rounded-2xl bg-slate-50 border border-slate-100 font-bold text-slate-700 outline-none focus:ring-2 focus:ring-gold-500/20"
                             />
-                            <div className="grid grid-cols-3 gap-2">
-                                {timeSlots.map(slot => (
-                                    <button 
-                                        key={slot} 
-                                        onClick={() => setActSlot(slot)}
-                                        className={`p-3 rounded-xl border text-[10px] font-black transition-all ${actSlot === slot ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-400 hover:border-gold-200'}`}
-                                    >
-                                        {slot}
-                                    </button>
-                                ))}
-                            </div>
+
+                            {/* Slot grid with availability */}
+                            {loadingSlots ? (
+                                <div className="flex items-center justify-center py-6 text-slate-400 text-xs font-bold">
+                                    Loading availability...
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-3 gap-2">
+                                    {timeSlots.map(slot => {
+                                        const booked = isSlotBooked(slot);
+                                        const selected = actSlot === slot;
+                                        return (
+                                            <button 
+                                                key={slot} 
+                                                onClick={() => !booked && setActSlot(slot)}
+                                                disabled={booked}
+                                                title={booked ? 'Already booked' : slot}
+                                                className={`p-3 rounded-xl border text-[10px] font-black transition-all relative flex flex-col items-center gap-0.5
+                                                    ${booked
+                                                        ? 'bg-red-50 border-red-200 text-red-400 cursor-not-allowed opacity-70'
+                                                        : selected
+                                                            ? 'bg-slate-900 text-white shadow-lg border-slate-900'
+                                                            : 'bg-white text-slate-400 hover:border-gold-200'
+                                                    }`}
+                                            >
+                                                <span>{slot}</span>
+                                                {booked && (
+                                                    <span className="text-[8px] font-black text-red-400 uppercase tracking-wide leading-none">Unavailable</span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            {!selectedAct && (
+                                <p className="text-[10px] text-slate-400 text-center">Select an activity first to see availability</p>
+                            )}
                         </div>
                         <button 
                             onClick={() => { addActivity(selectedAct, actDate, actSlot); setActSlot(''); }}
@@ -587,49 +690,384 @@ const ActivitiesTab = ({ availableActivities, bookingData, addActivity, removeAc
     );
 };
 
-const VehicleTab = ({ availableVehicles, bookingData, selectVehicle, removeVehicle }) => {
+const VehicleTab = ({ availableVehicles, bookingData, setBookingData, selectVehicle, removeVehicle }) => {
+
+    const [vehicleSubTab, setVehicleSubTab] = useState('arrival');
+    const [hireStartDate, setHireStartDate] = useState(bookingData.checkIn || '');
+
+    const getCalculatedDays = () => {
+        if (!hireStartDate || !bookingData.checkOut) return bookingData.nights || 1;
+        const start = new Date(hireStartDate);
+        const end = new Date(bookingData.checkOut);
+        if (end <= start) return 1;
+        return Math.ceil(Math.abs(end - start) / (1000 * 60 * 60 * 24));
+    };
+    const calculatedDays = getCalculatedDays();
+
+    // Arrival Transport state
+    const [arrivalForm, setArrivalForm] = useState({
+        pickup_location: '',
+        custom_pickup_location: '',
+        arrival_date: bookingData.checkIn || '',
+        arrival_time: '',
+        flight_train_number: '',
+        num_passengers: 1,
+        vehicle_type_requested: '',
+        notes: ''
+    });
+    const [arrivalSuccess, setArrivalSuccess] = useState(null);
+
+    const pickupLocations = [
+        'Colombo Airport (BIA)',
+        'Katunayake Airport',
+        'Colombo Fort Railway Station',
+        'Kandy Railway Station',
+        'Galle Bus Stand',
+        'Matara Bus Stand',
+        'Port of Colombo',
+        'Other'
+    ];
+
+    const vehicleTypes = [...new Set(availableVehicles.map(v => v.vehicle_type))];
+
+    const handleArrivalSubmit = (e) => {
+        e.preventDefault();
+        if (!arrivalForm.pickup_location || !arrivalForm.arrival_date || !arrivalForm.arrival_time) {
+            alert('Please fill in pickup location, arrival date and time.');
+            return;
+        }
+        if (arrivalForm.pickup_location === 'Other' && !arrivalForm.custom_pickup_location) {
+            alert('Please specify the custom pickup location.');
+            return;
+        }
+
+        const scheduled_at = `${arrivalForm.arrival_date}T${arrivalForm.arrival_time}:00`;
+        const finalPickupLocation = arrivalForm.pickup_location === 'Other' ? arrivalForm.custom_pickup_location : arrivalForm.pickup_location;
+
+        // Calculate estimated price locally
+        let estimatedPrice = 0;
+        if (arrivalForm.vehicle_type_requested) {
+            const v = availableVehicles.find(v => v.vehicle_type === arrivalForm.vehicle_type_requested);
+            if (v) estimatedPrice = parseFloat(v.vehicle_price_per_day);
+        }
+
+        setBookingData({
+            ...bookingData,
+            arrivalTransport: {
+                pickup_location: finalPickupLocation,
+                scheduled_at,
+                flight_train_number: arrivalForm.flight_train_number || null,
+                num_passengers: arrivalForm.num_passengers,
+                vehicle_type_requested: arrivalForm.vehicle_type_requested || null,
+                notes: arrivalForm.notes || null,
+                estimatedPrice
+            }
+        });
+
+        // Reset local form state
+        setArrivalForm({
+            pickup_location: '',
+            custom_pickup_location: '',
+            arrival_date: bookingData.checkIn || '',
+            arrival_time: '',
+            flight_train_number: '',
+            num_passengers: 1,
+            vehicle_type_requested: '',
+            notes: ''
+        });
+    };
+
     return (
         <div className="animate-in fade-in slide-in-from-left-4 duration-500 space-y-6">
-            <h4 className="text-slate-400 text-xs font-black uppercase tracking-widest leading-none mb-1">Pick your ride</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {availableVehicles.map(v => (
-                    <div
-                        key={v.vehicle_id}
-                        onClick={() => selectVehicle(v)}
-                        className={`group rounded-[2rem] border transition-all cursor-pointer overflow-hidden ${bookingData.vehicle?.vehicle_id === v.vehicle_id ? 'border-gold-500 bg-gold-50 shadow-xl shadow-gold-50' : 'border-slate-100 hover:border-gold-200 bg-white'}`}
-                    >
-                        {/* Vehicle Image */}
-                        {v.vehicle_image ? (
-                            <img
-                                src={v.vehicle_image.startsWith('/') ? `${axios.defaults.baseURL}${v.vehicle_image}` : v.vehicle_image}
-                                alt={v.vehicle_type}
-                                className="w-full h-36 object-cover group-hover:scale-105 transition-transform duration-500"
-                            />
+            {/* Sub-tab navigation */}
+            <div className="flex rounded-2xl bg-slate-100 p-1.5 gap-1">
+                <button
+                    onClick={() => setVehicleSubTab('arrival')}
+                    className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${vehicleSubTab === 'arrival' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                    ✈️ Arrival Transport
+                </button>
+                <button
+                    onClick={() => setVehicleSubTab('hire')}
+                    className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${vehicleSubTab === 'hire' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                    🚗 Hire Vehicle
+                </button>
+            </div>
+
+            {/* === ARRIVAL TRANSPORT === */}
+            {vehicleSubTab === 'arrival' && (
+                <div className="space-y-6">
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-xl">✈️</div>
+                            <div>
+                                <h4 className="font-bold text-slate-900">Arrival Transfer</h4>
+                                <p className="text-xs text-slate-500">Request a pickup from airport, station or port to the hotel</p>
+                            </div>
+                        </div>
+
+                        {bookingData.arrivalTransport ? (
+                            <div className="bg-green-50 border border-green-200 rounded-2xl p-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center text-xl">✅</div>
+                                        <div>
+                                            <h4 className="font-bold text-green-800">Transport Scheduled</h4>
+                                            <p className="text-xs text-green-600">This will be confirmed with your room booking</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => setBookingData({...bookingData, arrivalTransport: null})}
+                                        className="text-[10px] font-black text-red-500 uppercase tracking-widest hover:bg-red-50 px-3 py-1 rounded-lg transition-colors border border-red-100"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
+                                
+                                <div className="space-y-3 bg-white/50 rounded-xl p-4 border border-green-100">
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-slate-500 font-bold uppercase tracking-widest">Pickup From</span>
+                                        <span className="text-slate-900 font-bold">{bookingData.arrivalTransport.pickup_location}</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-slate-500 font-bold uppercase tracking-widest">Date & Time</span>
+                                        <span className="text-slate-900 font-bold">
+                                            {new Date(bookingData.arrivalTransport.scheduled_at).toLocaleDateString()} at {new Date(bookingData.arrivalTransport.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-slate-500 font-bold uppercase tracking-widest">Vehicle Type</span>
+                                        <span className="text-slate-900 font-bold">{bookingData.arrivalTransport.vehicle_type_requested || 'Any Available'}</span>
+                                    </div>
+                                    {bookingData.arrivalTransport.estimatedPrice > 0 && (
+                                        <div className="pt-2 border-t border-green-100 mt-2 flex justify-between items-center">
+                                            <span className="text-slate-500 font-bold uppercase tracking-widest">Est. Charge</span>
+                                            <span className="text-gold-600 font-black text-lg">Rs. {bookingData.arrivalTransport.estimatedPrice.toLocaleString()}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         ) : (
-                            <div className="w-full h-36 bg-slate-50 flex items-center justify-center text-5xl group-hover:scale-110 transition-transform">
-                                {v.vehicle_type === 'Car' ? '🚗' : v.vehicle_type === 'Bike' ? '🏍️' : '🚐'}
-                            </div>
+                            <form onSubmit={handleArrivalSubmit} className="space-y-4">
+                                {/* Pickup Location */}
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Pickup Location</label>
+                                    <select
+                                        value={arrivalForm.pickup_location}
+                                        onChange={e => setArrivalForm({...arrivalForm, pickup_location: e.target.value})}
+                                        required
+                                        className="w-full p-3 rounded-xl bg-white border border-slate-200 font-medium text-slate-800 text-sm outline-none focus:ring-2 focus:ring-gold-500/30"
+                                    >
+                                        <option value="">Select pickup location</option>
+                                        {pickupLocations.map(loc => (
+                                            <option key={loc} value={loc}>{loc}</option>
+                                        ))}
+                                    </select>
+                                    {arrivalForm.pickup_location === 'Other' && (
+                                        <div className="mt-3">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Add Pickup Location</label>
+                                            <input
+                                                type="text"
+                                                value={arrivalForm.custom_pickup_location}
+                                                onChange={e => setArrivalForm({...arrivalForm, custom_pickup_location: e.target.value})}
+                                                placeholder="Enter pickup location"
+                                                required={arrivalForm.pickup_location === 'Other'}
+                                                className="w-full p-3 rounded-xl bg-white border border-slate-200 font-medium text-slate-800 text-sm outline-none focus:ring-2 focus:ring-gold-500/30"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Date & Time */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Arrival Date</label>
+                                        <input
+                                            type="date"
+                                            value={arrivalForm.arrival_date}
+                                            onChange={e => setArrivalForm({...arrivalForm, arrival_date: e.target.value})}
+                                            required
+                                            className="w-full p-3 rounded-xl bg-white border border-slate-200 font-medium text-slate-800 text-sm outline-none focus:ring-2 focus:ring-gold-500/30"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Arrival Time</label>
+                                        <input
+                                            type="time"
+                                            value={arrivalForm.arrival_time}
+                                            onChange={e => setArrivalForm({...arrivalForm, arrival_time: e.target.value})}
+                                            required
+                                            className="w-full p-3 rounded-xl bg-white border border-slate-200 font-medium text-slate-800 text-sm outline-none focus:ring-2 focus:ring-gold-500/30"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Flight / Train Number & Passengers */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Flight / Train No.</label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. UL 101"
+                                            value={arrivalForm.flight_train_number}
+                                            onChange={e => setArrivalForm({...arrivalForm, flight_train_number: e.target.value})}
+                                            className="w-full p-3 rounded-xl bg-white border border-slate-200 font-medium text-slate-800 text-sm outline-none focus:ring-2 focus:ring-gold-500/30"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">No. of Passengers</label>
+                                        <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl p-2">
+                                            <button type="button" onClick={() => setArrivalForm({...arrivalForm, num_passengers: Math.max(1, arrivalForm.num_passengers - 1)})} className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 font-bold text-slate-700">-</button>
+                                            <span className="flex-1 text-center font-bold text-slate-900">{arrivalForm.num_passengers}</span>
+                                            <button type="button" onClick={() => setArrivalForm({...arrivalForm, num_passengers: Math.min(20, arrivalForm.num_passengers + 1)})} className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 font-bold text-slate-700">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Vehicle Type (optional) */}
+                                {vehicleTypes.length > 0 && (
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Vehicle Type Preference <span className="text-slate-300">(optional)</span></label>
+                                        <div className="flex flex-wrap gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setArrivalForm({...arrivalForm, vehicle_type_requested: ''})}
+                                                className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${!arrivalForm.vehicle_type_requested ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'}`}
+                                            >
+                                                Any
+                                            </button>
+                                            {vehicleTypes.map(type => (
+                                                <button
+                                                    type="button"
+                                                    key={type}
+                                                    onClick={() => setArrivalForm({...arrivalForm, vehicle_type_requested: type})}
+                                                    className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${arrivalForm.vehicle_type_requested === type ? 'bg-gold-500 text-white border-gold-500' : 'bg-white text-slate-500 border-slate-200 hover:border-gold-300'}`}
+                                                >
+                                                    {type}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {arrivalForm.vehicle_type_requested && (() => {
+                                            const v = availableVehicles.find(v => v.vehicle_type === arrivalForm.vehicle_type_requested);
+                                            return v ? (
+                                                <p className="text-xs text-gold-600 font-bold mt-2">
+                                                    Estimated charge: Rs. {parseFloat(v.vehicle_price_per_day).toLocaleString()} (vehicle rate)
+                                                </p>
+                                            ) : null;
+                                        })()}
+                                    </div>
+                                )}
+
+                                {/* Notes */}
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Special Notes <span className="text-slate-300">(optional)</span></label>
+                                    <textarea
+                                        value={arrivalForm.notes}
+                                        onChange={e => setArrivalForm({...arrivalForm, notes: e.target.value})}
+                                        placeholder="e.g. I have extra luggage, need child seat..."
+                                        rows={2}
+                                        className="w-full p-3 rounded-xl bg-white border border-slate-200 font-medium text-slate-800 text-sm outline-none focus:ring-2 focus:ring-gold-500/30 resize-none"
+                                    />
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    className="w-full py-4 bg-gold-500 hover:bg-gold-600 text-white font-black rounded-xl shadow-xl shadow-gold-100 transition-all transform active:scale-95"
+                                >
+                                    ✈️ Add Arrival Transfer
+                                </button>
+                            </form>
                         )}
-                        <div className="p-6">
-                            <div className="flex justify-between items-start mb-4">
-                                <h4 className="text-xl font-black text-slate-900 group-hover:text-gold-600 transition-colors uppercase tracking-tight">{v.vehicle_type}</h4>
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl transition-all ${bookingData.vehicle?.vehicle_id === v.vehicle_id ? 'bg-gold-500 text-white' : 'bg-slate-100 text-slate-300'}`}>✓</div>
+                    </div>
+                </div>
+            )}
+
+            {/* === HIRE VEHICLE === */}
+            {vehicleSubTab === 'hire' && (
+                <div className="space-y-6">
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-xl">🚗</div>
+                            <div className="flex-1">
+                                <h4 className="font-bold text-slate-900">Hire Vehicle Per Day</h4>
+                                <p className="text-xs text-slate-500">
+                                    Hire a vehicle for {calculatedDays} day(s) — travel anywhere freely during your stay
+                                </p>
                             </div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Plate: {v.vehicle_number}</p>
-                            <div className="pt-4 border-t border-slate-100 flex justify-between items-end">
-                                <div className="flex flex-col">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-2">Daily</span>
-                                    <span className="text-lg font-black text-slate-900 tracking-tighter">Rs. {v.vehicle_price_per_day.toLocaleString()}</span>
-                                </div>
-                                <div className="text-right flex flex-col items-end">
-                                    <span className="text-[10px] font-black text-gold-500 uppercase tracking-widest leading-none mb-2">Total ({bookingData.nights} d)</span>
-                                    <span className="text-sm font-bold text-slate-400">Rs. {(v.vehicle_price_per_day * bookingData.nights).toLocaleString()}</span>
-                                </div>
+                            <div className="flex flex-col text-right">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Starting Date</label>
+                                <input
+                                    type="date"
+                                    value={hireStartDate}
+                                    onChange={e => setHireStartDate(e.target.value)}
+                                    min={bookingData.checkIn}
+                                    max={bookingData.checkOut}
+                                    className="p-2 w-32 rounded-xl bg-white border border-slate-200 font-medium text-slate-800 text-xs outline-none focus:ring-2 focus:ring-gold-500/30"
+                                />
                             </div>
                         </div>
                     </div>
-                ))}
-            </div>
+
+                    <h4 className="text-slate-400 text-xs font-black uppercase tracking-widest leading-none">Pick your vehicle</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {availableVehicles.map(v => (
+                            <div
+                                key={v.vehicle_id}
+                                className={`group rounded-[2rem] border transition-all overflow-hidden flex flex-col ${bookingData.vehicle?.vehicle_id === v.vehicle_id ? 'border-gold-500 bg-gold-50 shadow-xl shadow-gold-50' : 'border-slate-100 hover:border-gold-200 bg-white'}`}
+                            >
+                                {v.vehicle_image ? (
+                                    <img
+                                        src={v.vehicle_image.startsWith('/') ? `${axios.defaults.baseURL}${v.vehicle_image}` : v.vehicle_image}
+                                        alt={v.vehicle_type}
+                                        className="w-full h-36 object-cover group-hover:scale-105 transition-transform duration-500"
+                                    />
+                                ) : (
+                                    <div className="w-full h-36 bg-slate-50 flex items-center justify-center text-5xl group-hover:scale-110 transition-transform">
+                                        {v.vehicle_type === 'Car' ? '🚗' : v.vehicle_type === 'Bike' ? '🏍️' : '🚐'}
+                                    </div>
+                                )}
+                                <div className="p-6 flex-1 flex flex-col">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <h4 className="text-xl font-black text-slate-900 group-hover:text-gold-600 transition-colors uppercase tracking-tight">{v.vehicle_type}</h4>
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl transition-all ${bookingData.vehicle?.vehicle_id === v.vehicle_id ? 'bg-gold-500 text-white' : 'bg-slate-100 text-slate-300'}`}>✓</div>
+                                    </div>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Plate: {v.vehicle_number}</p>
+                                    
+                                    <div className="pt-4 border-t border-slate-100 flex justify-between items-end mb-6">
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-2">Daily Rate</span>
+                                            <span className="text-lg font-black text-slate-900 tracking-tighter">Rs. {v.vehicle_price_per_day.toLocaleString()}</span>
+                                        </div>
+                                        <div className="text-right flex flex-col items-end">
+                                            <span className="text-[10px] font-black text-gold-500 uppercase tracking-widest leading-none mb-2">Total ({calculatedDays} d)</span>
+                                            <span className="text-sm font-bold text-slate-400">Rs. {(v.vehicle_price_per_day * calculatedDays).toLocaleString()}</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-auto">
+                                        {bookingData.vehicle?.vehicle_id === v.vehicle_id ? (
+                                            <button 
+                                                onClick={() => removeVehicle()}
+                                                className="w-full py-3 bg-red-50 text-red-600 font-black rounded-xl text-[10px] uppercase tracking-widest border border-red-100 hover:bg-red-100 transition-all"
+                                            >
+                                                ✕ Remove Selection
+                                            </button>
+                                        ) : (
+                                            <button 
+                                                onClick={() => selectVehicle(v, hireStartDate)}
+                                                className="w-full py-3 bg-slate-900 text-white font-black rounded-xl text-[10px] uppercase tracking-widest shadow-xl shadow-slate-900/10 hover:bg-gold-500 transition-all transform active:scale-95"
+                                            >
+                                                🚗 Add Hire Vehicle
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

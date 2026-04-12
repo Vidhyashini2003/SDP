@@ -30,6 +30,14 @@ const ActivityBooking = () => {
         fetchData();
     }, []);
 
+    const toLocalDateStr = (d) => {
+        const date = new Date(d);
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    };
+
     const fetchData = async () => {
         try {
             const [activitiesRes, activeBookingsRes] = await Promise.all([
@@ -96,10 +104,14 @@ const ActivityBooking = () => {
             const duration = parseInt(selectedActivity.activity_duration) || 1;
             const endTime = new Date(startTime.getTime() + (duration * 60 * 60 * 1000));
 
+            const formatLocal = (d) => {
+                return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:00`;
+            };
+
             const payload = {
                 activity_id: selectedActivity.activity_id,
-                start_time: startTime.toISOString().replace('T', ' ').substring(0, 19),
-                end_time: endTime.toISOString().replace('T', ' ').substring(0, 19),
+                start_time: formatLocal(startTime),
+                end_time: formatLocal(endTime),
                 total_amount: paymentAmount,
                 rb_id: urlLinkedRbId || selectedBooking || activeBookings[0]?.rb_id
             };
@@ -123,7 +135,7 @@ const ActivityBooking = () => {
         }
     };
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = toLocalDateStr(new Date());
     const currentLinkedBookingKey = urlLinkedRbId ? parseInt(urlLinkedRbId, 10) : selectedBooking;
     const currentLinkedBooking = activeBookings.find(b => b.rb_id === currentLinkedBookingKey);
     
@@ -131,8 +143,8 @@ const ActivityBooking = () => {
     let maxDate = '';
 
     if (currentLinkedBooking) {
-        const checkIn = new Date(currentLinkedBooking.rb_checkin).toISOString().split('T')[0];
-        const checkOut = new Date(currentLinkedBooking.rb_checkout).toISOString().split('T')[0];
+        const checkIn = toLocalDateStr(new Date(currentLinkedBooking.check_in_date));
+        const checkOut = toLocalDateStr(new Date(currentLinkedBooking.check_out_date));
         minDate = checkIn > today ? checkIn : today;
         maxDate = checkOut;
     }
@@ -177,7 +189,7 @@ const ActivityBooking = () => {
                 {activeBookings.length > 0 && !urlLinkedRbId && (
                     <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg inline-block">
                         <p className="text-sm text-slate-700">
-                            <span className="font-medium">📌 Linked to:</span> {activeBookings.find(b => b.rb_id === selectedBooking)?.room_type || 'Selected Booking'} ({new Date(activeBookings.find(b => b.rb_id === selectedBooking)?.rb_checkin).toLocaleDateString()} - {new Date(activeBookings.find(b => b.rb_id === selectedBooking)?.rb_checkout).toLocaleDateString()})
+                            <span className="font-medium">📌 Linked to:</span> {activeBookings.find(b => b.rb_id === selectedBooking)?.room_type || 'Selected Booking'} ({new Date(activeBookings.find(b => b.rb_id === selectedBooking)?.check_in_date).toLocaleDateString()} - {new Date(activeBookings.find(b => b.rb_id === selectedBooking)?.check_out_date).toLocaleDateString()})
                         </p>
                         {activeBookings.length > 1 && (
                             <select

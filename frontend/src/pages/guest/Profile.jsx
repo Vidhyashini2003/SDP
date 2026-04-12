@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import axios from '../../config/axios';
+import { useAuth } from '../../context/AuthContext';
 
 const Profile = () => {
+    const { updateUser } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
     const [profileData, setProfileData] = useState({
         first_name: '',
@@ -44,6 +46,11 @@ const Profile = () => {
         try {
             await axios.put('/api/guest/profile', profileData);
             setOriginalData(profileData);
+            updateUser({
+                name: `${profileData.first_name} ${profileData.last_name}`.trim(),
+                first_name: profileData.first_name,
+                last_name: profileData.last_name
+            });
             setIsEditing(false);
             alert('Profile updated successfully!');
         } catch (error) {

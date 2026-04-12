@@ -14,7 +14,7 @@ async function check() {
 
         let output = '';
         
-        const tables = ['foodorder', 'orderitem', 'activitybooking', 'vehiclebooking', 'roombooking'];
+        const tables = ['foodorder', 'orderitem', 'activitybooking', 'hirevehicle', 'roombooking'];
         
         for (const table of tables) {
             output += `--- ${table} columns ---\n`;

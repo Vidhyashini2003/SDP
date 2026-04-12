@@ -13,6 +13,7 @@ const ReceptionistBookings = () => {
         vehicles: []
     });
     const [loading, setLoading] = useState(true);
+    const [pendingModal, setPendingModal] = useState({ open: false, pending: null, guestName: '' });
 
     useEffect(() => {
         const fetchBookings = async () => {
@@ -64,9 +65,7 @@ const ReceptionistBookings = () => {
         return `${statusColors[status?.toLowerCase()] || 'bg-slate-500'} text-white`;
     };
 
-    const handleStatusUpdate = async (type, id, newStatus) => {
-        // Implementation for easy status updates directly from the list if needed
-        // For now, let's keep it simple or port the existing logic for rooms/activities
+    const handleStatusUpdate = async (type, id, newStatus, guestName = '') => {
         try {
             let endpoint = '';
             if (type === 'room') endpoint = `/api/receptionist/bookings/rooms/${id}/status`;
@@ -75,11 +74,19 @@ const ReceptionistBookings = () => {
             if (endpoint) {
                 await axios.put(endpoint, { status: newStatus });
                 toast.success('Status updated');
-                // Refresh logic would be ideal here
-                window.location.reload(); // Simple refresh for now
+                window.location.reload();
             }
         } catch (error) {
-            toast.error('Failed to update status');
+            // Checkout blocked by pending payments
+            if (error.response?.data?.pendingPayments) {
+                setPendingModal({
+                    open: true,
+                    pending: error.response.data.pending,
+                    guestName
+                });
+            } else {
+                toast.error('Failed to update status');
+            }
         }
     };
 
@@ -94,6 +101,7 @@ const ReceptionistBookings = () => {
     if (loading) return <div className="p-8">Loading...</div>;
 
     return (
+        <>
         <div className="p-8">
             <div className="mb-8">
                 <h1 className="text-3xl font-bold text-slate-900">Manage Bookings</h1>
@@ -257,12 +265,12 @@ const ReceptionistBookings = () => {
 
                                     <div className="mt-4 flex gap-3 justify-end">
                                         {booking.rb_status === 'Booked' && (
-                                            <button onClick={() => handleStatusUpdate('room', booking.rb_id, 'Checked-in')} className="px-4 py-2 bg-gold-600 text-white text-sm font-medium rounded-lg hover:bg-gold-700 transition-colors shadow-sm">
+                                            <button onClick={() => handleStatusUpdate('room', booking.rb_id, 'Checked-in', booking.guest_name)} className="px-4 py-2 bg-gold-600 text-white text-sm font-medium rounded-lg hover:bg-gold-700 transition-colors shadow-sm">
                                                 Check-In Guest
                                             </button>
                                         )}
                                         {booking.rb_status === 'Checked-in' && (
-                                            <button onClick={() => handleStatusUpdate('room', booking.rb_id, 'Checked-out')} className="px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors shadow-sm">
+                                            <button onClick={() => handleStatusUpdate('room', booking.rb_id, 'Checked-out', booking.guest_name)} className="px-4 py-2 bg-slate-700 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors shadow-sm">
                                                 Check-Out Guest
                                             </button>
                                         )}
@@ -406,7 +414,88 @@ const ReceptionistBookings = () => {
                 </div>
             </div>
         </div>
+        <PendingPaymentsModal modal={pendingModal} onClose={() => setPendingModal({ open: false, pending: null, guestName: '' })} />
+        </>
     );
 };
 
 export default ReceptionistBookings;
+
+// ── Pending Payments Modal (inline) ──────────────────────────────────────────
+function PendingPaymentsModal({ modal, onClose }) {
+    if (!modal.open) return null;
+    const { pending, guestName } = modal;
+
+    const total =
+        (pending.damages || []).reduce((s, d) => s + Number(d.charge_amount), 0) +
+        (pending.vehicles || []).length * 0 +
+        (pending.activities || []).length * 0 +
+        (pending.foodOrders || []).length * 0;
+
+    return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden">
+                <div className="bg-red-600 px-6 py-4">
+                    <p className="text-2xl">🚫</p>
+                    <h3 className="text-white font-bold text-lg mt-1">Cannot Check Out</h3>
+                    <p className="text-red-100 text-sm mt-1">
+                        {guestName || 'This guest'} has outstanding payments that must be settled first.
+                    </p>
+                </div>
+
+                <div className="p-6 max-h-96 overflow-y-auto space-y-4">
+                    {pending.damages?.length > 0 && (
+                        <div>
+                            <p className="font-bold text-slate-700 mb-2">⚠️ Unpaid Damage Charges</p>
+                            {pending.damages.map(d => (
+                                <div key={d.damage_id} className="flex justify-between text-sm py-2 border-b border-slate-100">
+                                    <span className="text-slate-600">{d.damage_type}: {d.description?.substring(0, 50)}</span>
+                                    <span className="font-bold text-red-600">Rs. {Number(d.charge_amount).toLocaleString()}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {pending.vehicles?.length > 0 && (
+                        <div>
+                            <p className="font-bold text-slate-700 mb-2">🚗 Unpaid Vehicle Hires</p>
+                            {pending.vehicles.map(v => (
+                                <div key={v.vb_id} className="text-sm py-2 border-b border-slate-100 text-slate-600">
+                                    {v.vehicle_type} – {v.vb_date ? new Date(v.vb_date).toLocaleDateString() : ''}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {pending.activities?.length > 0 && (
+                        <div>
+                            <p className="font-bold text-slate-700 mb-2">🏋️ Unpaid Activity Bookings</p>
+                            {pending.activities.map(a => (
+                                <div key={a.ab_id} className="text-sm py-2 border-b border-slate-100 text-slate-600">
+                                    {a.activity_name} – {a.ab_start_time ? new Date(a.ab_start_time).toLocaleDateString() : ''}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {pending.foodOrders?.length > 0 && (
+                        <div>
+                            <p className="font-bold text-slate-700 mb-2">🍽️ Unpaid Food Orders</p>
+                            {pending.foodOrders.map(f => (
+                                <div key={f.order_id} className="text-sm py-2 border-b border-slate-100 text-slate-600">
+                                    Order #{f.order_id}{f.scheduled_date ? ` – ${new Date(f.scheduled_date).toLocaleDateString()}` : ''}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="px-6 pb-6 pt-2 flex justify-end">
+                    <button
+                        onClick={onClose}
+                        className="px-6 py-2.5 bg-slate-800 text-white font-semibold rounded-xl hover:bg-slate-900 transition-all"
+                    >
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
