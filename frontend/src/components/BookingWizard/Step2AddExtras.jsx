@@ -14,7 +14,8 @@ const Step2AddExtras = ({
     setAvailableVehicles,
     onNext,
     onBack,
-    onSkip
+    onSkip,
+    isWalkIn = false
 }) => {
     const [activeTab, setActiveTab] = useState('food');
     const [selectedActivity, setSelectedActivity] = useState(null);
@@ -299,6 +300,7 @@ const Step2AddExtras = ({
                                 setBookingData={setBookingData}
                                 selectVehicle={selectVehicle}
                                 removeVehicle={removeVehicle}
+                                isWalkIn={isWalkIn}
                             />
                         )}
                     </div>
@@ -461,8 +463,8 @@ const FoodTab = ({ categorizeMenu, bookingData, addFoodItem, removeFoodItem, upd
             <div className="bg-slate-900 rounded-[2rem] p-8 text-white shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-gold-500/10 rounded-full -mr-32 -mt-32 blur-3xl"></div>
                 
-                <div className="relative z-10 flex flex-col md:flex-row gap-8 items-end">
-                    <div className="flex-1 space-y-4">
+                <div className="relative z-10 flex flex-col md:flex-row gap-x-8 gap-y-6 items-stretch md:items-end">
+                    <div className="flex-1 min-w-0 space-y-4">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Select Menu Date</label>
                         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
                             {stayDates.map(date => {
@@ -482,7 +484,7 @@ const FoodTab = ({ categorizeMenu, bookingData, addFoodItem, removeFoodItem, upd
                         </div>
                     </div>
 
-                    <div className="flex-1 space-y-4">
+                    <div className="w-full md:w-80 flex-shrink-0 space-y-4">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Meal Time</label>
                         <div className="flex bg-slate-800 p-1.5 rounded-2xl">
                             {mealTypes.map(type => (
@@ -690,9 +692,9 @@ const ActivitiesTab = ({ availableActivities, bookingData, addActivity, removeAc
     );
 };
 
-const VehicleTab = ({ availableVehicles, bookingData, setBookingData, selectVehicle, removeVehicle }) => {
+const VehicleTab = ({ availableVehicles, bookingData, setBookingData, selectVehicle, removeVehicle, isWalkIn }) => {
 
-    const [vehicleSubTab, setVehicleSubTab] = useState('arrival');
+    const [vehicleSubTab, setVehicleSubTab] = useState(isWalkIn ? 'hire' : 'arrival');
     const [hireStartDate, setHireStartDate] = useState(bookingData.checkIn || '');
 
     const getCalculatedDays = () => {
@@ -777,22 +779,45 @@ const VehicleTab = ({ availableVehicles, bookingData, setBookingData, selectVehi
         });
     };
 
+    const getMaxHireDate = () => {
+        if (!bookingData.checkOut) return '';
+        const d = new Date(bookingData.checkOut);
+        d.setDate(d.getDate() - 1);
+        return d.toISOString().split('T')[0];
+    };
+    const maxHireDate = getMaxHireDate();
+
     return (
         <div className="animate-in fade-in slide-in-from-left-4 duration-500 space-y-6">
             {/* Sub-tab navigation */}
             <div className="flex rounded-2xl bg-slate-100 p-1.5 gap-1">
-                <button
-                    onClick={() => setVehicleSubTab('arrival')}
-                    className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${vehicleSubTab === 'arrival' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-800'}`}
-                >
-                    ✈️ Arrival Transport
-                </button>
+                {!isWalkIn && (
+                    <button
+                        onClick={() => setVehicleSubTab('arrival')}
+                        className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${vehicleSubTab === 'arrival' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-800'}`}
+                    >
+                        ✈️ Arrival Transport
+                    </button>
+                )}
                 <button
                     onClick={() => setVehicleSubTab('hire')}
                     className={`flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${vehicleSubTab === 'hire' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-500 hover:text-slate-800'}`}
                 >
                     🚗 Hire Vehicle
                 </button>
+            </div>
+
+            {/* Terms & Conditions Notice */}
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex gap-4 items-center">
+                <div className="text-2xl">📜</div>
+                <div className="text-xs text-amber-900">
+                    <p className="font-bold">Vehicle Hire Terms:</p>
+                    <ul className="list-disc ml-4 mt-1 opacity-80">
+                        <li>Starting day is counted in the total number of days.</li>
+                        <li>For new room bookings, vehicle hire is not available on your checkout day.</li>
+                        <li>After checking in, you may hire a vehicle for your checkout day separately.</li>
+                    </ul>
+                </div>
             </div>
 
             {/* === ARRIVAL TRANSPORT === */}
@@ -887,6 +912,8 @@ const VehicleTab = ({ availableVehicles, bookingData, setBookingData, selectVehi
                                             type="date"
                                             value={arrivalForm.arrival_date}
                                             onChange={e => setArrivalForm({...arrivalForm, arrival_date: e.target.value})}
+                                            min={bookingData.checkIn}
+                                            max={bookingData.checkOut}
                                             required
                                             className="w-full p-3 rounded-xl bg-white border border-slate-200 font-medium text-slate-800 text-sm outline-none focus:ring-2 focus:ring-gold-500/30"
                                         />
@@ -1000,9 +1027,15 @@ const VehicleTab = ({ availableVehicles, bookingData, setBookingData, selectVehi
                                 <input
                                     type="date"
                                     value={hireStartDate}
-                                    onChange={e => setHireStartDate(e.target.value)}
+                                    onChange={e => {
+                                        if (e.target.value === bookingData.checkOut) {
+                                            alert("Vehicle hire starting on checkout day is only available after you check-in.");
+                                            return;
+                                        }
+                                        setHireStartDate(e.target.value);
+                                    }}
                                     min={bookingData.checkIn}
-                                    max={bookingData.checkOut}
+                                    max={maxHireDate}
                                     className="p-2 w-32 rounded-xl bg-white border border-slate-200 font-medium text-slate-800 text-xs outline-none focus:ring-2 focus:ring-gold-500/30"
                                 />
                             </div>

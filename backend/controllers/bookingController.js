@@ -173,18 +173,26 @@ exports.getActivitySlots = async (req, res) => {
 
 exports.createActivityBooking = async (req, res) => {
     try {
-        const { activity_id, start_time, end_time, total_amount, rb_id } = req.body;
+        const { activity_id, start_time, end_time, total_amount, rb_id, guest_id: bodyGuestId, payment_id } = req.body;
         const userId = req.user.id;
+        const isReceptionist = req.user.role === 'receptionist';
 
         const connection = await db.getConnection();
 
         try {
-            // Get Guest ID correctly
-            const [guests] = await connection.query('SELECT guest_id FROM Guest WHERE user_id = ?', [userId]);
-            if (guests.length === 0) {
-                return res.status(404).json({ error: 'Guest profile not found' });
+            // Get Guest IDs
+            let guest_id = null;
+            let wig_id = null;
+
+            if (isReceptionist && bodyGuestId) {
+                const { id, type } = bodyGuestId;
+                if (type === 'walkin') wig_id = id;
+                else guest_id = id;
+            } else {
+                const [guests] = await connection.query('SELECT guest_id FROM Guest WHERE user_id = ?', [userId]);
+                if (guests.length === 0) return res.status(404).json({ error: 'Guest profile not found' });
+                guest_id = guests[0].guest_id;
             }
-            const guest_id = guests[0].guest_id;
 
             await connection.beginTransaction();
 
@@ -192,11 +200,11 @@ exports.createActivityBooking = async (req, res) => {
             const [activeBookings] = await connection.query(
                 `SELECT rb_id, rb_checkin, rb_checkout 
                  FROM roombooking 
-                 WHERE guest_id = ? 
+                 WHERE (guest_id = ? OR wig_id = ?) 
                  AND rb_status IN ('Booked', 'Checked-in', 'Active')
                  AND rb_checkout >= CURDATE()
                  ORDER BY rb_checkin ASC`,
-                [guest_id]
+                [guest_id, wig_id]
             );
 
             if (activeBookings.length === 0) {
@@ -270,15 +278,19 @@ exports.createActivityBooking = async (req, res) => {
                 return res.status(400).json({ error: 'You already have a booking overlapping with this time slot.' });
             }
 
-            const [paymentResult] = await connection.query(
-                'INSERT INTO payment (payment_amount, payment_status) VALUES (?, ?)',
-                [total_amount, 'Success']
-            );
-            const payment_id = paymentResult.insertId;
+            let finalPaymentId = payment_id;
+
+            if (!finalPaymentId) {
+                const [paymentResult] = await connection.query(
+                    'INSERT INTO payment (payment_amount, payment_status) VALUES (?, ?)',
+                    [total_amount, 'Success']
+                );
+                finalPaymentId = paymentResult.insertId;
+            }
 
             const [bookingResult] = await connection.query(
-                'INSERT INTO activitybooking (guest_id, activity_id, ab_start_time, ab_end_time, ab_total_amount, ab_payment_id, ab_status, rb_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                [guest_id, activity_id, start_time, end_time, total_amount, payment_id, 'Reserved', linkedBookingId]
+                'INSERT INTO activitybooking (guest_id, wig_id, activity_id, ab_start_time, ab_end_time, ab_total_amount, ab_payment_id, ab_status, rb_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [guest_id, wig_id, activity_id, start_time, end_time, total_amount, finalPaymentId, 'Reserved', linkedBookingId]
             );
 
             await connection.commit();
@@ -349,8 +361,9 @@ exports.getAvailableVehicles = async (req, res) => {
 
 exports.createhirevehicle = async (req, res) => {
     try {
-        const { vehicle_id, vb_date, vb_days, rb_id } = req.body;
+        const { vehicle_id, vb_date, vb_days, rb_id, guest_id: bodyGuestId, payment_id } = req.body;
         const userId = req.user.id;
+        const isReceptionist = req.user.role === 'receptionist';
 
         // Validation
         if (!vb_date || !vb_days || vb_days < 1) {
@@ -360,12 +373,19 @@ exports.createhirevehicle = async (req, res) => {
         const connection = await db.getConnection();
 
         try {
-            // Get Guest ID correctly
-            const [guests] = await connection.query('SELECT guest_id FROM Guest WHERE user_id = ?', [userId]);
-            if (guests.length === 0) {
-                return res.status(404).json({ error: 'Guest profile not found' });
+            // Get Guest IDs
+            let guest_id = null;
+            let wig_id = null;
+
+            if (isReceptionist && bodyGuestId) {
+                const { id, type } = bodyGuestId;
+                if (type === 'walkin') wig_id = id;
+                else guest_id = id;
+            } else {
+                const [guests] = await connection.query('SELECT guest_id FROM Guest WHERE user_id = ?', [userId]);
+                if (guests.length === 0) return res.status(404).json({ error: 'Guest profile not found' });
+                guest_id = guests[0].guest_id;
             }
-            const guest_id = guests[0].guest_id;
 
             await connection.beginTransaction();
 
@@ -373,11 +393,11 @@ exports.createhirevehicle = async (req, res) => {
             const [activeBookings] = await connection.query(
                 `SELECT rb_id, rb_checkin, rb_checkout 
                  FROM roombooking 
-                 WHERE guest_id = ? 
+                 WHERE (guest_id = ? OR wig_id = ?) 
                  AND rb_status IN ('Booked', 'Checked-in', 'Active')
                  AND rb_checkout >= CURDATE()
                  ORDER BY rb_checkin ASC`,
-                [guest_id]
+                [guest_id, wig_id]
             );
 
             if (activeBookings.length === 0) {
@@ -402,26 +422,22 @@ exports.createhirevehicle = async (req, res) => {
                 }
             }
 
-            // 3. Validate vehicle dates overlap with room booking (allow 1 day before/after)
+            // 3. Validate vehicle dates strictly within room booking 
             const linkedBooking = activeBookings.find(b => b.rb_id === linkedBookingId);
             const vehicleStart = new Date(vb_date);
             const vehicleEnd = new Date(vb_date);
             vehicleEnd.setDate(vehicleEnd.getDate() + parseInt(vb_days));
 
             const roomCheckIn = new Date(linkedBooking.rb_checkin);
+            roomCheckIn.setHours(0, 0, 0, 0);
             const roomCheckOut = new Date(linkedBooking.rb_checkout);
+            roomCheckOut.setHours(23, 59, 59, 999);
 
-            // Allow 1 day buffer before check-in and after checkout
-            const bufferStart = new Date(roomCheckIn);
-            bufferStart.setDate(bufferStart.getDate() - 1);
-            const bufferEnd = new Date(roomCheckOut);
-            bufferEnd.setDate(bufferEnd.getDate() + 1);
-
-            if (vehicleStart < bufferStart || vehicleEnd > bufferEnd) {
+            if (vehicleStart < roomCheckIn || vehicleEnd > roomCheckOut) {
                 await connection.rollback();
                 return res.status(400).json({
-                    error: 'Vehicle hire dates should be within your room booking dates',
-                    message: `Vehicle hire should be between ${bufferStart.toISOString().split('T')[0]} and ${bufferEnd.toISOString().split('T')[0]}`
+                    error: 'Vehicle hire dates must fall strictly within your room booking dates',
+                    message: `Stay dates: ${linkedBooking.rb_checkin.split('T')[0]} to ${linkedBooking.rb_checkout.split('T')[0]}`
                 });
             }
 
@@ -447,8 +463,8 @@ exports.createhirevehicle = async (req, res) => {
             }
 
             await connection.query(
-                'INSERT INTO hirevehicle (guest_id, vehicle_id, vb_date, vb_days, vb_status, rb_id) VALUES (?, ?, ?, ?, ?, ?)',
-                [guest_id, vehicle_id, vb_date, vb_days, 'Pending Approval', linkedBookingId]
+                'INSERT INTO hirevehicle (guest_id, wig_id, vehicle_id, vb_date, vb_days, vb_status, rb_id, vb_payment_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                [guest_id, wig_id, vehicle_id, vb_date, vb_days, 'Booked', linkedBookingId, payment_id || null]
             );
 
             await connection.commit();
@@ -533,6 +549,13 @@ exports.cancelBooking = async (req, res) => {
 
         await db.query(`UPDATE ${table} SET ${statusField} = 'Cancelled' WHERE ${idField} = ?`, [id]);
 
+        // Cascading cancellation for trips
+        if (type === 'room') {
+            await db.query('UPDATE activitybooking SET ab_status = "Cancelled" WHERE rb_id = ?', [id]);
+            await db.query('UPDATE foodorder SET order_status = "Cancelled" WHERE rb_id = ?', [id]);
+            await db.query('UPDATE hirevehicle SET vb_status = "Cancelled" WHERE rb_id = ?', [id]);
+        }
+
         // --- Notifications ---
 
         // 1. Notify Guest (if cancelled by someone else)
@@ -568,25 +591,48 @@ exports.cancelBooking = async (req, res) => {
 // --- Complete Booking (Unified Flow) ---
 exports.completeBooking = async (req, res) => {
     try {
-        const { room, food, activities, vehicle, arrivalTransport, paymentMethod } = req.body;
+        const { room, food, activities, vehicle, arrivalTransport, paymentMethod, guest_id: bodyGuestId } = req.body;
         const userId = req.user.id;
+        const isReceptionist = req.user.role === 'receptionist';
 
         // Validate room booking data
         if (!room || !room.room_id || !room.checkIn || !room.checkOut || !room.totalAmount) {
             return res.status(400).json({ error: 'Room booking details are required' });
         }
 
+        // Receptionist must provide a guest_id to book on behalf of
+        if (isReceptionist && !bodyGuestId) {
+            return res.status(400).json({ error: 'guest_id is required when booking as receptionist' });
+        }
+
         const connection = await db.getConnection();
 
         try {
-            // Get Guest ID
-            const [guests] = await connection.query('SELECT guest_id FROM Guest WHERE user_id = ?', [userId]);
-            if (guests.length === 0) {
-                return res.status(404).json({ error: 'Guest profile not found' });
+            // Get Guest IDs — receptionist provides it directly; guests use their own account
+            let guest_id = null;
+            let wig_id = null;
+
+            if (isReceptionist) {
+                const { id, type } = bodyGuestId; // Expecting {id, type} from frontend
+                if (!id || !type) {
+                    return res.status(400).json({ error: 'Invalid guest selection format' });
+                }
+                if (type === 'walkin') {
+                    wig_id = id;
+                } else {
+                    guest_id = id;
+                }
+            } else {
+                const [guests] = await connection.query('SELECT guest_id FROM Guest WHERE user_id = ?', [userId]);
+                if (guests.length === 0) {
+                    return res.status(404).json({ error: 'Guest profile not found' });
+                }
+                guest_id = guests[0].guest_id;
             }
-            const guest_id = guests[0].guest_id;
 
             await connection.beginTransaction();
+            const foodOrderIds = [];
+            const activityBookingIds = [];
 
             // Calculate total amount
             let totalAmount = parseFloat(room.totalAmount);
@@ -609,8 +655,6 @@ exports.completeBooking = async (req, res) => {
                 });
             }
 
-            // Note: Vehicle hire has no upfront payment
-
             // 1. Create Single Payment Record
             const [paymentResult] = await connection.query(
                 'INSERT INTO payment (payment_amount, payment_status) VALUES (?, ?)',
@@ -620,27 +664,21 @@ exports.completeBooking = async (req, res) => {
 
             // 2. Create Room Booking
             const [roomBookingResult] = await connection.query(
-                'INSERT INTO roombooking (guest_id, room_id, rb_checkin, rb_checkout, rb_total_amount, rb_payment_id, rb_status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                [guest_id, room.room_id, room.checkIn, room.checkOut, room.totalAmount, payment_id, 'Booked']
+                'INSERT INTO roombooking (guest_id, wig_id, room_id, rb_checkin, rb_checkout, rb_total_amount, rb_payment_id, rb_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                [guest_id, wig_id, room.room_id, room.checkIn, room.checkOut, room.totalAmount, payment_id, 'Booked']
             );
             const rb_id = roomBookingResult.insertId;
 
-            // 3. Create Food Orders (if any)
-            let foodOrderIds = [];
+            // 3. Create Food Orders
             if (food && food.length > 0) {
-                // 'food' is now expected to be an array of scheduled orders:
-                // [{ scheduled_date, meal_type, items: [{ item_id, quantity, item_price }] }]
-                
                 for (const orderGroup of food) {
                     const { scheduled_date, meal_type, items } = orderGroup;
-                    
                     const [orderResult] = await connection.query(
-                        'INSERT INTO foodorder (guest_id, order_status, dining_option, rb_id, scheduled_date, meal_type, payment_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                        [guest_id, 'Pending', room.diningOption || 'Delivery', rb_id, scheduled_date, meal_type, payment_id]
+                        'INSERT INTO foodorder (guest_id, wig_id, order_status, dining_option, rb_id, scheduled_date, meal_type, payment_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                        [guest_id, wig_id, 'Pending', room.diningOption || 'Delivery', rb_id, scheduled_date, meal_type, payment_id]
                     );
                     const order_id = orderResult.insertId;
                     foodOrderIds.push(order_id);
-
                     for (const item of items) {
                         await connection.query(
                             'INSERT INTO orderitem (order_id, item_id, quantity, item_price) VALUES (?, ?, ?, ?)',
@@ -650,104 +688,52 @@ exports.completeBooking = async (req, res) => {
                 }
             }
 
-            // 4. Create Activity Bookings (if any)
-            let activityBookingIds = [];
+            // 4. Create Activity Bookings
             if (activities && activities.length > 0) {
                 for (const activity of activities) {
-                    // Validate dates within room booking
                     const activityStart = new Date(activity.start_time);
                     const activityEnd = new Date(activity.end_time);
                     const roomCheckIn = new Date(room.checkIn);
-                    roomCheckIn.setHours(0, 0, 0, 0);
-                    // Allow activities through the end of checkout day
                     const roomCheckOut = new Date(room.checkOut);
                     roomCheckOut.setHours(23, 59, 59, 999);
 
                     if (activityStart < roomCheckIn || activityEnd > roomCheckOut) {
                         await connection.rollback();
-                        return res.status(400).json({
-                            error: `Activity "${activity.name}" date must fall within your room booking dates (${room.checkIn} to ${room.checkOut})`,
-                        });
+                        return res.status(400).json({ error: `Activity dates out of bounds` });
                     }
 
-                    // Create activity booking (no separate payment - bundled)
                     const [activityResult] = await connection.query(
-                        'INSERT INTO activitybooking (guest_id, activity_id, ab_start_time, ab_end_time, ab_total_amount, ab_payment_id, ab_status, rb_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                        [guest_id, activity.activity_id, activity.start_time, activity.end_time, activity.price, payment_id, 'Reserved', rb_id]
+                        'INSERT INTO activitybooking (guest_id, wig_id, activity_id, ab_start_time, ab_end_time, ab_total_amount, ab_payment_id, ab_status, rb_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                        [guest_id, wig_id, activity.activity_id, activity.start_time, activity.end_time, activity.price, payment_id, 'Reserved', rb_id]
                     );
                     activityBookingIds.push(activityResult.insertId);
                 }
             }
 
-            // 5. Create Vehicle Booking (if requested)
+            // 5. Create Vehicle Booking
             let hirevehicleId = null;
             if (vehicle && vehicle.vehicle_id) {
-                // Validate dates (allow ±1 day buffer)
-                const vehicleStart = new Date(vehicle.date);
-                const vehicleEnd = new Date(vehicle.date);
-                vehicleEnd.setDate(vehicleEnd.getDate() + parseInt(vehicle.days));
-
-                const roomCheckIn = new Date(room.checkIn);
-                const roomCheckOut = new Date(room.checkOut);
-
-                const bufferStart = new Date(roomCheckIn);
-                bufferStart.setDate(bufferStart.getDate() - 1);
-                const bufferEnd = new Date(roomCheckOut);
-                bufferEnd.setDate(bufferEnd.getDate() + 1);
-
-                if (vehicleStart < bufferStart || vehicleEnd > bufferEnd) {
-                    await connection.rollback();
-                    return res.status(400).json({
-                        error: 'Vehicle hire dates should be within your room booking dates (±1 day)'
-                    });
-                }
-
-                // Create vehicle booking (pending driver acceptance)
                 const [vehicleResult] = await connection.query(
-                    'INSERT INTO hirevehicle (guest_id, vehicle_id, vb_date, vb_days, vb_status, rb_id) VALUES (?, ?, ?, ?, ?, ?)',
-                    [guest_id, vehicle.vehicle_id, vehicle.date, vehicle.days, 'Pending Approval', rb_id]
+                    'INSERT INTO hirevehicle (guest_id, wig_id, vehicle_id, vb_date, vb_days, vb_status, rb_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    [guest_id, wig_id, vehicle.vehicle_id, vehicle.date, vehicle.days, 'Pending Approval', rb_id]
                 );
                 hirevehicleId = vehicleResult.insertId;
 
-                // Waive arrival transport fee if matching vehicle type (for existing records)
                 await connection.query(
-                    `UPDATE hire_vehicle_for_arrival 
-                     SET final_amount = 0 
-                     WHERE guest_id = ? 
-                     AND (rb_id IS NULL OR rb_id = ?) 
-                     AND (vehicle_type_requested = ? OR vehicle_type_requested IS NULL)
-                     AND status != 'Cancelled'`,
-                    [guest_id, rb_id, vehicle.type]
+                    `UPDATE hire_vehicle_for_arrival SET final_amount = 0 WHERE (guest_id = ? OR wig_id = ?) AND status != 'Cancelled'`,
+                    [guest_id, wig_id]
                 );
             }
 
-            // 6. Create Arrival Transport (if requested in this session)
+            // 6. Create Arrival Transport
             let arrivalTransportId = null;
             if (arrivalTransport) {
-                const { pickup_location, scheduled_at, flight_train_number, num_passengers, notes, vehicle_type_requested } = arrivalTransport;
-                
-                // Get vehicle price if a type is requested
-                let final_amount = 0;
-                if (vehicle_type_requested) {
-                    const [vPrice] = await connection.query(
-                        `SELECT vehicle_price_per_day FROM vehicle WHERE vehicle_type = ? AND vehicle_status = 'Available' LIMIT 1`,
-                        [vehicle_type_requested]
-                    );
-                    if (vPrice.length > 0) {
-                        final_amount = vPrice[0].vehicle_price_per_day;
-                    }
-                }
-
-                // Apply waiver if same vehicle type is hired in same booking
-                if (vehicle && vehicle.type && (vehicle.type === vehicle_type_requested || !vehicle_type_requested)) {
-                    final_amount = 0;
-                }
-
+                const { pickup_location, scheduled_at, flight_train_number, num_passengers, notes, vehicle_type_requested, final_price } = arrivalTransport;
                 const [arrivalResult] = await connection.query(
                     `INSERT INTO hire_vehicle_for_arrival 
-                     (guest_id, rb_id, request_type, pickup_location, scheduled_at, flight_train_number, num_passengers, notes, vehicle_type_requested, final_amount, status, payment_status)
-                     VALUES (?, ?, 'Transfer', ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Pending')`,
-                    [guest_id, rb_id, pickup_location, scheduled_at, flight_train_number || null, num_passengers || 1, notes || null, vehicle_type_requested || null, final_amount]
+                     (guest_id, wig_id, rb_id, request_type, pickup_location, scheduled_at, flight_train_number, num_passengers, notes, vehicle_type_requested, final_amount, status, payment_status)
+                     VALUES (?, ?, ?, 'Transfer', ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Pending')`,
+                    [guest_id, wig_id, rb_id, pickup_location, scheduled_at, flight_train_number || null, num_passengers || 1, notes || null, vehicle_type_requested || null, final_price || 0]
                 );
                 arrivalTransportId = arrivalResult.insertId;
             }
@@ -820,8 +806,9 @@ exports.completeBooking = async (req, res) => {
 exports.extendRoomBooking = async (req, res) => {
     try {
         const { id } = req.params; // rb_id
-        const { newCheckOut, extraAmount } = req.body;
-        const guest_id = req.user.role === 'guest' ? req.user.id : null;
+        const { newCheckOut, extraAmount, payment_id } = req.body;
+        const isReceptionist = req.user.role === 'receptionist';
+        const guest_user_id = req.user.role === 'guest' ? req.user.id : null;
 
         if (!newCheckOut || extraAmount === undefined) {
             return res.status(400).json({ error: 'Missing newCheckOut date or extraAmount' });
@@ -831,9 +818,9 @@ exports.extendRoomBooking = async (req, res) => {
         let query = 'SELECT * FROM roombooking WHERE rb_id = ?';
         let params = [id];
         
-        if (guest_id) {
+        if (guest_user_id) {
             query += ' AND guest_id = (SELECT guest_id FROM guest WHERE user_id = ?)';
-            params.push(guest_id);
+            params.push(guest_user_id);
         }
 
         const [bookings] = await db.execute(query, params);
@@ -868,6 +855,8 @@ exports.extendRoomBooking = async (req, res) => {
         // 3. Update the booking
         const newTotal = parseFloat(booking.rb_total_amount) + parseFloat(extraAmount);
         
+        // If receptionist provided a payment_id (swipe card), we keep track of it if we had a log, 
+        // but for now we update dates and total.
         await db.execute(
             'UPDATE roombooking SET rb_checkout = ?, rb_total_amount = ? WHERE rb_id = ?',
             [newCheckOut, newTotal, id]
@@ -876,7 +865,8 @@ exports.extendRoomBooking = async (req, res) => {
         res.json({
             message: 'Room booking extended successfully',
             newCheckOut,
-            newTotal
+            newTotal,
+            payment_id: payment_id || null
         });
 
     } catch (error) {

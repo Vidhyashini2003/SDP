@@ -7,32 +7,40 @@ const { verifyToken, authorizeRole } = require('../config/auth');
 
 // Protect all guest routes
 router.use(verifyToken);
-router.use(authorizeRole('guest'));
 
-router.get('/profile', guestController.getProfile);
-router.put('/profile', guestController.updateProfile);
-router.get('/bookings', guestController.getMyBookings);
-router.get('/bookings/grouped', guestController.getGroupedBookings);
-router.get('/bookings/active', guestController.getActiveBookings);
-router.post('/bookings/rooms/:id/cancel', guestController.cancelRoomBooking);
-// router.post('/bookings/room', guestController.createRoomBooking); // Moved to bookingController
-router.get('/activities', guestController.getActivities);
-router.get('/vehicles', guestController.getVehicles);
-router.get('/menu', guestController.getMenu);
-router.get('/orders', guestController.getOrders);
-router.post('/orders', orderController.placeOrder);
-router.post('/orders/bulk', orderController.placeBulkOrder);
-router.put('/orders/:id/cancel', guestController.cancelFoodOrder);
-router.put('/orders/:orderId/items/:itemId/cancel', guestController.cancelFoodOrderItem);
+// --- Guest-only routes ---
+const guestOnly = authorizeRole('guest');
 
-router.put('/bookings/activities/:id/cancel', guestController.cancelActivityBooking);
+router.get('/profile', guestOnly, guestController.getProfile);
+router.put('/profile', guestOnly, guestController.updateProfile);
+router.get('/bookings', guestOnly, guestController.getMyBookings);
+router.get('/bookings/grouped', guestOnly, guestController.getGroupedBookings);
+router.get('/bookings/active', guestOnly, guestController.getActiveBookings);
+router.post('/bookings/rooms/:id/cancel', guestOnly, guestController.cancelRoomBooking);
 
-router.post('/bookings/vehicles/:id/pay', guestController.payhirevehicle);
-router.post('/bookings/arrivals/:id/pay', guestController.payArrivalTransport);
+router.get('/orders', guestOnly, guestController.getOrders);
+router.post('/orders', guestOnly, orderController.placeOrder);
+router.post('/orders/bulk', guestOnly, orderController.placeBulkOrder);
+router.put('/orders/:id/cancel', guestOnly, guestController.cancelFoodOrder);
+router.put('/orders/:orderId/items/:itemId/cancel', guestOnly, guestController.cancelFoodOrderItem);
+
+router.put('/bookings/activities/:id/cancel', guestOnly, guestController.cancelActivityBooking);
+router.post('/bookings/vehicles/:id/pay', guestOnly, guestController.payhirevehicle);
+router.put('/bookings/vehicles/:id/cancel', guestOnly, guestController.cancelVehicleHire);
+router.post('/bookings/arrivals/:id/pay', guestOnly, guestController.payArrivalTransport);
+router.put('/bookings/arrivals/:id/cancel', guestOnly, guestController.cancelArrivalTransport);
 
 // Quick Ride routes
-router.post('/quickrides', quickrideController.requestQuickRide);
-router.get('/quickrides', quickrideController.getGuestQuickRides);
-router.post('/quickrides/:id/pay', quickrideController.payQuickRide);
+router.post('/quickrides', guestOnly, quickrideController.requestQuickRide);
+router.get('/quickrides', guestOnly, quickrideController.getGuestQuickRides);
+router.post('/quickrides/:id/pay', guestOnly, quickrideController.payQuickRide);
+
+
+// --- Shared informational routes (Accessible by Receptionist for Walk-in Bookings) ---
+const shared = authorizeRole('guest', 'receptionist', 'admin');
+
+router.get('/activities', shared, guestController.getActivities);
+router.get('/vehicles', shared, guestController.getVehicles);
+router.get('/menu', shared, guestController.getMenu);
 
 module.exports = router;

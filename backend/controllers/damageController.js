@@ -4,26 +4,28 @@ const notificationController = require('./notificationController');
 // Report Damage (Receptionist / Staff)
 exports.reportDamage = async (req, res) => {
     try {
-        const { guest_id, room_id, damage_type, description, charge_amount } = req.body;
+        const { guest_id, wig_id, room_id, damage_type, description, charge_amount } = req.body;
         const reported_by = req.user ? req.user.role : 'Staff';
 
-        // Insert damage record including room_id
+        // Insert damage record
         await db.query(
-            'INSERT INTO damage (guest_id, room_id, reported_by, damage_type, description, charge_amount) VALUES (?, ?, ?, ?, ?, ?)',
-            [guest_id, room_id || null, reported_by, damage_type || 'Room', description, charge_amount]
+            'INSERT INTO damage (guest_id, wig_id, room_id, reported_by, damage_type, description, charge_amount) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [guest_id || null, wig_id || null, room_id || null, reported_by, damage_type || 'Room', description, charge_amount]
         );
 
-        // Notify guest — urgent payment notification
-        const [guest] = await db.query('SELECT user_id FROM Guest WHERE guest_id = ?', [guest_id]);
-        if (guest.length > 0) {
-            const roomLabel = room_id ? ` (Room #${room_id})` : '';
-            await notificationController.createNotification(
-                guest[0].user_id,
-                `💳 Payment Required – ${damage_type || 'Room'} Damage${roomLabel}`,
-                `A damage charge of Rs. ${Number(charge_amount).toLocaleString()} has been raised against your account for ${damage_type || 'Room'} damage${roomLabel}: "${description}". This amount must be paid before check-out. Please contact the reception desk or pay via your guest portal.`,
-                'Payment',
-                '/guest/bookings'
-            );
+        // Notify guest if it's a registered guest with a user account
+        if (guest_id) {
+            const [guest] = await db.query('SELECT user_id FROM Guest WHERE guest_id = ?', [guest_id]);
+            if (guest.length > 0) {
+                const roomLabel = room_id ? ` (Room #${room_id})` : '';
+                await notificationController.createNotification(
+                    guest[0].user_id,
+                    `💳 Payment Required – ${damage_type || 'Room'} Damage${roomLabel}`,
+                    `A damage charge of Rs. ${Number(charge_amount).toLocaleString()} has been raised against your account for ${damage_type || 'Room'} damage${roomLabel}: "${description}". This amount must be paid before check-out.`,
+                    'Payment',
+                    '/guest/bookings'
+                );
+            }
         }
 
         res.status(201).json({ message: 'Damage reported successfully' });
@@ -38,12 +40,13 @@ exports.getAllDamages = async (req, res) => {
     try {
         const [damages] = await db.query(
             `SELECT d.*, 
-                    CONCAT(u.first_name, ' ', u.last_name) as guest_name, 
-                    g.guest_phone,
+                    COALESCE(CONCAT(u.first_name, ' ', u.last_name), CONCAT(wig.first_name, ' ', wig.last_name)) as guest_name, 
+                    COALESCE(g.guest_phone, wig.phone) as guest_phone,
                     d.room_id
              FROM damage d 
-             JOIN Guest g ON d.guest_id = g.guest_id 
-             JOIN Users u ON g.user_id = u.user_id
+             LEFT JOIN Guest g ON d.guest_id = g.guest_id 
+             LEFT JOIN Users u ON g.user_id = u.user_id
+             LEFT JOIN walkin_guest wig ON d.wig_id = wig.wig_id
              ORDER BY d.report_date DESC`
         );
         res.json(damages);
@@ -93,21 +96,21 @@ exports.checkPendingPayments = async (req, res) => {
     try {
         const { rb_id } = req.params;
 
-        // Get guest_id for this booking
+        // Get IDs for this booking
         const [booking] = await db.query(
-            'SELECT guest_id, rb_status FROM roombooking WHERE rb_id = ?',
+            'SELECT guest_id, wig_id, rb_status FROM roombooking WHERE rb_id = ?',
             [rb_id]
         );
         if (booking.length === 0) {
             return res.status(404).json({ error: 'Booking not found' });
         }
-        const { guest_id, rb_status } = booking[0];
+        const { guest_id, wig_id } = booking[0];
 
         // 1. Unpaid damage charges
         const [damages] = await db.query(
             `SELECT damage_id, damage_type, description, charge_amount, report_date
-             FROM damage WHERE guest_id = ? AND status = 'Pending'`,
-            [guest_id]
+             FROM damage WHERE (guest_id = ? OR wig_id = ?) AND status = 'Pending'`,
+            [guest_id, wig_id]
         );
 
         // 2. Unpaid vehicle hires linked to this booking

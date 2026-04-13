@@ -117,6 +117,15 @@ const ReceptionistRefunds = () => {
         return null;
     };
 
+    const cleanReason = (reason) => {
+        if (!reason) return '—';
+        return reason
+            .replace(/System cascade: Trip #\d+ cancelled\. Reason: /gi, '')
+            .replace(/Trip #\d+ cancelled\.? /gi, '')
+            .replace(/Trip #\d+ cancelled/gi, '')
+            .trim();
+    };
+
     return (
         <div className="p-8 max-w-7xl mx-auto">
             {/* Header */}
@@ -208,7 +217,7 @@ const ReceptionistRefunds = () => {
                                     {/* Reason */}
                                     <div className="flex-1 min-w-[200px]">
                                         <p className="text-xs text-slate-400 mb-0.5">Reason</p>
-                                        <p className="text-sm text-slate-700 line-clamp-2">{refund.refund_reason}</p>
+                                        <p className="text-sm text-slate-700 line-clamp-2">{cleanReason(refund.refund_reason)}</p>
                                     </div>
 
                                     {/* Amount */}
@@ -273,14 +282,6 @@ const ReceptionistRefunds = () => {
                                                     <p className="text-sm font-medium text-slate-700">{bookingInfo}</p>
                                                 </div>
                                             )}
-                                            <div>
-                                                <p className="text-xs text-slate-400 mb-0.5">Refund ID</p>
-                                                <p className="text-sm font-medium text-slate-700">#{refund.refund_id}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs text-slate-400 mb-0.5">Payment ID</p>
-                                                <p className="text-sm font-medium text-slate-700">#{refund.payment_id}</p>
-                                            </div>
                                         </div>
                                         {refund.refund_status === 'Approved' && (
                                             <div className="mt-3 flex items-center gap-2 text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2 text-xs font-medium">
@@ -334,7 +335,7 @@ const ReceptionistRefunds = () => {
                                 </div>
                                 <div className="pt-2 border-t border-slate-200">
                                     <p className="text-xs text-slate-400 mb-1">Reason</p>
-                                    <p className="text-sm text-slate-700">{modal.refund.refund_reason}</p>
+                                    <p className="text-sm text-slate-700">{cleanReason(modal.refund.refund_reason)}</p>
                                 </div>
                             </div>
                         </div>

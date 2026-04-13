@@ -22,6 +22,7 @@ const createStorage = (folder) => multer.diskStorage({
 const uploadRoom = multer({ storage: createStorage('rooms') });
 const uploadActivity = multer({ storage: createStorage('activities') });
 const uploadVehicle = multer({ storage: createStorage('vehicles') });
+const uploadNIC = multer({ storage: createStorage('nic_documents') });
 
 router.use(verifyToken);
 // Admin can also access these features usually, but strictly speaking this is receptionist role
@@ -29,6 +30,7 @@ router.use(authorizeRole('receptionist', 'admin'));
 
 router.get('/dashboard', receptionistController.getDashboardStats);
 router.get('/guests', receptionistController.getAllGuests);
+router.post('/walkin/register', uploadNIC.single('nic_image'), receptionistController.registerWalkinGuest);
 
 // Booking Management
 router.get('/bookings/rooms', receptionistController.getAllRoomBookings);
@@ -76,6 +78,9 @@ router.put('/refunds/:id', receptionistController.processRefund);
 router.post('/damages', damageController.reportDamage);
 router.get('/damages', damageController.getAllDamages);
 router.get('/bookings/rooms/:rb_id/pending-payments', damageController.checkPendingPayments);
+
+// Walk-in guest vehicle payment (after driver accepts, guest returns to pay at desk)
+router.post('/walkin/pay-vehicle/:vb_id', receptionistController.payWalkinVehicle);
 
 module.exports = router;
 

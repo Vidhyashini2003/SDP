@@ -116,16 +116,11 @@ const VehicleHire = () => {
     let maxDate = '';
 
     if (currentLinkedBooking) {
-        const bufferStartDate = new Date(currentLinkedBooking.check_in_date);
-        bufferStartDate.setDate(bufferStartDate.getDate() - 1);
-        const bufferEndDate = new Date(currentLinkedBooking.check_out_date);
-        bufferEndDate.setDate(bufferEndDate.getDate() + 1);
+        const checkIn = toLocalDateStr(currentLinkedBooking.check_in_date);
+        const checkOut = toLocalDateStr(currentLinkedBooking.check_out_date);
 
-        const minS = toLocalDateStr(bufferStartDate);
-        const maxS = toLocalDateStr(bufferEndDate);
-
-        minDate = minS > today ? minS : today;
-        maxDate = maxS;
+        minDate = checkIn > today ? checkIn : today;
+        maxDate = checkOut;
     }
 
     const getPassengerCount = (vehicleType) => {
@@ -176,6 +171,18 @@ const VehicleHire = () => {
                 <div className="mb-6">
                     <h3 className="text-xl font-bold text-slate-900">Vehicle Hire</h3>
                     <p className="text-sm text-slate-500">Search for available vehicles for your dates</p>
+
+                    {/* Terms & Conditions Notice */}
+                    <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-4 items-center">
+                        <div className="text-2xl">📜</div>
+                        <div className="text-xs text-amber-900">
+                            <p className="font-bold">Vehicle Hire Terms:</p>
+                            <ul className="list-disc ml-4 mt-1 opacity-80">
+                                <li>The starting day is included in the total number of days.</li>
+                                <li>Note: As you are already checked-in (or have an active booking), you are permitted to hire a vehicle for your checkout day.</li>
+                            </ul>
+                        </div>
+                    </div>
 
                     {/* Booking Info */}
                     {activeBookings.length > 0 && !urlLinkedRbId && (

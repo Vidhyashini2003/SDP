@@ -7,7 +7,7 @@ router.use(verifyToken);
 
 // Guest Routes
 router.get('/menu', orderController.getMenu); // Guests see available menu
-router.post('/', authorizeRole('guest'), orderController.placeOrder);
+router.post('/', authorizeRole('guest', 'receptionist'), orderController.placeOrder);
 router.get('/:id', authorizeRole('guest'), async (req, res) => { /* Details impl if needed */ });
 
 module.exports = router;

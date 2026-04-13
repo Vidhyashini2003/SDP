@@ -23,7 +23,8 @@ router.post('/vehicles', authorizeRole('guest', 'receptionist'), bookingControll
 router.put('/:type/:id/cancel', authorizeRole('guest', 'receptionist', 'admin'), bookingController.cancelBooking);
 
 // Complete Booking (Unified Flow - Room + Extras)
-router.post('/complete', authorizeRole('guest'), bookingController.completeBooking);
+// Receptionist can also use this endpoint to book for walk-in guests
+router.post('/complete', authorizeRole('guest', 'receptionist'), bookingController.completeBooking);
 
 // Extend Room Time
 router.put('/rooms/:id/extend', authorizeRole('guest', 'receptionist'), bookingController.extendRoomBooking);

@@ -54,7 +54,7 @@ const initCronJobs = () => {
                 const [quickRide] = await connection.query(`
                     UPDATE quickride 
                     SET status = 'Completed' 
-                    WHERE status = 'Pending' AND created_at <= DATE_SUB(NOW(), INTERVAL 1 DAY)
+                    WHERE status = 'Pending' AND created_date <= DATE_SUB(NOW(), INTERVAL 1 DAY)
                 `);
                 if(quickRide.affectedRows > 0) console.log(`[CRON] Auto-completed ${quickRide.affectedRows} passed point-to-point old quick rides.`);
 

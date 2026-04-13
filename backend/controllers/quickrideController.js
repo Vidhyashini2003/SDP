@@ -19,6 +19,32 @@ exports.requestQuickRide = async (req, res) => {
 
         await connection.beginTransaction();
 
+        // Validate Stay Dates if scheduled_at or rb_id is provided
+        if (rb_id) {
+            const [roomBookings] = await connection.query(
+                "SELECT rb_checkin, rb_checkout FROM roombooking WHERE rb_id = ?",
+                [rb_id]
+            );
+            if (roomBookings.length > 0) {
+                const booking = roomBookings[0];
+                const checkIn = new Date(booking.rb_checkin);
+                checkIn.setHours(0, 0, 0, 0);
+                const checkOut = new Date(booking.rb_checkout);
+                checkOut.setHours(23, 59, 59, 999);
+
+                if (scheduled_at) {
+                    const scheduledDate = new Date(scheduled_at);
+                    if (scheduledDate < checkIn || scheduledDate > checkOut) {
+                        await connection.rollback();
+                        return res.status(400).json({ 
+                            error: 'Scheduled time must be within your hotel stay periods.',
+                            message: `Stay dates: ${booking.rb_checkin.split('T')[0]} to ${booking.rb_checkout.split('T')[0]}`
+                        });
+                    }
+                }
+            }
+        }
+
         // Find a vehicle of requested type to "reserve"
         const [vehicles] = await connection.query(
             "SELECT vehicle_id, vehicle_price_per_km, waiting_time_price_per_hour FROM vehicle WHERE vehicle_type = ? AND vehicle_status = 'Available' LIMIT 1",
@@ -39,7 +65,7 @@ exports.requestQuickRide = async (req, res) => {
 
         const [result] = await connection.query(
             `INSERT INTO quickride 
-             (guest_id, vehicle_id, rb_id, pickup_location, vehicle_type_requested, scheduled_at, price_per_km, waiting_price_per_hour, status, payment_status)
+             (guest_id, vehicle_id, rb_id, pickup_location, vehicle_type, scheduled_at, per_km_rate, waiting_price_per_hour, status, payment_status)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Requested', 'Pending')`,
             [guest_id, vehicle_id, rb_id || null, pickup_location, vehicle_type_requested, scheduled_at || null, price_per_km, waiting_price_per_hour]
         );
@@ -76,7 +102,7 @@ exports.getGuestQuickRides = async (req, res) => {
              LEFT JOIN Driver d ON qr.driver_id = d.driver_id
              LEFT JOIN Users u ON d.user_id = u.user_id
              WHERE qr.guest_id = ?
-             ORDER BY qr.created_at DESC`,
+             ORDER BY qr.created_date DESC`,
             [guest_id]
         );
         res.json(rides);
@@ -100,7 +126,7 @@ exports.payQuickRide = async (req, res) => {
             `SELECT qr.*, g.user_id as guest_user_id
              FROM quickride qr
              JOIN Guest g ON qr.guest_id = g.guest_id
-             WHERE qr.qr_id = ? AND g.user_id = ? FOR UPDATE`,
+             WHERE qr.quickride_id = ? AND g.user_id = ? FOR UPDATE`,
             [id, req.user.id]
         );
 
@@ -116,7 +142,7 @@ exports.payQuickRide = async (req, res) => {
         }
 
         await connection.query(
-            "UPDATE quickride SET payment_status = 'Paid' WHERE qr_id = ?",
+            "UPDATE quickride SET payment_status = 'Paid' WHERE quickride_id = ?",
             [id]
         );
 
@@ -129,7 +155,7 @@ exports.payQuickRide = async (req, res) => {
         }
 
         await connection.commit();
-        res.json({ message: 'Payment successful. Thank you!', total_paid: ride.total_amount });
+        res.json({ message: 'Payment successful. Thank you!', total_paid: ride.final_amount });
     } catch (error) {
         await connection.rollback();
         console.error('Error paying quick ride:', error);
@@ -159,7 +185,7 @@ exports.setQuickRideAmount = async (req, res) => {
              FROM quickride qr
              JOIN Driver d ON qr.driver_id = d.driver_id
              JOIN Guest g ON qr.guest_id = g.guest_id
-             WHERE qr.qr_id = ? AND d.user_id = ? FOR UPDATE`,
+             WHERE qr.quickride_id = ? AND d.user_id = ? FOR UPDATE`,
             [id, req.user.id]
         );
 
@@ -171,16 +197,16 @@ exports.setQuickRideAmount = async (req, res) => {
         const ride = rides[0];
         const km = parseFloat(actual_km) || 0;
         const waitHours = parseFloat(waiting_hours) || 0;
-        const pricePerKm = parseFloat(ride.price_per_km) || 0;
+        const pricePerKm = parseFloat(ride.per_km_rate) || 0;
         const waitingRate = parseFloat(ride.waiting_price_per_hour) || 0;
 
         const totalAmount = (km * pricePerKm) + (waitHours * waitingRate);
 
         await connection.query(
             `UPDATE quickride 
-             SET actual_km = ?, waiting_hours = ?, total_amount = ?, 
+             SET actual_km = ?, waiting_time_hrs = ?, final_amount = ?, 
                  status = 'Completed', completed_at = NOW(), payment_status = 'Awaiting Payment'
-             WHERE qr_id = ?`,
+             WHERE quickride_id = ?`,
             [km, waitHours, totalAmount, id]
         );
 

@@ -3,7 +3,7 @@ import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar'; // Import Sidebar
 import ProtectedRoute from './components/ProtectedRoute';
-import { HomeIcon, BuildingOfficeIcon, TicketIcon, CurrencyDollarIcon, ExclamationCircleIcon, TruckIcon, ClipboardDocumentListIcon, CakeIcon, ClockIcon, BellIcon, UserIcon } from '@heroicons/react/24/outline';
+import { HomeIcon, BuildingOfficeIcon, TicketIcon, CurrencyDollarIcon, ExclamationCircleIcon, TruckIcon, ClipboardDocumentListIcon, CakeIcon, ClockIcon, BellIcon, UserIcon, UserPlusIcon } from '@heroicons/react/24/outline';
 
 // Public Pages
 import Home from './pages/Home';
@@ -22,6 +22,7 @@ import Profile from './pages/guest/Profile';
 import ActivityBooking from './pages/guest/ActivityBooking';
 import FoodOrders from './pages/guest/FoodOrders';
 import QuickRide from './pages/guest/QuickRide';
+import VehicleHire from './pages/guest/VehicleHire';
 import Notifications from './pages/guest/Notifications';
 import ExtendRoomBooking from './pages/guest/ExtendRoomBooking';
 
@@ -36,6 +37,7 @@ import ReceptionistActivities from './pages/receptionist/Activities';
 import ReceptionistRefunds from './pages/receptionist/Refunds';
 import ReceptionistDamages from './pages/receptionist/Damages';
 import ManageAvailability from './pages/receptionist/ManageAvailability';
+import WalkInBooking from './pages/receptionist/WalkInBooking';
 import DriverDashboard from './pages/driver/Dashboard';
 import DriverTrips from './pages/driver/Trips';
 import DriverRefunds from './pages/driver/Refunds';
@@ -87,12 +89,13 @@ const adminItems = [
 const receptionistItems = [
     { name: 'Dashboard', path: '/receptionist/dashboard', icon: HomeIcon },
     { name: 'Manage Bookings', path: '/receptionist/bookings', icon: BuildingOfficeIcon },
+    { name: 'Walk-in Booking', path: '/receptionist/walkin', icon: UserPlusIcon },
     { name: 'Activity Bookings', path: '/receptionist/activities', icon: TicketIcon },
     { name: 'Manage Availability', path: '/receptionist/availability', icon: TruckIcon },
     { name: 'Resource Management', path: '/receptionist/resources', icon: BuildingOfficeIcon },
     { name: 'Refund Requests', path: '/receptionist/refunds', icon: CurrencyDollarIcon },
     { name: 'Damages', path: '/receptionist/damages', icon: ExclamationCircleIcon },
-    { name: 'Notifications', path: '/receptionist/notifications', icon: BellIcon }, // Added
+    { name: 'Notifications', path: '/receptionist/notifications', icon: BellIcon },
 ];
 
 const driverItems = [
@@ -144,7 +147,7 @@ function App() {
                         <Route path="activities" element={<ActivityBooking />} />
                         <Route path="food-orders" element={<FoodOrders />} />
                         <Route path="quick-ride" element={<QuickRide />} />
-                        <Route path="vehicle-hire" element={<QuickRide />} />
+                        <Route path="vehicle-hire" element={<VehicleHire />} />
                         <Route path="extend-room" element={<ExtendRoomBooking />} />
                         <Route path="notifications" element={<Notifications />} />
                         <Route index element={<Navigate to="my-bookings" replace />} />
@@ -176,12 +179,13 @@ function App() {
                     }>
                         <Route path="dashboard" element={<ReceptionistDashboard />} />
                         <Route path="bookings" element={<ReceptionistBookings />} />
+                        <Route path="walkin" element={<WalkInBooking />} />
                         <Route path="activities" element={<ReceptionistActivities />} />
                         <Route path="availability" element={<ManageAvailability />} />
                         <Route path="resources" element={<ResourceManagement />} />
                         <Route path="refunds" element={<ReceptionistRefunds />} />
                         <Route path="damages" element={<ReceptionistDamages />} />
-                        <Route path="notifications" element={<CommonNotifications />} /> {/* Added */}
+                        <Route path="notifications" element={<CommonNotifications />} />
                         <Route path="profile" element={<StaffProfile />} />
                         <Route path="change-password" element={<ChangePassword />} />
                         <Route index element={<Navigate to="dashboard" replace />} />

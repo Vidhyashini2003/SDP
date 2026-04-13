@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const bcrypt = require('bcryptjs');
 
 // Dashboard Stats
 exports.getDashboardStats = async (req, res) => {
@@ -19,30 +20,33 @@ exports.getDashboardStats = async (req, res) => {
     }
 };
 
-// Check-in / Check-out (with checkout payment guard)
+// Check-in / Check-out / Cancel (with checkout payment guard and cascading cancellation)
 exports.updateRoomBookingStatus = async (req, res) => {
+    const connection = await db.getConnection();
     try {
         const { id } = req.params;
-        const { status } = req.body;
+        const { status, cancelReason } = req.body;
+
+        await connection.beginTransaction();
 
         // ── Checkout payment guard ──────────────────────────────────────────
         if (status === 'Checked-out') {
-            // Get guest_id for this booking
-            const [booking] = await db.query(
-                'SELECT guest_id FROM roombooking WHERE rb_id = ?', [id]
+            // Get guest_id or wig_id for this booking
+            const [booking] = await connection.query(
+                'SELECT guest_id, wig_id FROM roombooking WHERE rb_id = ?', [id]
             );
             if (booking.length > 0) {
-                const { guest_id } = booking[0];
+                const { guest_id, wig_id } = booking[0];
 
                 // 1. Unpaid damage charges
-                const [damages] = await db.query(
+                const [damages] = await connection.query(
                     `SELECT damage_id, damage_type, description, charge_amount
-                     FROM damage WHERE guest_id = ? AND status = 'Pending'`,
-                    [guest_id]
+                     FROM damage WHERE (guest_id = ? OR wig_id = ?) AND status = 'Pending'`,
+                    [guest_id, wig_id]
                 );
 
                 // 2. Unpaid vehicle hires for this booking
-                const [vehicles] = await db.query(
+                const [vehicles] = await connection.query(
                     `SELECT vb.vb_id, v.vehicle_type, vb.vb_date, p.payment_status
                      FROM hirevehicle vb
                      LEFT JOIN vehicle v ON vb.vehicle_id = v.vehicle_id
@@ -53,7 +57,7 @@ exports.updateRoomBookingStatus = async (req, res) => {
                 );
 
                 // 3. Unpaid activity bookings for this booking
-                const [activities] = await db.query(
+                const [activities] = await connection.query(
                     `SELECT ab.ab_id, a.activity_name, ab.ab_start_time, p.payment_status
                      FROM activitybooking ab
                      LEFT JOIN activity a ON ab.activity_id = a.activity_id
@@ -64,7 +68,7 @@ exports.updateRoomBookingStatus = async (req, res) => {
                 );
 
                 // 4. Unpaid food orders for this booking
-                const [foodOrders] = await db.query(
+                const [foodOrders] = await connection.query(
                     `SELECT fo.order_id, fo.scheduled_date, p.payment_status
                      FROM foodorder fo
                      LEFT JOIN payment p ON fo.payment_id = p.payment_id
@@ -77,6 +81,7 @@ exports.updateRoomBookingStatus = async (req, res) => {
                                    activities.length > 0 || foodOrders.length > 0;
 
                 if (hasPending) {
+                    await connection.rollback();
                     return res.status(400).json({
                         error: 'Cannot check out: guest has pending payments.',
                         pendingPayments: true,
@@ -87,25 +92,87 @@ exports.updateRoomBookingStatus = async (req, res) => {
         }
         // ────────────────────────────────────────────────────────────────────
 
-        await db.query('UPDATE roombooking SET rb_status = ? WHERE rb_id = ?', [status, id]);
+        // Update the main Room Booking status
+        await connection.query('UPDATE roombooking SET rb_status = ? WHERE rb_id = ?', [status, id]);
+
+        // ── Cascading Cancellation Logic ────────────────────────────────────
+        if (status === 'Cancelled') {
+            const reason = cancelReason || 'Cancelled by Receptionist';
+
+            // 1. Associated Activities
+            await connection.query('UPDATE activitybooking SET ab_status = "Cancelled", cancel_reason = ? WHERE rb_id = ?', [reason, id]);
+
+            // 2. Associated Food Orders
+            await connection.query('UPDATE foodorder SET order_status = "Cancelled" WHERE rb_id = ?', [id]);
+            await connection.query('UPDATE orderitem oi JOIN foodorder fo ON oi.order_id = fo.order_id SET oi.item_status = "Cancelled" WHERE fo.rb_id = ?', [id]);
+
+            // 3. Associated Vehicle Hires
+            await connection.query('UPDATE hirevehicle SET vb_status = "Cancelled", cancel_reason = ? WHERE rb_id = ?', [reason, id]);
+
+            // 4. Associated Arrival Transports
+            await connection.query('UPDATE hire_vehicle_for_arrival SET status = "Cancelled", cancel_reason = ? WHERE rb_id = ?', [reason, id]);
+        }
+        // ────────────────────────────────────────────────────────────────────
+
+        await connection.commit();
         res.json({ message: `Room booking status updated to ${status}` });
     } catch (error) {
-        res.status(500).json({ error: 'Failed to update booking' });
+        if (connection) await connection.rollback();
+        console.error('Update Room Booking Status Error:', error);
+        res.status(500).json({ error: 'Failed to update booking status' });
+    } finally {
+        if (connection) connection.release();
     }
 };
 
 
-// Get All Guests
+// Get All Guests (Registered + Walk-in)
 exports.getAllGuests = async (req, res) => {
     try {
-        const [guests] = await db.query(
-            `SELECT g.*, CONCAT(u.first_name, ' ', u.last_name) as guest_name, u.email as guest_email, g.guest_phone, u.created_at
+        const [registered] = await db.query(
+            `SELECT g.guest_id, CONCAT(u.first_name, ' ', u.last_name) as guest_name, u.email as guest_email, g.guest_phone, 'registered' as type
              FROM Guest g
              JOIN Users u ON g.user_id = u.user_id`
         );
-        res.json(guests);
+        const [walkins] = await db.query(
+            `SELECT wig_id as guest_id, CONCAT(first_name, ' ', last_name) as guest_name, COALESCE(email, 'Walk-in') as guest_email, phone as guest_phone, 'walkin' as type
+             FROM walkin_guest`
+        );
+        res.json([...registered, ...walkins]);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch guests' });
+    }
+};
+
+// Create New Walk-in Guest (No User Account)
+exports.registerWalkinGuest = async (req, res) => {
+    try {
+        const { first_name, last_name, email, phone, nic_passport, nationality } = req.body;
+        const nic_image = req.file ? `/uploads/nic_documents/${req.file.filename}` : null;
+
+        if (!first_name || !last_name || !phone || !nic_passport) {
+            return res.status(400).json({ error: 'Missing required guest details' });
+        }
+
+        const [result] = await db.query(
+            `INSERT INTO walkin_guest (first_name, last_name, email, phone, nic_passport, nationality, nic_image)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [first_name, last_name, email, phone, nic_passport, nationality, nic_image]
+        );
+
+        const [newGuest] = await db.query(
+            `SELECT wig_id as guest_id, CONCAT(first_name, ' ', last_name) as guest_name, COALESCE(email, 'Walk-in') as guest_email, phone as guest_phone, 'walkin' as type
+             FROM walkin_guest WHERE wig_id = ?`,
+            [result.insertId]
+        );
+
+        res.status(201).json({
+            message: 'Walk-in guest registered successfully',
+            guest: newGuest[0]
+        });
+    } catch (error) {
+        console.error('Register walk-in guest error:', error);
+        res.status(500).json({ error: 'Failed to register walk-in guest' });
     }
 };
 
@@ -114,17 +181,18 @@ exports.getAllRoomBookings = async (req, res) => {
     try {
         const [bookings] = await db.query(
             `SELECT rb.*,
-                    CONCAT(u.first_name, ' ', u.last_name) as guest_name,
-                    g.guest_phone,
-                    g.guest_nic_passport,
-                    g.nationality,
+                    COALESCE(CONCAT(u.first_name, ' ', u.last_name), CONCAT(wig.first_name, ' ', wig.last_name)) as guest_name,
+                    COALESCE(g.guest_phone, wig.phone) as guest_phone,
+                    COALESCE(g.guest_nic_passport, wig.nic_passport) as guest_nic_passport,
+                    COALESCE(g.nationality, wig.nationality) as nationality,
                     r.room_type,
                     r.room_price_per_day
              FROM roombooking rb
-             JOIN Guest g ON rb.guest_id = g.guest_id
-             JOIN Users u ON g.user_id = u.user_id
+             LEFT JOIN Guest g ON rb.guest_id = g.guest_id
+             LEFT JOIN Users u ON g.user_id = u.user_id
+             LEFT JOIN walkin_guest wig ON rb.wig_id = wig.wig_id
              JOIN room r ON rb.room_id = r.room_id
-             ORDER BY rb.rb_checkin DESC`
+             ORDER BY rb.rb_id DESC`
         );
         res.json(bookings);
     } catch (error) {
@@ -137,17 +205,18 @@ exports.getAllActivityBookings = async (req, res) => {
     try {
         const [bookings] = await db.query(
             `SELECT ab.*,
-                    CONCAT(u.first_name, ' ', u.last_name) as guest_name,
-                    g.guest_phone,
-                    g.guest_nic_passport,
-                    g.nationality,
+                    COALESCE(CONCAT(u.first_name, ' ', u.last_name), CONCAT(wig.first_name, ' ', wig.last_name)) as guest_name,
+                    COALESCE(g.guest_phone, wig.phone) as guest_phone,
+                    COALESCE(g.guest_nic_passport, wig.nic_passport) as guest_nic_passport,
+                    COALESCE(g.nationality, wig.nationality) as nationality,
                     a.activity_name,
                     a.activity_price_per_hour
              FROM activitybooking ab
-             JOIN Guest g ON ab.guest_id = g.guest_id
-             JOIN Users u ON g.user_id = u.user_id
+             LEFT JOIN Guest g ON ab.guest_id = g.guest_id
+             LEFT JOIN Users u ON g.user_id = u.user_id
+             LEFT JOIN walkin_guest wig ON ab.wig_id = wig.wig_id
              JOIN activity a ON ab.activity_id = a.activity_id
-             ORDER BY ab.ab_start_time DESC`
+             ORDER BY ab.ab_id DESC`
         );
         res.json(bookings);
     } catch (error) {
@@ -190,8 +259,8 @@ exports.getRefundRequests = async (req, res) => {
                         WHEN fo.order_id IS NOT NULL THEN 'Food'
                         ELSE 'Unknown'
                     END as service_type,
-                    CONCAT(u.first_name, ' ', u.last_name) as guest_name,
-                    u.email as guest_email,
+                    COALESCE(CONCAT(u.first_name, ' ', u.last_name), CONCAT(wig.first_name, ' ', wig.last_name)) as guest_name,
+                    COALESCE(u.email, 'Walk-in') as guest_email,
                     u.user_id as guest_user_id,
                     rb.rb_checkin, rb.rb_checkout,
                     ab.ab_start_time, ab.ab_end_time,
@@ -203,6 +272,7 @@ exports.getRefundRequests = async (req, res) => {
              LEFT JOIN activitybooking ab ON p.payment_id = ab.ab_payment_id
              LEFT JOIN hirevehicle vb ON p.payment_id = vb.vb_payment_id
              LEFT JOIN foodorder fo ON p.payment_id = fo.payment_id
+             LEFT JOIN walkin_guest wig ON COALESCE(rb.wig_id, ab.wig_id, vb.wig_id, fo.wig_id) = wig.wig_id
              LEFT JOIN Guest g ON COALESCE(rb.guest_id, ab.guest_id, vb.guest_id, fo.guest_id) = g.guest_id
              LEFT JOIN Users u ON g.user_id = u.user_id
              ${whereClause}
@@ -278,16 +348,18 @@ exports.getAllhirevehicles = async (req, res) => {
     try {
         const [bookings] = await db.query(
             `SELECT vb.*,
-                    CONCAT(u.first_name, ' ', u.last_name) as guest_name,
-                    g.guest_phone,
-                    g.guest_nic_passport,
-                    g.nationality,
-                    v.vehicle_type
+                    COALESCE(CONCAT(u.first_name, ' ', u.last_name), CONCAT(wig.first_name, ' ', wig.last_name)) as guest_name,
+                    COALESCE(g.guest_phone, wig.phone) as guest_phone,
+                    COALESCE(g.guest_nic_passport, wig.nic_passport) as guest_nic_passport,
+                    COALESCE(g.nationality, wig.nationality) as nationality,
+                    v.vehicle_type,
+                    v.vehicle_price_per_day
              FROM hirevehicle vb
-             JOIN Guest g ON vb.guest_id = g.guest_id
-             JOIN Users u ON g.user_id = u.user_id
+             LEFT JOIN Guest g ON vb.guest_id = g.guest_id
+             LEFT JOIN Users u ON g.user_id = u.user_id
+             LEFT JOIN walkin_guest wig ON vb.wig_id = wig.wig_id
              LEFT JOIN vehicle v ON vb.vehicle_id = v.vehicle_id
-             ORDER BY vb.vb_date DESC`
+             ORDER BY vb.vb_id DESC`
         );
         res.json(bookings);
     } catch (error) {
@@ -299,21 +371,22 @@ exports.getAllFoodOrders = async (req, res) => {
     try {
         const [orders] = await db.query(
             `SELECT fo.*,
-                    CONCAT(u.first_name, ' ', u.last_name) as guest_name,
-                    g.guest_phone,
-                    g.guest_nic_passport,
-                    g.nationality,
+                    COALESCE(CONCAT(u.first_name, ' ', u.last_name), CONCAT(wig.first_name, ' ', wig.last_name)) as guest_name,
+                    COALESCE(g.guest_phone, wig.phone) as guest_phone,
+                    COALESCE(g.guest_nic_passport, wig.nic_passport) as guest_nic_passport,
+                    COALESCE(g.nationality, wig.nationality) as nationality,
                     p.payment_amount,
                     COALESCE(p.payment_amount, SUM(oi.subtotal), 0) as order_total_amount,
                     GROUP_CONCAT(CONCAT(mi.item_name, ' (x', oi.quantity, ')') SEPARATOR ', ') as item_details
              FROM foodorder fo
-             JOIN Guest g ON fo.guest_id = g.guest_id
-             JOIN Users u ON g.user_id = u.user_id
+             LEFT JOIN Guest g ON fo.guest_id = g.guest_id
+             LEFT JOIN Users u ON g.user_id = u.user_id
+             LEFT JOIN walkin_guest wig ON fo.wig_id = wig.wig_id
              LEFT JOIN payment p ON fo.payment_id = p.payment_id
              LEFT JOIN orderitem oi ON fo.order_id = oi.order_id
              LEFT JOIN menuitem mi ON oi.item_id = mi.item_id
              GROUP BY fo.order_id
-             ORDER BY fo.order_date DESC`
+             ORDER BY fo.order_id DESC`
         );
         res.json(orders);
     } catch (error) {
@@ -894,3 +967,94 @@ exports.deleteVehicle = async (req, res) => {
         res.status(500).json({ error: 'Failed to delete vehicle' });
     }
 };
+
+// ============================================================
+// Walk-in Vehicle Payment
+// Called by receptionist after driver accepts a walk-in vehicle hire.
+// The guest returns to reception, receptionist swipes card and records payment.
+// ============================================================
+
+exports.payWalkinVehicle = async (req, res) => {
+    const connection = await db.getConnection();
+    try {
+        const { vb_id } = req.params;
+
+        await connection.beginTransaction();
+
+        // Fetch the vehicle hire details
+        const [hires] = await connection.query(
+            `SELECT vb.*, v.vehicle_price_per_day, v.vehicle_type, v.vehicle_id as v_id,
+                    g.user_id as guest_user_id
+             FROM hirevehicle vb
+             LEFT JOIN vehicle v ON vb.vehicle_id = v.vehicle_id
+             LEFT JOIN Guest g ON vb.guest_id = g.guest_id
+             WHERE vb.vb_id = ?`,
+            [vb_id]
+        );
+
+        if (hires.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ error: 'Vehicle hire not found' });
+        }
+
+        const hire = hires[0];
+
+        // Must be in an accepted/confirmed state to pay
+        if (!['Confirmed', 'Booked', 'Pending Payment'].includes(hire.vb_status)) {
+            await connection.rollback();
+            return res.status(400).json({
+                error: `Cannot pay for a vehicle hire with status "${hire.vb_status}". The driver must accept the request first.`
+            });
+        }
+
+        // If already paid, reject
+        if (hire.vb_payment_id) {
+            await connection.rollback();
+            return res.status(400).json({ error: 'This vehicle hire has already been paid.' });
+        }
+
+        // Calculate total amount = price per day × number of days
+        const amount = parseFloat(hire.vehicle_price_per_day || 0) * parseInt(hire.vb_days || 1);
+
+        // Create payment record
+        const [paymentResult] = await connection.query(
+            'INSERT INTO payment (payment_amount, payment_status) VALUES (?, ?)',
+            [amount, 'Success']
+        );
+        const payment_id = paymentResult.insertId;
+
+        // Link payment to vehicle hire
+        await connection.query(
+            'UPDATE hirevehicle SET vb_payment_id = ? WHERE vb_id = ?',
+            [payment_id, vb_id]
+        );
+
+        // Notify the guest
+        if (hire.guest_user_id) {
+            try {
+                await connection.query(
+                    'INSERT INTO notifications (user_id, title, message, type, is_read) VALUES (?, ?, ?, ?, FALSE)',
+                    [
+                        hire.guest_user_id,
+                        '🚗 Vehicle Hire Payment Confirmed',
+                        `Your vehicle hire (${hire.vehicle_type || 'vehicle'}) payment of Rs. ${Number(amount).toLocaleString()} has been successfully processed at the reception desk.`,
+                        'Payment'
+                    ]
+                );
+            } catch (notifyErr) {
+                console.error('Failed to notify guest:', notifyErr);
+            }
+        }
+
+        await connection.commit();
+        res.json({ message: 'Vehicle hire payment recorded successfully', payment_id, amount });
+
+    } catch (error) {
+        await connection.rollback();
+        console.error('Error paying walk-in vehicle:', error);
+        res.status(500).json({ error: 'Failed to record vehicle payment' });
+    } finally {
+        connection.release();
+    }
+};
+

@@ -71,7 +71,14 @@ const DriverTrips = () => {
                         No trips assigned to you yet.
                     </div>
                 ) : (
-                    trips.map((trip) => (
+                    trips.map((trip) => {
+                        const tripDate = new Date(trip.vb_date);
+                        tripDate.setHours(0, 0, 0, 0);
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const isFutureTrip = tripDate > today;
+
+                        return (
                         <div key={`${trip.type}-${trip.vb_id}`} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col lg:flex-row justify-between lg:items-center gap-4">
 
                             <div className="flex-1">
@@ -101,7 +108,9 @@ const DriverTrips = () => {
                                 )}
 
                                 <div className="mb-2">
-                                    <p className="text-xs text-slate-500 uppercase font-semibold">Booking Date</p>
+                                    <p className="text-xs text-slate-500 uppercase font-semibold">
+                                        {trip.isArrival ? 'Scheduled Date' : trip.isQuickRide ? 'Ride Date' : 'Trip Start Date'}
+                                    </p>
                                     <p className="font-medium text-slate-900">{new Date(trip.vb_date).toLocaleDateString()}</p>
                                 </div>
 
@@ -138,7 +147,13 @@ const DriverTrips = () => {
                                 {(trip.vb_status === 'Booked' || trip.vb_status === 'Confirmed') && (
                                     <button
                                         onClick={() => handleStatusUpdate(trip.vb_id, 'In Progress', trip.type)}
-                                        className="w-full py-2 px-4 bg-gold-500 hover:bg-gold-600 text-white font-bold rounded-lg transition-colors"
+                                        disabled={isFutureTrip}
+                                        title={isFutureTrip ? "Trip cannot be started before its scheduled date" : "Start this trip now"}
+                                        className={`w-full py-2 px-4 font-bold rounded-lg transition-colors ${
+                                            isFutureTrip
+                                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                                : 'bg-gold-500 hover:bg-gold-600 text-white'
+                                        }`}
                                     >
                                         Start Trip
                                     </button>
@@ -186,7 +201,8 @@ const DriverTrips = () => {
                                 )}
                             </div>
                         </div>
-                    ))
+                        )
+                    })
                 )}
             </div>
         </div>

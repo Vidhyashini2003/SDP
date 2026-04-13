@@ -14,7 +14,7 @@ exports.getMenu = async (req, res) => {
 
 exports.placeOrder = async (req, res) => {
     try {
-        const { items, total_amount, dining_option, rb_id, scheduled_date, meal_type } = req.body;
+        const { items, total_amount, dining_option, rb_id, scheduled_date, meal_type, guest_id: bodyGuestId, payment_id } = req.body;
         const userId = req.user.id; // user_id
 
         const connection = await db.getConnection();
@@ -22,22 +22,31 @@ exports.placeOrder = async (req, res) => {
 
         try {
             // 0. Get guest_id
-            const [guestRows] = await connection.query('SELECT guest_id FROM Guest WHERE user_id = ?', [userId]);
-            if (guestRows.length === 0) {
-                await connection.rollback();
-                return res.status(404).json({ error: 'Guest profile not found' });
+            let guest_id = null;
+            let wig_id = null;
+
+            if (req.user.role === 'receptionist' && bodyGuestId) {
+                const { id, type } = bodyGuestId;
+                if (type === 'walkin') wig_id = id;
+                else guest_id = id;
+            } else {
+                const [guestRows] = await connection.query('SELECT guest_id FROM Guest WHERE user_id = ?', [userId]);
+                if (guestRows.length === 0) {
+                    await connection.rollback();
+                    return res.status(404).json({ error: 'Guest profile not found' });
+                }
+                guest_id = guestRows[0].guest_id;
             }
-            const guest_id = guestRows[0].guest_id;
 
             // 1. Validate Active Booking (Hybrid Strategy)
             const [activeBookings] = await connection.query(
                 `SELECT rb_id, rb_checkin, rb_checkout 
                  FROM roombooking 
-                 WHERE guest_id = ? 
+                 WHERE (guest_id = ? OR wig_id = ?) 
                  AND rb_status IN ('Booked', 'Checked-in', 'Active')
                  AND rb_checkout >= CURDATE()
                  ORDER BY rb_checkin ASC`,
-                [guest_id]
+                [guest_id, wig_id]
             );
 
             if (activeBookings.length === 0) {
@@ -61,11 +70,28 @@ exports.placeOrder = async (req, res) => {
                     return res.status(400).json({ error: 'Invalid booking ID provided' });
                 }
             }
+            // 3. Validate scheduled date against stay dates
+            const currentBooking = activeBookings.find(b => b.rb_id === parseInt(linkedBookingId, 10));
+            if (scheduled_date && currentBooking) {
+                const sDate = new Date(scheduled_date);
+                const checkIn = new Date(currentBooking.rb_checkin);
+                checkIn.setHours(0, 0, 0, 0);
+                const checkOut = new Date(currentBooking.rb_checkout);
+                checkOut.setHours(23, 59, 59, 999);
+
+                if (sDate < checkIn || sDate > checkOut) {
+                    await connection.rollback();
+                    return res.status(400).json({ 
+                        error: 'Food order date must fall within your room stay period.',
+                        message: `Stay dates: ${currentBooking.rb_checkin.split('T')[0]} to ${currentBooking.rb_checkout.split('T')[0]}`
+                    });
+                }
+            }
 
             // 4. Create Order in foodorder table
             const [orderResult] = await connection.query(
-                'INSERT INTO foodorder (guest_id, order_status, dining_option, rb_id, scheduled_date, meal_type) VALUES (?, ?, ?, ?, ?, ?)',
-                [guest_id, 'Pending', dining_option || 'Delivery', linkedBookingId, scheduled_date, meal_type]
+                'INSERT INTO foodorder (guest_id, wig_id, order_status, dining_option, rb_id, scheduled_date, meal_type) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [guest_id, wig_id, 'Pending', dining_option || 'Delivery', linkedBookingId, scheduled_date, meal_type]
             );
             const order_id = orderResult.insertId;
 
@@ -82,15 +108,18 @@ exports.placeOrder = async (req, res) => {
                 );
             }
 
-            // 6. Create Payment record
-            const [paymentResult] = await connection.query(
-                'INSERT INTO payment (payment_amount, payment_status) VALUES (?, ?)',
-                [total_amount, 'Success']
-            );
-            const payment_id = paymentResult.insertId;
+            // 6. Handle Payment
+            let finalPaymentId = payment_id;
+            if (!finalPaymentId) {
+                const [paymentResult] = await connection.query(
+                    'INSERT INTO payment (payment_amount, payment_status) VALUES (?, ?)',
+                    [total_amount, 'Success']
+                );
+                finalPaymentId = paymentResult.insertId;
+            }
 
             // 7. Update FoodOrder with Payment ID
-            await connection.query('UPDATE foodorder SET payment_id = ? WHERE order_id = ?', [payment_id, order_id]);
+            await connection.query('UPDATE foodorder SET payment_id = ? WHERE order_id = ?', [finalPaymentId, order_id]);
 
             await connection.commit();
 
@@ -145,7 +174,33 @@ exports.placeBulkOrder = async (req, res) => {
             }
             const guest_id = guestRows[0].guest_id;
 
-            // 1. Create a single Payment record for the entire cart
+            // 1. Validate Stay Dates
+            const [roomBookings] = await connection.query(
+                "SELECT rb_checkin, rb_checkout FROM roombooking WHERE rb_id = ?",
+                [rb_id]
+            );
+            if (roomBookings.length === 0) {
+                await connection.rollback();
+                return res.status(404).json({ error: 'Linked room booking not found' });
+            }
+            const booking = roomBookings[0];
+            const checkIn = new Date(booking.rb_checkin);
+            checkIn.setHours(0, 0, 0, 0);
+            const checkOut = new Date(booking.rb_checkout);
+            checkOut.setHours(23, 59, 59, 999);
+
+            for (const group of orderGroups) {
+                const sDate = new Date(group.scheduled_date);
+                if (sDate < checkIn || sDate > checkOut) {
+                    await connection.rollback();
+                    return res.status(400).json({ 
+                        error: `The order scheduled for ${group.scheduled_date} falls outside your stay period.`,
+                        message: `Stay dates: ${booking.rb_checkin.split('T')[0]} to ${booking.rb_checkout.split('T')[0]}`
+                    });
+                }
+            }
+
+            // 2. Create a single Payment record for the entire cart
             const [paymentResult] = await connection.query(
                 'INSERT INTO payment (payment_amount, payment_status) VALUES (?, ?)',
                 [total_amount, 'Success']

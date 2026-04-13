@@ -13,5 +13,7 @@ router.post('/requests/:id/accept', driverController.acceptHireRequest);
 router.put('/trips/:id/status', driverController.updateTripStatus);
 router.put('/vehicle/status', driverController.updateVehicleStatus);
 router.put('/quickrides/:id/amount', quickrideController.setQuickRideAmount);
+router.get('/refunds', driverController.getRefundRequests);
+router.put('/refunds/:id/process', driverController.processRefundRequest);
 
 module.exports = router;

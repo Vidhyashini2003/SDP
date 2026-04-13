@@ -77,6 +77,19 @@ const QuickRide = () => {
         return v ? { per_km: v.vehicle_price_per_km, waiting: v.waiting_time_price_per_hour } : null;
     };
 
+    // Helper to format date for datetime-local input (YYYY-MM-DDTHH:mm)
+    const toLocalDateTimeStr = (d, isMax = false) => {
+        if (!d) return '';
+        const date = new Date(d);
+        if (isNaN(date.getTime())) return '';
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hh = isMax ? '23' : '00';
+        const mm = isMax ? '59' : '00';
+        return `${y}-${m}-${day}T${hh}:${mm}`;
+    };
+
     if (loading) return <div className="flex items-center justify-center p-16"><div className="w-10 h-10 border-4 border-gold-200 border-t-gold-600 rounded-full animate-spin"></div></div>;
 
     if (!hasActiveBooking && !urlLinkedRbId) {
@@ -97,6 +110,9 @@ const QuickRide = () => {
     }
 
     const priceInfo = getPriceInfo(form.vehicle_type_requested);
+    const currentBooking = activeBookings.find(b => b.rb_id === selectedBooking);
+    const minDateTime = currentBooking ? toLocalDateTimeStr(currentBooking.check_in_date) : '';
+    const maxDateTime = currentBooking ? toLocalDateTimeStr(currentBooking.check_out_date, true) : '';
 
     return (
         <div className="p-6 md:p-10 max-w-2xl mx-auto">
@@ -194,8 +210,6 @@ const QuickRide = () => {
                     </div>
                 </div>
 
-                {/* Dropoff is removed based on user request - meter will calculate everything. */}
-
                 {/* Optional Scheduled Time */}
                 <div>
                     <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">
@@ -203,6 +217,8 @@ const QuickRide = () => {
                     </label>
                     <input
                         type="datetime-local"
+                        min={minDateTime}
+                        max={maxDateTime}
                         value={form.scheduled_at}
                         onChange={e => setForm(f => ({ ...f, scheduled_at: e.target.value }))}
                         className="w-full px-4 py-4 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-gold-100 focus:border-gold-500 outline-none transition-all text-sm font-medium"

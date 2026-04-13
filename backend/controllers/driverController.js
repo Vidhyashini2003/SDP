@@ -45,19 +45,19 @@ exports.getAssignedTrips = async (req, res) => {
 
         // 3. Fetch Quick Ride trips (Accepted or In Progress)
         const [quickRideTrips] = await db.query(
-            `SELECT qr.qr_id as vb_id, 'quickride' as type, qr.created_at as vb_date, 1 as vb_days,
+            `SELECT qr.quickride_id as vb_id, 'quickride' as type, qr.created_date as vb_date, 1 as vb_days,
                     qr.status as ha_status, qr.payment_status,
                     CONCAT(u.first_name, ' ', u.last_name) as guest_name, g.guest_phone,
-                    v.vehicle_number, qr.vehicle_type_requested as vehicle_type,
-                    qr.pickup_location, qr.actual_km, qr.waiting_hours,
-                    qr.total_amount, qr.price_per_km, qr.waiting_price_per_hour
+                    v.vehicle_number, qr.vehicle_type as vehicle_type,
+                    NULL as pickup_location, qr.actual_km, qr.waiting_time_hrs as waiting_hours,
+                    qr.final_amount as total_amount, qr.per_km_rate as price_per_km, NULL as waiting_price_per_hour
              FROM quickride qr
              JOIN Driver d ON qr.driver_id = d.driver_id
              JOIN Guest g ON qr.guest_id = g.guest_id
              JOIN Users u ON g.user_id = u.user_id
              LEFT JOIN vehicle v ON qr.vehicle_id = v.vehicle_id
              WHERE d.user_id = ? AND qr.status IN ('Accepted', 'In Progress', 'Completed')
-             ORDER BY qr.created_at DESC`,
+             ORDER BY qr.created_date DESC`,
             [userId]
         );
 
@@ -85,7 +85,9 @@ exports.getHireRequests = async (req, res) => {
              JOIN Guest g ON vb.guest_id = g.guest_id
              JOIN Users u ON g.user_id = u.user_id
              JOIN vehicle v ON vb.vehicle_id = v.vehicle_id
+             LEFT JOIN roombooking rb ON vb.rb_id = rb.rb_id
              WHERE vb.vb_status = 'Pending Approval' AND vb.driver_id IS NULL
+               AND (vb.rb_id IS NULL OR rb.rb_status != 'Cancelled')
              ORDER BY vb.vb_date ASC`
         );
         
@@ -101,16 +103,16 @@ exports.getHireRequests = async (req, res) => {
 
         // Fetch pending quick ride requests
         const [quickRideRequests] = await db.query(
-            `SELECT qr.qr_id as id, 'quickride' as request_type, qr.created_at as date, NULL as duration,
+            `SELECT qr.quickride_id as id, 'quickride' as request_type, qr.created_date as date, NULL as duration,
                     qr.status, CONCAT(u.first_name, ' ', u.last_name) as guest_name,
-                    qr.vehicle_type_requested as vehicle_type, v.vehicle_number,
-                    qr.pickup_location
+                    qr.vehicle_type as vehicle_type, v.vehicle_number,
+                    NULL as pickup_location
              FROM quickride qr
              JOIN Guest g ON qr.guest_id = g.guest_id
              JOIN Users u ON g.user_id = u.user_id
              LEFT JOIN vehicle v ON qr.vehicle_id = v.vehicle_id
              WHERE qr.status = 'Requested' AND qr.driver_id IS NULL
-             ORDER BY qr.created_at ASC`
+             ORDER BY qr.created_date ASC`
         );
 
         const unifiedRequests = [...hireRequests, ...arrivalRequests, ...quickRideRequests]
@@ -211,7 +213,7 @@ exports.acceptHireRequest = async (req, res) => {
                 }
             } else if (type === 'quickride') {
                 const [booking] = await connection.query(
-                    "SELECT status, vehicle_type_requested FROM quickride WHERE qr_id = ? FOR UPDATE",
+                    "SELECT status, vehicle_type FROM quickride WHERE quickride_id = ? FOR UPDATE",
                     [id]
                 );
                 if (booking.length === 0 || booking[0].status !== 'Requested') {
@@ -220,15 +222,15 @@ exports.acceptHireRequest = async (req, res) => {
                 }
 
                 await connection.query(
-                    "UPDATE quickride SET driver_id = ?, status = 'Accepted' WHERE qr_id = ?",
+                    "UPDATE quickride SET driver_id = ?, status = 'Accepted' WHERE quickride_id = ?",
                     [realDriverId, id]
                 );
 
                 const [guestInfo] = await connection.query(
-                    `SELECT g.user_id, qr.vehicle_type_requested 
+                    `SELECT g.user_id, qr.vehicle_type 
                      FROM quickride qr
                      JOIN Guest g ON qr.guest_id = g.guest_id
-                     WHERE qr.qr_id = ?`,
+                     WHERE qr.quickride_id = ?`,
                     [id]
                 );
 
@@ -236,7 +238,7 @@ exports.acceptHireRequest = async (req, res) => {
                     await notificationController.createNotification(
                         guestInfo[0].user_id,
                         'Quick Ride Accepted',
-                        `Your Quick Ride request for a ${guestInfo[0].vehicle_type_requested || 'vehicle'} has been accepted by a driver. They are on the way!`,
+                        `Your Quick Ride request for a ${guestInfo[0].vehicle_type || 'vehicle'} has been accepted by a driver. They are on the way!`,
                         'Booking',
                         '/guest/my-bookings'
                     );
@@ -282,12 +284,12 @@ exports.updateTripStatus = async (req, res) => {
             await connection.query('UPDATE hirevehicle SET vb_status = ? WHERE vb_id = ?', [status, id]);
         } else if (type === 'quickride') {
             const [booking] = await connection.query(
-                'SELECT vehicle_id FROM quickride WHERE qr_id = ? AND driver_id = (SELECT driver_id FROM Driver WHERE user_id = ?)',
+                'SELECT vehicle_id FROM quickride WHERE quickride_id = ? AND driver_id = (SELECT driver_id FROM Driver WHERE user_id = ?)',
                 [id, driverId]
             );
             if (booking.length > 0) vehicleId = booking[0].vehicle_id;
             // For quickride: only 'In Progress' is set here. 'Completed' is set via setQuickRideAmount.
-            await connection.query('UPDATE quickride SET status = ?, started_at = IF(? = "In Progress", NOW(), started_at) WHERE qr_id = ?', [status, status, id]);
+            await connection.query('UPDATE quickride SET status = ? WHERE quickride_id = ?', [status, id]);
         } else {
             const [booking] = await connection.query(
                 'SELECT vehicle_id FROM hire_vehicle_for_arrival WHERE transport_id = ? AND driver_id = (SELECT driver_id FROM Driver WHERE user_id = ?)',
@@ -332,3 +334,73 @@ exports.updateVehicleStatus = async (req, res) => {
         res.status(500).json({ error: 'Failed to update vehicle status' });
     }
 }
+
+exports.getRefundRequests = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        // Fetch driver_id
+        const [drivers] = await db.query("SELECT driver_id FROM Driver WHERE user_id = ?", [userId]);
+        if (drivers.length === 0) return res.status(403).json({ error: 'Not a driver' });
+        const driverId = drivers[0].driver_id;
+
+        // 1. Refunds for regular hire vehicle trips
+        const [hireRefunds] = await db.query(
+            `SELECT r.*, p.payment_amount, 'Vehicle Hire' as trip_type, hv.vb_id as trip_id, CONCAT(u.first_name, ' ', u.last_name) as guest_name
+             FROM refund r
+             JOIN payment p ON r.payment_id = p.payment_id
+             JOIN hirevehicle hv ON p.payment_id = hv.vb_payment_id
+             JOIN Guest g ON hv.guest_id = g.guest_id
+             JOIN Users u ON g.user_id = u.user_id
+             WHERE hv.driver_id = ?
+             ORDER BY r.refund_date DESC`,
+            [driverId]
+        );
+
+        // 2. Refunds for arrival transfer trips
+        const [arrivalRefunds] = await db.query(
+            `SELECT r.*, p.payment_amount, 'Arrival Transfer' as trip_type, ha.transport_id as trip_id, CONCAT(u.first_name, ' ', u.last_name) as guest_name
+             FROM refund r
+             JOIN payment p ON r.payment_id = p.payment_id
+             JOIN hire_vehicle_for_arrival ha ON p.payment_id = ha.ha_payment_id
+             JOIN Guest g ON ha.guest_id = g.guest_id
+             JOIN Users u ON g.user_id = u.user_id
+             WHERE ha.driver_id = ?
+             ORDER BY r.refund_date DESC`,
+            [driverId]
+        );
+
+        const allRefunds = [...hireRefunds, ...arrivalRefunds].sort((a, b) => new Date(b.refund_date) - new Date(a.refund_date));
+        res.json(allRefunds);
+    } catch (error) {
+        console.error('Error fetching refund requests:', error);
+        res.status(500).json({ error: 'Failed to fetch refund requests' });
+    }
+};
+
+exports.processRefundRequest = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+
+        // Check if user is a driver
+        const [drivers] = await db.query("SELECT driver_id FROM Driver WHERE user_id = ?", [userId]);
+        if (drivers.length === 0) return res.status(403).json({ error: 'Not a driver' });
+
+        // Update refund status
+        const [result] = await db.query(
+            "UPDATE refund SET refund_status = 'Processed' WHERE refund_id = ? AND refund_status = 'Pending'",
+            [id]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(400).json({ error: 'Refund request not found or already processed' });
+        }
+
+        res.json({ message: 'Refund marked as processed successfully' });
+
+    } catch (error) {
+        console.error('Error processing refund:', error);
+        res.status(500).json({ error: 'Failed to process refund request' });
+    }
+};
