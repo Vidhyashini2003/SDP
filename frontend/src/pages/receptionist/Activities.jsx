@@ -102,12 +102,20 @@ const ReceptionistActivities = () => {
                                             </button>
                                         )}
                                         {booking.ab_status === 'In Progress' && (
-                                            <button
-                                                onClick={() => handleStatusUpdate(booking.ab_id, 'Completed')}
-                                                className="px-4 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg shadow-sm transition-all"
-                                            >
-                                                End
-                                            </button>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => handleStatusUpdate(booking.ab_id, 'Completed')}
+                                                    className="px-4 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg shadow-sm transition-all"
+                                                >
+                                                    End
+                                                </button>
+                                                <button
+                                                    onClick={() => handleStatusUpdate(booking.ab_id, 'Reserved')}
+                                                    className="px-4 py-1.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 text-xs font-semibold rounded-lg shadow-sm transition-all"
+                                                >
+                                                    Undo Start
+                                                </button>
+                                            </div>
                                         )}
                                     </td>
                                 </tr>

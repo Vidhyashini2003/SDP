@@ -63,9 +63,9 @@ const ChefOrders = () => {
 
     // Orders are already filtered by date from the backend
     const activeOrders = orders.filter(o => o.order_status === 'Pending' || o.order_status === 'Preparing');
-    const historyOrders = orders.filter(o => o.order_status === 'Prepared' || o.order_status === 'Delivered' || o.order_status === 'Cancelled');
+    const historyOrders = orders.filter(o => o.order_status === 'Prepared' || o.order_status === 'Delivered' || o.order_status === 'Cancelled' || o.order_status === 'Incomplete');
 
-    const recentHistory = orders.filter(o => o.order_status === 'Prepared' || o.order_status === 'Delivered' || o.order_status === 'Cancelled').slice(0, 10);
+    const recentHistory = historyOrders.slice(0, 10);
 
     return (
         <div className="p-8">
@@ -153,6 +153,8 @@ const ChefOrders = () => {
                                         <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
                                             order.order_status === 'Delivered' ? 'bg-green-100 text-green-700' : 
                                             order.order_status === 'Prepared' ? 'bg-blue-100 text-blue-700' :
+                                            order.order_status === 'Incomplete' ? 'bg-red-100 text-red-800' :
+                                            order.order_status === 'Cancelled' ? 'bg-red-100 text-red-700' :
                                             'bg-slate-100 text-slate-600'
                                         }`}>
                                             {order.order_status}

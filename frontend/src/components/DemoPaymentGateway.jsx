@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import jsPDF from 'jspdf';
 
 const DemoPaymentGateway = ({ isOpen, onClose, onPaymentSuccess, amount }) => {
     const [step, setStep] = useState('input'); // input, processing, success
@@ -9,12 +10,14 @@ const DemoPaymentGateway = ({ isOpen, onClose, onPaymentSuccess, amount }) => {
         name: ''
     });
     const [errors, setErrors] = useState({});
+    const [receiptRef, setReceiptRef] = useState('');
 
     useEffect(() => {
         if (isOpen) {
             setStep('input');
             setErrors({});
             setCardData({ cardNumber: '', expiry: '', cvc: '', name: '' });
+            setReceiptRef('');
         }
     }, [isOpen]);
 
@@ -64,12 +67,91 @@ const DemoPaymentGateway = ({ isOpen, onClose, onPaymentSuccess, amount }) => {
         
         // Simulate a realistic payment processing delay
         setTimeout(() => {
+            const newRef = `JAN-${Math.random().toString(36).substring(7).toUpperCase()}`;
+            setReceiptRef(newRef);
             setStep('success');
-            setTimeout(() => {
-                onPaymentSuccess();
-                onClose();
-            }, 2000);
         }, 3000);
+    };
+
+    const downloadGatewayReceipt = () => {
+        const doc = new jsPDF();
+        
+        // Brand Colors
+        const slate900 = [15, 23, 42];
+        const gold500 = [234, 179, 8];
+        const gold600 = [202, 138, 4];
+        
+        // Header
+        doc.setFillColor(...slate900);
+        doc.rect(0, 0, 210, 45, 'F');
+        
+        doc.setTextColor(...gold500);
+        doc.setFontSize(26);
+        doc.setFont("helvetica", "bold");
+        doc.text("JANAS GATEWAY", 105, 22, { align: 'center' });
+        
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text("SECURE ACADEMIC TRANSACTION", 105, 30, { align: 'center' });
+        
+        // Main Content Area
+        doc.setTextColor(...slate900);
+        
+        // Title
+        doc.setFontSize(18);
+        doc.setFont("helvetica", "bold");
+        doc.text("Payment Receipt", 105, 65, { align: 'center' });
+        
+        // Horizontal line
+        doc.setDrawColor(230, 230, 230);
+        doc.line(20, 75, 190, 75);
+        
+        // Details
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(100, 100, 100);
+        
+        doc.text("Date & Time:", 20, 95);
+        doc.text("Reference No:", 20, 110);
+        doc.text("Cardholder:", 20, 125);
+        doc.text("Card Details:", 20, 140);
+        doc.text("Status:", 20, 155);
+        
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...slate900);
+        
+        doc.text(new Date().toLocaleString(), 80, 95);
+        doc.text(receiptRef, 80, 110);
+        doc.text(cardData.name.toUpperCase(), 80, 125);
+        doc.text(`**** **** **** ${cardData.cardNumber.replace(/\\s/g, '').slice(-4)}`, 80, 140);
+        
+        // Status with color
+        doc.setTextColor(34, 197, 94); // Green
+        doc.text("SUCCESS", 80, 155);
+        
+        // Total Box
+        doc.setFillColor(249, 250, 251); // slate-50
+        doc.setDrawColor(226, 232, 240); // slate-200
+        doc.roundedRect(20, 175, 170, 30, 5, 5, 'FD');
+        
+        doc.setTextColor(...slate900);
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text("Total Amount Paid", 30, 193);
+        
+        doc.setTextColor(...gold600);
+        doc.setFontSize(18);
+        doc.text(`Rs. ${amount?.toLocaleString() || '0'}`, 180, 194, { align: 'right' });
+        
+        // Footer
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(150, 150, 150);
+        doc.text("This is a computer generated receipt from Janas Payment Gateway.", 105, 275, { align: 'center' });
+        doc.text("Academic Demonstration Mode Only", 105, 282, { align: 'center' });
+        
+        doc.save(`Janas_Receipt_${receiptRef}.pdf`);
     };
 
     if (!isOpen) return null;
@@ -203,17 +285,35 @@ const DemoPaymentGateway = ({ isOpen, onClose, onPaymentSuccess, amount }) => {
                     )}
 
                     {step === 'success' && (
-                        <div className="py-16 flex flex-col items-center justify-center text-center animate-in zoom-in spin-in-90 duration-700">
-                            <div className="w-24 h-24 bg-gold-500 text-white rounded-3xl flex items-center justify-center text-5xl mb-8 shadow-2xl shadow-gold-500/40 transform rotate-12">
+                        <div className="py-12 flex flex-col items-center justify-center text-center animate-in zoom-in spin-in-90 duration-700">
+                            <div className="w-24 h-24 bg-gold-500 text-white rounded-3xl flex items-center justify-center text-5xl mb-6 shadow-2xl shadow-gold-500/40 transform rotate-12">
                                 ✓
                             </div>
                             <h3 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">SUCCESS!</h3>
-                            <p className="text-gold-600 font-extrabold mt-1 mb-8 tracking-[0.3em] text-[10px] uppercase">Transaction Authorized</p>
+                            <p className="text-gold-600 font-extrabold mt-1 mb-6 tracking-[0.3em] text-[10px] uppercase">Transaction Authorized</p>
                             
-                            <div className="w-full p-6 bg-slate-900 rounded-[2rem] text-left relative overflow-hidden shadow-inner">
+                            <div className="w-full p-6 bg-slate-900 rounded-[2rem] text-left relative overflow-hidden shadow-inner mb-6">
                                 <div className="absolute top-0 right-0 w-24 h-24 bg-gold-500/5 rounded-full -mr-12 -mt-12 blur-lg"></div>
                                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Receipt Ref</p>
-                                <p className="font-mono text-gold-500 text-sm font-bold">JAN-{Math.random().toString(36).substring(7).toUpperCase()}</p>
+                                <p className="font-mono text-gold-500 text-sm font-bold">{receiptRef}</p>
+                            </div>
+                            
+                            <div className="w-full flex flex-col gap-3">
+                                <button
+                                    onClick={downloadGatewayReceipt}
+                                    className="w-full py-4 bg-white border-2 border-slate-200 hover:border-gold-500 hover:text-gold-600 text-slate-700 font-black rounded-2xl transition-all flex items-center justify-center gap-2 shadow-sm"
+                                >
+                                    <span className="text-xl">📥</span> Download Receipt
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        onPaymentSuccess();
+                                        onClose();
+                                    }}
+                                    className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-2xl transition-all shadow-xl shadow-slate-900/20 uppercase tracking-widest text-sm"
+                                >
+                                    Complete & Return
+                                </button>
                             </div>
                         </div>
                     )}

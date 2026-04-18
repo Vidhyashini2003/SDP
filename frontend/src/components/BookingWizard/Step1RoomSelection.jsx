@@ -376,10 +376,13 @@ const Step1RoomSelection = ({ bookingData, setBookingData, availableRooms, setAv
                                                                 <h3 className="text-xl font-black text-slate-900">{roomGroup.type}</h3>
                                                                 <p className="text-slate-500 text-sm mt-0.5">{bedInfo.beds} · {bedInfo.size}</p>
                                                             </div>
-                                                            <div className="flex items-center gap-1 text-amber-400">
-                                                                {[...Array(5)].map((_, i) => (
-                                                                    <StarIcon key={i} className="w-4 h-4 fill-current" />
-                                                                ))}
+                                                            <div className="flex flex-col items-end">
+                                                                <div className="flex items-center gap-1 text-amber-400">
+                                                                    {[...Array(5)].map((_, i) => (
+                                                                        <StarIcon key={i} className="w-4 h-4 fill-current" />
+                                                                    ))}
+                                                                </div>
+                                                                <span className="text-[10px] font-bold text-slate-500 mt-1 bg-slate-100 px-1.5 py-0.5 rounded">Exceptional 9.8</span>
                                                             </div>
                                                         </div>
 
@@ -392,10 +395,33 @@ const Step1RoomSelection = ({ bookingData, setBookingData, availableRooms, setAv
                                                             ))}
                                                         </div>
 
-                                                        {/* Availability info */}
-                                                        <p className="text-sm text-green-600 font-bold mt-3">
-                                                            ✓ {roomGroup.rooms.length} room{roomGroup.rooms.length > 1 ? 's' : ''} available
-                                                        </p>
+                                                        {/* Urgency & Trust Signals */}
+                                                        <div className="mt-4 flex flex-col gap-2">
+                                                            {/* Availability Urgency */}
+                                                            {roomGroup.rooms.length <= 3 ? (
+                                                                <div className="flex items-center gap-1.5 text-xs font-black text-red-600 bg-red-50 border border-red-100 px-2.5 py-1.5 rounded-md w-fit shadow-sm">
+                                                                    <span className="animate-pulse">🔥</span>
+                                                                    In high demand! Only {roomGroup.rooms.length} room{roomGroup.rooms.length > 1 ? 's' : ''} left on our site.
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex items-center gap-1.5 text-xs font-bold text-green-700 bg-green-50 px-2 py-1 rounded w-fit">
+                                                                    <CheckCircleIcon className="w-4 h-4" />
+                                                                    {roomGroup.rooms.length} rooms available
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {/* Trust Signal: Free Cancellation */}
+                                                            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded w-fit">
+                                                                <CheckCircleIcon className="w-4 h-4" />
+                                                                Free Cancellation until 24h before check-in
+                                                            </div>
+
+                                                            {/* Cleanliness / Extra Trust */}
+                                                            <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
+                                                                <SparklesIcon className="w-3.5 h-3.5 text-gold-500" />
+                                                                Highly rated for cleanliness & comfort
+                                                            </div>
+                                                        </div>
                                                     </div>
 
                                                     {/* Pricing + Select CTA */}

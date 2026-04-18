@@ -443,7 +443,6 @@ const FoodTab = ({ categorizeMenu, bookingData, addFoodItem, removeFoodItem, upd
         const dates = [];
         let curr = new Date(startDate);
         const last = new Date(endDate);
-        // Include checkout date — guests may order meals (e.g. breakfast) on departure day
         while (curr <= last) {
             dates.push(new Date(curr).toISOString().split('T')[0]);
             curr.setDate(curr.getDate() + 1);
@@ -451,8 +450,52 @@ const FoodTab = ({ categorizeMenu, bookingData, addFoodItem, removeFoodItem, upd
         return dates;
     };
 
+    const getTodayStr = () => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    };
+
+    const isMealTypeDisabled = (date, type) => {
+        const now = new Date();
+        const todayStr = getTodayStr();
+        
+        if (date < todayStr) return true;
+        if (date > todayStr) return false;
+
+        const currentHour = now.getHours();
+        if (type === 'Breakfast') return currentHour >= 10;
+        if (type === 'Lunch') return currentHour >= 15;
+        if (type === 'Dinner') return currentHour >= 22;
+        return false;
+    };
+
     const stayDates = getDatesInRange(bookingData.checkIn, bookingData.checkOut);
     const mealTypes = ['Breakfast', 'Lunch', 'Dinner'];
+
+    // Auto-select first available date and meal
+    useEffect(() => {
+        const todayStr = getTodayStr();
+        const firstAvailableDate = stayDates.find(d => d >= todayStr) || stayDates[0];
+        setSelectedDate(firstAvailableDate);
+
+        if (isMealTypeDisabled(firstAvailableDate, 'Breakfast')) {
+            const nextAvailable = mealTypes.find(t => !isMealTypeDisabled(firstAvailableDate, t));
+            if (nextAvailable) setSelectedMealType(nextAvailable);
+            else if (firstAvailableDate === todayStr && stayDates.length > 1) {
+                // If today is fully booked, check tomorrow
+                setSelectedDate(stayDates[1]);
+                setSelectedMealType('Breakfast');
+            }
+        }
+    }, []);
+
+    // Ensure selected meal type is valid when date changes
+    useEffect(() => {
+        if (isMealTypeDisabled(selectedDate, selectedMealType)) {
+            const nextAvailable = mealTypes.find(t => !isMealTypeDisabled(selectedDate, t));
+            if (nextAvailable) setSelectedMealType(nextAvailable);
+        }
+    }, [selectedDate]);
 
     // getFoodImage fallback removed
     const categories = categorizeMenu();
@@ -487,15 +530,19 @@ const FoodTab = ({ categorizeMenu, bookingData, addFoodItem, removeFoodItem, upd
                     <div className="w-full md:w-80 flex-shrink-0 space-y-4">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Meal Time</label>
                         <div className="flex bg-slate-800 p-1.5 rounded-2xl">
-                            {mealTypes.map(type => (
-                                <button
-                                    key={type}
-                                    onClick={() => setSelectedMealType(type)}
-                                    className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all ${selectedMealType === type ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400 hover:text-white'}`}
-                                >
-                                    {type}
-                                </button>
-                            ))}
+                            {mealTypes.map(type => {
+                                const disabled = isMealTypeDisabled(selectedDate, type);
+                                return (
+                                    <button
+                                        key={type}
+                                        onClick={() => !disabled && setSelectedMealType(type)}
+                                        disabled={disabled}
+                                        className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all ${selectedMealType === type ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400 hover:text-white'} ${disabled ? 'opacity-20 cursor-not-allowed' : ''}`}
+                                    >
+                                        {type}
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
@@ -535,10 +582,11 @@ const FoodTab = ({ categorizeMenu, bookingData, addFoodItem, removeFoodItem, upd
                                         <div className="flex items-center">
                                             {!inCartItem ? (
                                                 <button 
-                                                    onClick={() => addFoodItem(item, selectedDate, selectedMealType)}
-                                                    className="w-10 h-10 bg-slate-900 hover:bg-gold-500 text-white rounded-xl flex items-center justify-center transition-all transform active:scale-95 shadow-lg shadow-slate-900/10"
+                                                    onClick={() => !isMealTypeDisabled(selectedDate, selectedMealType) && addFoodItem(item, selectedDate, selectedMealType)}
+                                                    disabled={isMealTypeDisabled(selectedDate, selectedMealType)}
+                                                    className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all transform active:scale-95 shadow-lg shadow-slate-900/10 ${isMealTypeDisabled(selectedDate, selectedMealType) ? 'bg-slate-100 text-slate-300 cursor-not-allowed' : 'bg-slate-900 hover:bg-gold-500 text-white'}`}
                                                 >
-                                                    <span className="text-xl font-light">+</span>
+                                                    <span className="text-xl font-light">{isMealTypeDisabled(selectedDate, selectedMealType) ? '✕' : '+'}</span>
                                                 </button>
                                             ) : (
                                                 <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-100">
@@ -598,6 +646,18 @@ const ActivitiesTab = ({ availableActivities, bookingData, addActivity, removeAc
         return found ? found.isBooked : false;
     };
 
+    const isSlotPast = (date, slot) => {
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        if (date < todayStr) return true;
+        if (date > todayStr) return false;
+        
+        const [h, m] = slot.split(':').map(Number);
+        const slotDate = new Date();
+        slotDate.setHours(h, m, 0, 0);
+        return now > slotDate;
+    };
+
     return (
         <div className="animate-in fade-in slide-in-from-left-4 duration-500 space-y-8">
              <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-6">
@@ -641,7 +701,13 @@ const ActivitiesTab = ({ availableActivities, bookingData, addActivity, removeAc
                             />
 
                             {/* Slot grid with availability */}
-                            {loadingSlots ? (
+                            {!selectedAct ? (
+                                <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-8 flex flex-col items-center justify-center text-center">
+                                    <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-xl shadow-sm mb-3">👈</div>
+                                    <p className="text-sm font-bold text-slate-600">Select an Activity</p>
+                                    <p className="text-[10px] text-slate-400 mt-1">Choose an activity from the list to see available time slots.</p>
+                                </div>
+                            ) : loadingSlots ? (
                                 <div className="flex items-center justify-center py-6 text-slate-400 text-xs font-bold">
                                     Loading availability...
                                 </div>
@@ -649,15 +715,16 @@ const ActivitiesTab = ({ availableActivities, bookingData, addActivity, removeAc
                                 <div className="grid grid-cols-3 gap-2">
                                     {timeSlots.map(slot => {
                                         const booked = isSlotBooked(slot);
+                                        const past = isSlotPast(actDate, slot);
                                         const selected = actSlot === slot;
                                         return (
                                             <button 
                                                 key={slot} 
-                                                onClick={() => !booked && setActSlot(slot)}
-                                                disabled={booked}
-                                                title={booked ? 'Already booked' : slot}
+                                                onClick={() => !booked && !past && setActSlot(slot)}
+                                                disabled={booked || past}
+                                                title={booked ? 'Already booked' : past ? 'Time has passed' : slot}
                                                 className={`p-3 rounded-xl border text-[10px] font-black transition-all relative flex flex-col items-center gap-0.5
-                                                    ${booked
+                                                    ${booked || past
                                                         ? 'bg-red-50 border-red-200 text-red-400 cursor-not-allowed opacity-70'
                                                         : selected
                                                             ? 'bg-slate-900 text-white shadow-lg border-slate-900'
@@ -665,17 +732,15 @@ const ActivitiesTab = ({ availableActivities, bookingData, addActivity, removeAc
                                                     }`}
                                             >
                                                 <span>{slot}</span>
-                                                {booked && (
-                                                    <span className="text-[8px] font-black text-red-400 uppercase tracking-wide leading-none">Unavailable</span>
+                                                {(booked || past) && (
+                                                    <span className="text-[8px] font-black text-red-400 uppercase tracking-wide leading-none text-center">
+                                                        {booked ? 'Unavailable' : 'Time Passed'}
+                                                    </span>
                                                 )}
                                             </button>
                                         );
                                     })}
                                 </div>
-                            )}
-
-                            {!selectedAct && (
-                                <p className="text-[10px] text-slate-400 text-center">Select an activity first to see availability</p>
                             )}
                         </div>
                         <button 
@@ -744,6 +809,14 @@ const VehicleTab = ({ availableVehicles, bookingData, setBookingData, selectVehi
         }
 
         const scheduled_at = `${arrivalForm.arrival_date}T${arrivalForm.arrival_time}:00`;
+        const scheduledDateTime = new Date(scheduled_at);
+        const now = new Date();
+
+        if (scheduledDateTime < now) {
+            alert('You cannot schedule an arrival transfer for a past time. Please select a valid future time.');
+            return;
+        }
+
         const finalPickupLocation = arrivalForm.pickup_location === 'Other' ? arrivalForm.custom_pickup_location : arrivalForm.pickup_location;
 
         // Calculate estimated price locally

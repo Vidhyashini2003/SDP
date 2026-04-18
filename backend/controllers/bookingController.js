@@ -14,7 +14,7 @@ exports.getAvailableRooms = async (req, res) => {
             // Find rooms that have NO booking overlapping with the requested dates
             query += ` AND room_id NOT IN (
                 SELECT room_id FROM roombooking 
-                WHERE rb_status IN ('Booked', 'Checked-in')
+                WHERE rb_status NOT IN ('Cancelled', 'Checked-out', 'Rejected')
                 AND NOT (rb_checkout <= ? OR rb_checkin >= ?)
             )`;
             params.push(checkIn, checkOut);
@@ -149,7 +149,7 @@ exports.getActivitySlots = async (req, res) => {
              FROM activitybooking 
              WHERE activity_id = ? 
              AND DATE(ab_start_time) = ? 
-             AND ab_status != 'Cancelled'`,
+             AND ab_status NOT IN ('Cancelled', 'Completed', 'Rejected')`,
             [activity_id, date]
         );
 
@@ -714,8 +714,8 @@ exports.completeBooking = async (req, res) => {
             let hirevehicleId = null;
             if (vehicle && vehicle.vehicle_id) {
                 const [vehicleResult] = await connection.query(
-                    'INSERT INTO hirevehicle (guest_id, wig_id, vehicle_id, vb_date, vb_days, vb_status, rb_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                    [guest_id, wig_id, vehicle.vehicle_id, vehicle.date, vehicle.days, 'Pending Approval', rb_id]
+                    'INSERT INTO hirevehicle (guest_id, wig_id, vehicle_id, vb_date, vb_days, vb_status, rb_id, vb_price_per_day) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                    [guest_id, wig_id, vehicle.vehicle_id, vehicle.date, vehicle.days, 'Pending Approval', rb_id, vehicle.price || null]
                 );
                 hirevehicleId = vehicleResult.insertId;
 

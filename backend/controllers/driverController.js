@@ -190,7 +190,7 @@ exports.acceptHireRequest = async (req, res) => {
                 
                 // Update transport with driver and assigned vehicle
                 await connection.query(
-                    "UPDATE hire_vehicle_for_arrival SET driver_id = ?, vehicle_id = ? WHERE transport_id = ?",
+                    "UPDATE hire_vehicle_for_arrival SET driver_id = ?, vehicle_id = ?, status = 'Accepted' WHERE transport_id = ?",
                     [realDriverId, assignedVehicleId, id]
                 );
 

@@ -72,8 +72,12 @@ const StaffManagement = () => {
                 await axios.put(`/api/admin/staff/${editingStaff.id}`, formData);
                 toast.success('Staff updated successfully!');
             } else {
-                // Create mode
-                await axios.post('/api/admin/staff/invite', formData);
+                // Create mode — backend expects combined 'name', 'email', 'role'
+                await axios.post('/api/admin/staff/invite', {
+                    name: `${formData.first_name} ${formData.last_name}`.trim(),
+                    email: formData.email,
+                    role: formData.role
+                });
                 toast.success('Staff invitation sent successfully!');
             }
             setShowAddModal(false);

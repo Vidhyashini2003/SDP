@@ -26,7 +26,7 @@ exports.updateProfile = async (req, res) => {
     const connection = await db.getConnection();
     try {
         await connection.beginTransaction();
-        const { first_name, last_name, guest_phone, guest_nic_passport, nationality } = req.body;
+        const { first_name, last_name, guest_phone, guest_nic_passport, nationality, guest_email } = req.body;
 
         const userId = req.user.id;
 
@@ -390,58 +390,59 @@ exports.cancelRoomBooking = async (req, res) => {
             }
         }
 
-        // 4. Handle Refunds for everything linked to this booking
-        // Collect all successful payments linked to this rb_id
-        const [bundledPayments] = await connection.query(
-            `SELECT p.payment_id, p.payment_amount, 'Room & Bundled Services' as reason
-             FROM payment p
-             JOIN roombooking rb ON p.payment_id = rb.rb_payment_id
-             WHERE rb.rb_id = ? AND p.payment_status = "Success"`,
-            [id]
-        );
-
-        const [activityPayments] = await connection.query(
-            `SELECT p.payment_id, p.payment_amount, CONCAT('Activity: ', a.activity_name) as reason
-             FROM payment p
-             JOIN activitybooking ab ON p.payment_id = ab.ab_payment_id
-             JOIN activity a ON ab.activity_id = a.activity_id
-             WHERE ab.rb_id = ? AND p.payment_status = "Success"`,
-            [id]
-        );
-
-        const [vehiclePayments] = await connection.query(
-            `SELECT p.payment_id, p.payment_amount, CONCAT('Vehicle: ', v.vehicle_type) as reason
-             FROM payment p
-             JOIN hirevehicle hv ON p.payment_id = hv.vb_payment_id
-             JOIN vehicle v ON hv.vehicle_id = v.vehicle_id
-             WHERE hv.rb_id = ? AND p.payment_status = "Success"`,
-            [id]
-        );
-
-        const [arrivalPayments] = await connection.query(
-            `SELECT p.payment_id, p.payment_amount, 'Arrival Transport' as reason
-             FROM payment p
-             JOIN hire_vehicle_for_arrival ha ON p.payment_id = ha.ha_payment_id
-             WHERE ha.rb_id = ? AND p.payment_status = "Success"`,
-            [id]
-        );
-
-        // Combine and unique by payment_id
-        const allPayments = [...bundledPayments, ...activityPayments, ...vehiclePayments, ...arrivalPayments];
-        const uniquePayments = Array.from(new Map(allPayments.map(p => [p.payment_id, p])).values());
+        // 4. Handle Refunds — only if guest explicitly requested AND it's >24h before check-in
+        const { requestRefund } = req.body;
 
         let refundCount = 0;
-        for (const payment of uniquePayments) {
-            await connection.query(
-                'INSERT INTO refund (payment_id, refund_amount, refund_reason, refund_status) VALUES (?, ?, ?, "Pending")',
-                [payment.payment_id, payment.payment_amount, `System cascade: Trip #${id} cancelled. Reason: ${cancelReason || 'N/A'}. ${payment.reason}`]
-            );
-            refundCount++;
+        if (requestRefund === true) {
+            const checkInDate = new Date(booking.rb_checkin);
+            const now = new Date();
+            const hoursUntilCheckIn = (checkInDate - now) / (1000 * 60 * 60);
+
+            if (hoursUntilCheckIn >= 24) {
+                // Refund room cost only (excluding activities/food which are non-refundable)
+                // The bundled payment covers room + food + activities, so we refund only room amount
+                const [bundledPayments] = await connection.query(
+                    `SELECT p.payment_id, rb.rb_total_amount as refund_amount
+                     FROM payment p
+                     JOIN roombooking rb ON p.payment_id = rb.rb_payment_id
+                     WHERE rb.rb_id = ? AND p.payment_status = 'Success'`,
+                    [id]
+                );
+
+                for (const payment of bundledPayments) {
+                    await connection.query(
+                        'INSERT INTO refund (payment_id, refund_amount, refund_reason, refund_status) VALUES (?, ?, ?, "Pending")',
+                        [payment.payment_id, payment.refund_amount, `Guest requested refund for room booking #${id}. Reason: ${cancelReason || 'N/A'}. Note: Activities & Dining costs are non-refundable.`]
+                    );
+                    refundCount++;
+                }
+
+                // Refund linked vehicle hires (separate payments if any)
+                const [vehiclePayments] = await connection.query(
+                    `SELECT p.payment_id, (hv.vb_price_per_day * hv.vb_days) as refund_amount, v.vehicle_type
+                     FROM payment p
+                     JOIN hirevehicle hv ON p.payment_id = hv.vb_payment_id
+                     JOIN vehicle v ON hv.vehicle_id = v.vehicle_id
+                     WHERE hv.rb_id = ? AND p.payment_status = 'Success'`,
+                    [id]
+                );
+
+                for (const payment of vehiclePayments) {
+                    await connection.query(
+                        'INSERT INTO refund (payment_id, refund_amount, refund_reason, refund_status) VALUES (?, ?, ?, "Pending")',
+                        [payment.payment_id, payment.refund_amount, `Guest requested refund for vehicle hire linked to room booking #${id}. Vehicle: ${payment.vehicle_type}`]
+                    );
+                    refundCount++;
+                }
+            }
         }
 
         let message = 'Booking and all associated services cancelled successfully.';
-        if (refundCount > 0) {
-            message = `Trip cancelled successfully. ${refundCount} refund request(s) initiated for your payments.`;
+        if (requestRefund && refundCount > 0) {
+            message = `Trip cancelled successfully. ${refundCount} refund request(s) submitted for review by the hotel.`;
+        } else if (requestRefund && refundCount === 0) {
+            message = `Trip cancelled. Refund not applicable (cancellation made less than 24 hours before check-in).`;
         }
 
         await connection.commit();
@@ -573,12 +574,19 @@ exports.cancelArrivalTransport = async (req, res) => {
             [cancelReason || 'Guest cancelled arrival transfer', id]
         );
 
-        // Handle Refund if paid
-        if (transfer.payment_status === 'Paid' && transfer.ha_payment_id) {
-            await connection.query(
-                'INSERT INTO refund (payment_id, refund_amount, refund_reason, refund_status) VALUES (?, ?, ?, "Pending")',
-                [transfer.ha_payment_id, transfer.final_amount, `Guest cancelled arrival transfer #${id}. Reason: ${cancelReason || 'N/A'}`]
-            );
+        // Handle Refund — only if guest explicitly requested AND >24h before scheduled arrival
+        const { requestRefund } = req.body;
+        if (requestRefund === true && transfer.payment_status === 'Paid' && transfer.ha_payment_id) {
+            const scheduledAt = transfer.scheduled_at ? new Date(transfer.scheduled_at) : null;
+            const now = new Date();
+            const hoursUntil = scheduledAt ? (scheduledAt - now) / (1000 * 60 * 60) : -1;
+
+            if (hoursUntil >= 24) {
+                await connection.query(
+                    'INSERT INTO refund (payment_id, refund_amount, refund_reason, refund_status) VALUES (?, ?, ?, "Pending")',
+                    [transfer.ha_payment_id, transfer.final_amount, `Guest requested refund for arrival transfer #${id}. Reason: ${cancelReason || 'N/A'}`]
+                );
+            }
         }
 
         // Notify the assigned driver (if any)
@@ -644,13 +652,20 @@ exports.cancelVehicleHire = async (req, res) => {
             [cancelReason || 'Guest cancelled vehicle hire', id]
         );
 
-        // Handle Refund if paid
-        if (hire.vb_payment_id) {
-            const refundAmount = hire.vb_price_per_day * hire.vb_days;
-            await connection.query(
-                'INSERT INTO refund (payment_id, refund_amount, refund_reason, refund_status) VALUES (?, ?, ?, "Pending")',
-                [hire.vb_payment_id, refundAmount, `Guest cancelled vehicle hire #${id}. Reason: ${cancelReason || 'N/A'}`]
-            );
+        // Handle Refund — only if guest explicitly requested AND >24h before vehicle date
+        const { requestRefund } = req.body;
+        if (requestRefund === true && hire.vb_date) {
+            const vehicleDate = new Date(hire.vb_date);
+            const now = new Date();
+            const hoursUntil = (vehicleDate - now) / (1000 * 60 * 60);
+
+            if (hoursUntil >= 24 && hire.vb_payment_id) {
+                const refundAmount = (hire.vb_price_per_day || 0) * hire.vb_days;
+                await connection.query(
+                    'INSERT INTO refund (payment_id, refund_amount, refund_reason, refund_status) VALUES (?, ?, ?, "Pending")',
+                    [hire.vb_payment_id, refundAmount, `Guest requested refund for vehicle hire #${id}. Reason: ${cancelReason || 'N/A'}`]
+                );
+            }
         }
 
         // Notify the assigned driver (if any)

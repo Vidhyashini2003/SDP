@@ -15,7 +15,7 @@ const ChefHistory = () => {
             const res = await axios.get('/api/chef/orders');
             // Filter for only completed history items (Delivered or Cancelled)
             const historyOrders = res.data.filter(o =>
-                o.order_status === 'Delivered' || o.order_status === 'Cancelled'
+                o.order_status === 'Delivered' || o.order_status === 'Cancelled' || o.order_status === 'Incomplete'
             );
             setOrders(historyOrders);
             setLoading(false);

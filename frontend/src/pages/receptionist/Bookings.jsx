@@ -69,6 +69,15 @@ const ReceptionistBookings = () => {
         });
     };
 
+    const isCheckInAllowed = (dateString) => {
+        if (!dateString) return false;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const checkinDate = new Date(dateString);
+        checkinDate.setHours(0, 0, 0, 0);
+        return today >= checkinDate;
+    };
+
     const getStatusColor = (status) => {
         const statusColors = {
             'checked-in': 'bg-blue-500',
@@ -267,9 +276,15 @@ const ReceptionistBookings = () => {
                                                     
                                                     <div className="flex gap-2">
                                                         {roomBooking.rb_status === 'Booked' && (
-                                                            <button onClick={() => handleStatusUpdate('room', roomBooking.rb_id, 'Checked-in', roomBooking.guest_name)} className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-gold-600 transition-all shadow-lg shadow-slate-200">
-                                                                Check-In
-                                                            </button>
+                                                            isCheckInAllowed(roomBooking.rb_checkin) ? (
+                                                                <button onClick={() => handleStatusUpdate('room', roomBooking.rb_id, 'Checked-in', roomBooking.guest_name)} className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-gold-600 transition-all shadow-lg shadow-slate-200">
+                                                                    Check-In
+                                                                </button>
+                                                            ) : (
+                                                                <button disabled title="Check-in only available on or after the scheduled date" className="px-4 py-2 bg-slate-100 text-slate-400 text-xs font-bold rounded-xl cursor-not-allowed border border-slate-200">
+                                                                    Check-In (Upcoming)
+                                                                </button>
+                                                            )
                                                         )}
                                                         {roomBooking.rb_status === 'Checked-in' && (
                                                             <div className="flex flex-col gap-2">
@@ -467,9 +482,15 @@ const ReceptionistBookings = () => {
 
                                     <div className="mt-6 flex gap-3 justify-end pt-4 border-t border-slate-50">
                                         {booking.rb_status === 'Booked' && (
-                                            <button onClick={() => handleStatusUpdate('room', booking.rb_id, 'Checked-in', booking.guest_name)} className="px-6 py-2.5 bg-slate-900 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-gold-600 transition-all shadow-lg shadow-slate-200">
-                                                Check-In Guest
-                                            </button>
+                                            isCheckInAllowed(booking.rb_checkin) ? (
+                                                <button onClick={() => handleStatusUpdate('room', booking.rb_id, 'Checked-in', booking.guest_name)} className="px-6 py-2.5 bg-slate-900 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-gold-600 transition-all shadow-lg shadow-slate-200">
+                                                    Check-In Guest
+                                                </button>
+                                            ) : (
+                                                <button disabled title="Check-in only available on or after the scheduled date" className="px-6 py-2.5 bg-slate-100 text-slate-400 text-xs font-black uppercase tracking-wider rounded-xl cursor-not-allowed border border-slate-200">
+                                                    Check-In (Upcoming)
+                                                </button>
+                                            )
                                         )}
                                         {booking.rb_status === 'Checked-in' && (
                                             <button onClick={() => handleStatusUpdate('room', booking.rb_id, 'Checked-out', booking.guest_name)} className="px-6 py-2.5 bg-blue-600 text-white text-xs font-black uppercase tracking-wider rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">

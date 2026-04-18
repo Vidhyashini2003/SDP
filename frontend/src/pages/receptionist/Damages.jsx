@@ -166,8 +166,8 @@ const ReceptionistDamages = () => {
                                 >
                                     <option value="">— Select Guest —</option>
                                     {guests.map(g => (
-                                        <option key={g.guest_id} value={g.guest_id}>
-                                            {g.guest_name} {g.guest_phone ? `(${g.guest_phone})` : ''}
+                                        <option key={`${g.type || 'guest'}-${g.guest_id}`} value={g.guest_id}>
+                                            {g.guest_name} {g.guest_phone ? `(${g.guest_phone})` : ''}{g.type === 'walkin' ? ' [Walk-in]' : ''}
                                         </option>
                                     ))}
                                 </select>

@@ -22,7 +22,7 @@ const GuestBookings = () => {
     const [trips, setTrips] = useState([]);
     const [loading, setLoading] = useState(true);
     const [paymentModal, setPaymentModal] = useState({ isOpen: false, amount: 0, vehicle: null });
-    const [cancelModal, setCancelModal] = useState({ isOpen: false, type: '', id: null, reason: '' });
+    const [cancelModal, setCancelModal] = useState({ isOpen: false, type: '', id: null, reason: '', requestRefund: false, checkInDate: null });
 
     useEffect(() => {
         fetchGroupedBookings();
@@ -40,9 +40,9 @@ const GuestBookings = () => {
         }
     };
 
-    const handleCancelRoom = async (bookingId, reason) => {
+    const handleCancelRoom = async (bookingId, reason, requestRefund) => {
         try {
-            await axios.post(`/api/guest/bookings/rooms/${bookingId}/cancel`, { cancelReason: reason });
+            await axios.post(`/api/guest/bookings/rooms/${bookingId}/cancel`, { cancelReason: reason, requestRefund });
             toast.success('Trip cancelled successfully');
             fetchGroupedBookings(); 
         } catch (error) {
@@ -115,9 +115,9 @@ const GuestBookings = () => {
         }
     };
 
-    const handleCancelArrivalTransfer = async (transportId, reason) => {
+    const handleCancelArrivalTransfer = async (transportId, reason, requestRefund) => {
         try {
-            await axios.put(`/api/guest/bookings/arrivals/${transportId}/cancel`, { cancelReason: reason });
+            await axios.put(`/api/guest/bookings/arrivals/${transportId}/cancel`, { cancelReason: reason, requestRefund });
             toast.success('Arrival transfer cancelled. Driver has been notified.');
             fetchGroupedBookings();
         } catch (error) {
@@ -125,9 +125,9 @@ const GuestBookings = () => {
         }
     };
 
-    const handleCancelVehicleHire = async (vbId, reason) => {
+    const handleCancelVehicleHire = async (vbId, reason, requestRefund) => {
         try {
-            await axios.put(`/api/guest/bookings/vehicles/${vbId}/cancel`, { cancelReason: reason });
+            await axios.put(`/api/guest/bookings/vehicles/${vbId}/cancel`, { cancelReason: reason, requestRefund });
             toast.success('Vehicle hire cancelled. Driver has been notified.');
             fetchGroupedBookings();
         } catch (error) {
@@ -135,8 +135,8 @@ const GuestBookings = () => {
         }
     };
 
-    const handleCancelClick = (type, id) => {
-        setCancelModal({ isOpen: true, type, id, reason: '' });
+    const handleCancelClick = (type, id, checkInDate = null) => {
+        setCancelModal({ isOpen: true, type, id, reason: '', requestRefund: false, checkInDate });
     };
 
     const confirmCancellation = async () => {
@@ -145,15 +145,26 @@ const GuestBookings = () => {
             return;
         }
 
-        if (cancelModal.type === 'room') {
-            await handleCancelRoom(cancelModal.id, cancelModal.reason);
-        } else if (cancelModal.type === 'arrival') {
-            await handleCancelArrivalTransfer(cancelModal.id, cancelModal.reason);
-        } else if (cancelModal.type === 'vehicle') {
-            await handleCancelVehicleHire(cancelModal.id, cancelModal.reason);
+        const { type, id, reason, requestRefund } = cancelModal;
+
+        if (type === 'room') {
+            await handleCancelRoom(id, reason, requestRefund);
+        } else if (type === 'arrival') {
+            await handleCancelArrivalTransfer(id, reason, requestRefund);
+        } else if (type === 'vehicle') {
+            await handleCancelVehicleHire(id, reason, requestRefund);
         }
         
-        setCancelModal({ isOpen: false, type: '', id: null, reason: '' });
+        setCancelModal({ isOpen: false, type: '', id: null, reason: '', requestRefund: false, checkInDate: null });
+    };
+
+    // Returns true if the booking is eligible for a refund (>24h before check-in date)
+    const isRefundEligible = (checkInDate) => {
+        if (!checkInDate) return false;
+        const checkIn = new Date(checkInDate);
+        const now = new Date();
+        const diffMs = checkIn - now;
+        return diffMs > 24 * 60 * 60 * 1000;
     };
 
     const getStatusBadge = (status) => {
@@ -187,192 +198,238 @@ const GuestBookings = () => {
     const downloadReceipt = (booking, type) => {
         const doc = new jsPDF();
         const pageWidth = doc.internal.pageSize.width;
+        const pageHeight = doc.internal.pageSize.height;
 
+        // --- DESIGN TOKENS ---
         const primaryColor = [15, 23, 42]; // Slate 900
         const accentColor = [184, 134, 11]; // Dark Goldenrod
         const grayColor = [100, 116, 139]; // Slate 500
         const lightGray = [248, 250, 252]; // Slate 50
+        const emeraldColor = [16, 185, 129]; // Emerald 500
+        const amberColor = [234, 179, 8]; // Amber 500
 
-        // --- HEADER ---
+        // --- HEADER SECTION ---
+        // Dark background header
         doc.setFillColor(...primaryColor);
-        doc.rect(0, 0, pageWidth, 40, 'F');
+        doc.rect(0, 0, pageWidth, 50, 'F');
+        
+        // Accent bar
+        doc.setFillColor(...accentColor);
+        doc.rect(0, 48, pageWidth, 2, 'F');
 
-        doc.setFontSize(22);
+        // Hotel Name & Brand
         doc.setTextColor(255, 255, 255);
         doc.setFont('helvetica', 'bold');
-        doc.text('Janas Blue Water Corner', 14, 25);
+        doc.setFontSize(22);
+        doc.text('JANAS BLUE WATER CORNER', 14, 25);
+        
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(148, 163, 184); // Slate 400
+        doc.text('LUXURY HOTEL & RESORT • TRINCOMALEE, SRI LANKA', 14, 32);
 
-        doc.setFontSize(30);
+        // Invoice Title
+        doc.setFontSize(32);
         doc.setTextColor(...accentColor);
-        doc.text('INVOICE', pageWidth - 14, 28, { align: 'right' });
+        doc.setFont('helvetica', 'bold');
+        doc.text('INVOICE', pageWidth - 14, 35, { align: 'right' });
 
         // --- INFO SECTION ---
+        let currentY = 65;
+
+        // Bill From
+        doc.setFontSize(8);
+        doc.setTextColor(...accentColor);
+        doc.setFont('helvetica', 'bold');
+        doc.text('ISSUED BY', 14, currentY);
+        
         doc.setTextColor(...primaryColor);
         doc.setFontSize(10);
-        doc.setFont('helvetica', 'bold');
-        doc.text('BILL FROM:', 14, 55);
+        doc.text('Janas Blue Water Corner', 14, currentY + 6);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(...grayColor);
-        doc.text('123 Beach Road, Trincomalee', 14, 60);
-        doc.text('info@janasblue.com', 14, 65);
-        doc.text('+94 77 123 4567', 14, 70);
+        doc.text('73, 9 Sandy Bay Road', 14, currentY + 11);
+        doc.text('Trincomalee, Sri Lanka', 14, currentY + 16);
+        doc.text('+94 77 765 4321', 14, currentY + 21);
+        doc.text('hotelmanagement.services17@gmail.com', 14, currentY + 26);
 
+        // Bill To
+        doc.setFontSize(8);
+        doc.setTextColor(...accentColor);
+        doc.setFont('helvetica', 'bold');
+        doc.text('BILL TO', 85, currentY);
+        
         doc.setTextColor(...primaryColor);
-        doc.setFont('helvetica', 'bold');
-        doc.text('BILL TO:', 80, 55);
+        doc.setFontSize(10);
+        doc.text(user?.name || 'Valued Guest', 85, currentY + 6);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(...grayColor);
-        doc.text(user?.name || 'Valued Guest', 80, 60);
-        doc.text(user?.email || 'N/A', 80, 65);
+        doc.text(user?.email || 'N/A', 85, currentY + 11);
+        doc.text('Guest Identification: Registered', 85, currentY + 16);
 
-        const receiptNo = `${type.substring(0, 2).toUpperCase()}-${String(booking.rb_id || booking.order_id || booking.ab_id || booking.vb_id).padStart(4, '0')}`;
+        // Invoice Metadata Box
+        doc.setFillColor(...lightGray);
+        doc.roundedRect(140, currentY - 5, 56, 30, 2, 2, 'F');
+        
+        const receiptNo = `${type.substring(0, 2).toUpperCase()}-${String(booking.rb_id || booking.order_id || booking.ab_id || booking.vb_id || '0').padStart(4, '0')}`;
+        
+        doc.setFontSize(7);
+        doc.setTextColor(...grayColor);
+        doc.setFont('helvetica', 'bold');
+        doc.text('INVOICE NO', 145, currentY + 2);
         doc.setTextColor(...primaryColor);
-        doc.setFont('helvetica', 'bold');
-        doc.text('INVOICE DETAILS:', pageWidth - 14, 55, { align: 'right' });
-        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.text(receiptNo, 145, currentY + 7);
+
+        doc.setFontSize(7);
         doc.setTextColor(...grayColor);
-        doc.text(`Invoice #: ${receiptNo}`, pageWidth - 14, 60, { align: 'right' });
-        doc.text(`Date: ${new Date().toLocaleDateString()}`, pageWidth - 14, 65, { align: 'right' });
-        doc.text(`Booking Ref: #${booking.rb_id || 'N/A'}`, pageWidth - 14, 70, { align: 'right' });
+        doc.text('DATE ISSUED', 145, currentY + 14);
+        doc.setTextColor(...primaryColor);
+        doc.setFontSize(9);
+        doc.text(new Date().toLocaleDateString(), 145, currentY + 19);
 
-        doc.setDrawColor(...lightGray);
-        doc.line(14, 80, pageWidth - 14, 80);
-
-        // --- ITEMS PREPARATION ---
+        // --- LINE ITEMS ---
         let items = [];
         let totalAmount = 0;
-
         const checkPaid = (s) => !['pending', 'pending payment', 'cancelled', 'rejected', 'pending approval', 'ordered'].includes(s?.toLowerCase()) ? 'PAID' : 'PENDING';
 
         if (type === 'Summary') {
             // Room
             const roomPrice = parseFloat(booking.total_price || 0);
-            items.push(['Room Stay', `${booking.room_type} (#${booking.room_number})\n${formatDate(booking.check_in_date)} - ${formatDate(booking.check_out_date)}`, 'Stay', `Rs. ${roomPrice.toLocaleString()}`, checkPaid(booking.rb_status)]);
+            items.push(['ROOM', `${booking.room_type || 'Room'} (#${booking.room_number || 'TBD'})\n${formatDate(booking.check_in_date)} - ${formatDate(booking.check_out_date)}`, 'STAY', `Rs. ${roomPrice.toLocaleString()}`, checkPaid(booking.rb_status)]);
             totalAmount += roomPrice;
 
             // Activities
-            booking.activities.forEach(act => {
+            (booking.activities || []).forEach(act => {
                 const p = parseFloat(act.total_price || 0);
-                items.push(['Activity', `${act.activity_name}\n${formatDate(act.ab_start_time, {hour:'2-digit', minute:'2-digit'})} -\n${formatDate(act.ab_end_time, {hour:'2-digit', minute:'2-digit'})}`, '1', `Rs. ${p.toLocaleString()}`, checkPaid(act.ab_status)]);
+                items.push(['ACTIVITY', `${act.activity_name || 'Activity'}\n${formatDate(act.ab_start_time, {hour:'2-digit', minute:'2-digit'})} - ${formatDate(act.ab_end_time, {hour:'2-digit', minute:'2-digit'})}`, '1', `Rs. ${p.toLocaleString()}`, checkPaid(act.ab_status)]);
                 totalAmount += p;
             });
 
             // Food
-            booking.foodOrders.forEach(order => {
-                const orderPrice = order.items.filter(i => i.item_status !== 'Cancelled').reduce((sum, item) => sum + (parseFloat(item.item_price) * parseInt(item.order_quantity || 0)), 0);
-                if (orderPrice > 0 || order.items.length > 0) {
-                    items.push(['Catering', `Order #${order.order_id}\n${order.items.filter(i => i.item_status !== 'Cancelled').map(i => i.item_name).join(', ')}`, 'Order', `Rs. ${orderPrice.toLocaleString()}`, checkPaid(order.payment_status || order.order_status)]);
+            (booking.foodOrders || []).forEach(order => {
+                const activeItems = order.items?.filter(i => i.item_status !== 'Cancelled') || [];
+                const orderPrice = activeItems.reduce((sum, item) => sum + (parseFloat(item.item_price || 0) * parseInt(item.order_quantity || 0)), 0);
+                if (orderPrice > 0 || activeItems.length > 0) {
+                    items.push(['CATERING', `Order #${order.order_id}\n${activeItems.map(i => i.item_name).join(', ')}`, 'ORDER', `Rs. ${orderPrice.toLocaleString()}`, checkPaid(order.payment_status || order.order_status)]);
                     totalAmount += orderPrice;
                 }
             });
 
             // Vehicles
-            booking.vehicles.forEach(veh => {
+            (booking.vehicles || []).forEach(veh => {
                 const p = parseFloat(veh.vehicle_price_per_day || 0) * parseInt(veh.vb_days || 0);
-                items.push(['Transport', `${veh.vehicle_type} (${veh.vehicle_number})\n${veh.vb_days} Days Hiring`, 'Hire', `Rs. ${p.toLocaleString()}`, checkPaid(veh.vb_status)]);
+                items.push(['TRANSPORT', `${veh.vehicle_type || 'Vehicle'} (${veh.vehicle_number || 'TBD'})\n${veh.vb_days || 0} Days Hiring`, 'HIRE', `Rs. ${p.toLocaleString()}`, checkPaid(veh.vb_status)]);
                 totalAmount += p;
             });
-            if (booking.quickRides) {
-                booking.quickRides.forEach(qr => {
-                    const p = parseFloat(qr.total_amount || 0);
-                    items.push(['Quick Ride', `${qr.veh_type || qr.vehicle_type_requested}\nPickup: ${qr.pickup_location}`, 'Trip', `Rs. ${p.toLocaleString()}`, checkPaid(qr.status === 'Completed' && p > 0 ? (qr.payment_status === 'Paid' ? 'PAID' : 'PENDING') : 'PENDING')]);
-                    totalAmount += p;
-                });
-            }
+
+            // Quick Rides
+            (booking.quickRides || []).forEach(qr => {
+                const p = parseFloat(qr.total_amount || 0);
+                items.push(['QUICK RIDE', `${qr.veh_type || qr.vehicle_type_requested || 'Ride'}\nPickup: ${qr.pickup_location || 'Hotel'}`, 'TRIP', `Rs. ${p.toLocaleString()}`, checkPaid(qr.status === 'Completed' && p > 0 ? (qr.payment_status === 'Paid' ? 'PAID' : 'PENDING') : 'PENDING')]);
+                totalAmount += p;
+            });
         } else {
-            // Handle individual types (backward compatibility)
+            // Individual types logic
             if (type === 'Room') {
-                items.push(['Room Booking', booking.room_type, '1', `Rs. ${booking.total_price}`, checkPaid(booking.rb_status)]);
-                totalAmount = booking.total_price;
+                const p = parseFloat(booking.total_price || 0);
+                items.push(['ROOM', booking.room_type || 'Room Stay', '1', `Rs. ${p.toLocaleString()}`, checkPaid(booking.rb_status)]);
+                totalAmount = p;
             } else if (type === 'Activity') {
-                items.push(['Activity', booking.activity_name, '1', `Rs. ${booking.total_price}`, checkPaid(booking.ab_status)]);
-                totalAmount = booking.total_price;
+                const p = parseFloat(booking.total_price || 0);
+                items.push(['ACTIVITY', booking.activity_name || 'Activity Booking', '1', `Rs. ${p.toLocaleString()}`, checkPaid(booking.ab_status)]);
+                totalAmount = p;
             } else if (type === 'Vehicle') {
                 const p = parseFloat(booking.vehicle_price_per_day || 0) * parseInt(booking.vb_days || 0);
-                items.push(['Transport', `${booking.vehicle_type}\n${booking.vb_days} Days`, 'Hire', `Rs. ${p.toLocaleString()}`, checkPaid(booking.vb_status)]);
+                items.push(['TRANSPORT', `${booking.vehicle_type || 'Vehicle Hire'}\n${booking.vb_days || 0} Days`, 'HIRE', `Rs. ${p.toLocaleString()}`, checkPaid(booking.vb_status)]);
                 totalAmount = p;
             }
         }
 
-        // --- TABLE ---
         autoTable(doc, {
-            startY: 90,
-            head: [['Category', 'Description', 'Qty', 'Price', 'Status']],
+            startY: currentY + 35,
+            head: [['CATEGORY', 'DESCRIPTION', 'QTY', 'PRICE', 'STATUS']],
             body: items,
             theme: 'grid',
-            headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
-            styles: { fontSize: 9, cellPadding: 5, textColor: [51, 65, 85], valign: 'middle' },
+            headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center', fontSize: 8 },
+            styles: { fontSize: 8.5, cellPadding: 4, textColor: [51, 65, 85], valign: 'middle' },
             columnStyles: {
-                0: { cellWidth: 25 },
+                0: { cellWidth: 32, fontStyle: 'bold', textColor: accentColor },
                 1: { cellWidth: 'auto' },
-                2: { cellWidth: 22, halign: 'center' },
-                3: { cellWidth: 33, halign: 'right', fontStyle: 'bold' },
-                4: { cellWidth: 25, halign: 'center', fontStyle: 'bold' }
+                2: { cellWidth: 15, halign: 'center' },
+                3: { cellWidth: 35, halign: 'right', fontStyle: 'bold' },
+                4: { cellWidth: 22, halign: 'center', fontStyle: 'bold' }
             },
+            alternateRowStyles: { fillColor: [252, 252, 252] },
             didParseCell: (data) => {
                 if (data.column.index === 4 && data.section === 'body') {
-                    if (data.cell.raw === 'PAID') data.cell.styles.textColor = [16, 185, 129];
-                    if (data.cell.raw === 'PENDING') data.cell.styles.textColor = [234, 179, 8];
+                    if (data.cell.raw === 'PAID') data.cell.styles.textColor = emeraldColor;
+                    if (data.cell.raw === 'PENDING') data.cell.styles.textColor = amberColor;
                 }
             }
         });
 
-        // --- FINANCIAL SUMMARY BOX ---
+        // --- FINANCIAL SUMMARY ---
         let finalY = doc.lastAutoTable.finalY + 15;
-        const pageHeight = doc.internal.pageSize.height;
-        const boxHeight = 45; // Height of summary box + some padding
-
-        // Check for page overflow
-        if (finalY + boxHeight > pageHeight - 30) {
+        if (finalY + 50 > pageHeight - 30) {
             doc.addPage();
-            finalY = 20; // Start near top of new page
+            finalY = 20;
         }
 
-        const getVal = (row) => parseFloat(row[3].replace('Rs. ', '').replace(/,/g, '') || 0);
+        const getVal = (row) => parseFloat(String(row[3]).replace('Rs. ', '').replace(/,/g, '') || 0);
         const paidSum = items.filter(i => i[4] === 'PAID').reduce((sum, i) => sum + getVal(i), 0);
         const pendingSum = items.filter(i => i[4] === 'PENDING').reduce((sum, i) => sum + getVal(i), 0);
 
+        const summaryX = pageWidth - 90;
         doc.setFillColor(...lightGray);
-        doc.roundedRect(pageWidth - 95, finalY, 81, 42, 3, 3, 'F');
-
-        doc.setFontSize(10);
+        doc.roundedRect(summaryX, finalY, 76, 45, 2, 2, 'F');
+        
+        doc.setFontSize(9);
         doc.setTextColor(...grayColor);
-        doc.text('Subtotal:', pageWidth - 90, finalY + 10);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Subtotal:', summaryX + 5, finalY + 10);
         doc.setTextColor(...primaryColor);
-        doc.text(`Rs. ${totalAmount.toLocaleString()}`, pageWidth - 18, finalY + 10, { align: 'right' });
+        doc.text(`Rs. ${totalAmount.toLocaleString()}`, summaryX + 71, finalY + 10, { align: 'right' });
 
         doc.setTextColor(...grayColor);
-        doc.text('Amount Paid:', pageWidth - 90, finalY + 18);
-        doc.setTextColor(16, 185, 129);
-        doc.text(`- Rs. ${paidSum.toLocaleString()}`, pageWidth - 18, finalY + 18, { align: 'right' });
+        doc.text('Amount Paid:', summaryX + 5, finalY + 18);
+        doc.setTextColor(...emeraldColor);
+        doc.text(`- Rs. ${paidSum.toLocaleString()}`, summaryX + 71, finalY + 18, { align: 'right' });
 
         doc.setTextColor(...grayColor);
-        doc.text('Balance Due:', pageWidth - 90, finalY + 26);
-        doc.setTextColor(234, 179, 8);
-        doc.text(`Rs. ${pendingSum.toLocaleString()}`, pageWidth - 18, finalY + 26, { align: 'right' });
+        doc.text('Balance Due:', summaryX + 5, finalY + 26);
+        doc.setTextColor(...amberColor);
+        doc.text(`Rs. ${pendingSum.toLocaleString()}`, summaryX + 71, finalY + 26, { align: 'right' });
 
         doc.setDrawColor(226, 232, 240);
-        doc.line(pageWidth - 90, finalY + 30, pageWidth - 18, finalY + 30);
+        doc.line(summaryX + 5, finalY + 30, summaryX + 71, finalY + 30);
 
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(...primaryColor);
-        doc.text('GRAND TOTAL:', pageWidth - 90, finalY + 37);
+        doc.text('GRAND TOTAL:', summaryX + 5, finalY + 38);
         doc.setTextColor(...accentColor);
         doc.setFontSize(13);
-        doc.text(`Rs. ${totalAmount.toLocaleString()}`, pageWidth - 18, finalY + 37, { align: 'right' });
+        doc.text(`Rs. ${totalAmount.toLocaleString()}`, summaryX + 71, finalY + 38, { align: 'right' });
 
         // --- FOOTER ---
-        const footerY = doc.internal.pageSize.height - 30;
+        const footerY = pageHeight - 30;
         doc.setFontSize(10);
         doc.setTextColor(...primaryColor);
         doc.setFont('helvetica', 'bold');
-        doc.text('Thank you for choosing Janas Blue Water Corner!', 14, footerY);
+        doc.text('Thank you for choosing Janas Blue Water!', 14, footerY);
+        
+        doc.setFontSize(7);
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
         doc.setTextColor(...grayColor);
-        doc.text('Please note that all bookings are subject to our terms and conditions.', 14, footerY + 5);
-        doc.text('Electronic receipt - no signature required.', 14, footerY + 9);
+        doc.text('Note: This is a computer-generated invoice. No signature is required.', 14, footerY + 6);
+        doc.text('All payments are subject to our reservation and cancellation policy.', 14, footerY + 10);
+        
+        doc.setFillColor(...primaryColor);
+        doc.rect(0, pageHeight - 12, pageWidth, 12, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(8);
+        doc.text('© 2026 JANAS BLUE WATER CORNER. ALL RIGHTS RESERVED.', pageWidth / 2, pageHeight - 5, { align: 'center' });
 
         doc.save(`Invoice_${receiptNo}.pdf`);
     };
@@ -559,7 +616,7 @@ const GuestBookings = () => {
                                                         </button>
                                                         {['booked', 'confirmed', 'pending', 'pending payment'].includes(trip.rb_status?.toLowerCase()) && (
                                                             <button 
-                                                                onClick={() => handleCancelClick('room', trip.rb_id)}
+                                                                onClick={() => handleCancelClick('room', trip.rb_id, trip.check_in_date)}
                                                                 className="w-full py-3 border border-slate-800 text-slate-500 hover:text-rose-400 hover:border-rose-400/30 font-bold uppercase tracking-widest text-[9px] transition-all rounded-xl"
                                                             >
                                                                 Cancel This Booking
@@ -709,7 +766,7 @@ const GuestBookings = () => {
                                                                             )}
                                                                             {veh.isArrivalTransport && !['cancelled', 'completed'].includes(veh.vb_status?.toLowerCase()) && (
                                                                                 <button
-                                                                                    onClick={() => handleCancelClick('arrival', veh.vb_id)}
+                                                                                    onClick={() => handleCancelClick('arrival', veh.vb_id, veh.booking_date)}
                                                                                     className="mt-2 text-[9px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600 border border-transparent hover:border-rose-200 px-2 py-1 rounded transition-colors"
                                                                                 >
                                                                                     Cancel
@@ -717,7 +774,7 @@ const GuestBookings = () => {
                                                                             )}
                                                                             {!veh.isArrivalTransport && !['cancelled', 'completed'].includes(veh.vb_status?.toLowerCase()) && (
                                                                                 <button
-                                                                                    onClick={() => handleCancelClick('vehicle', veh.vb_id)}
+                                                                                    onClick={() => handleCancelClick('vehicle', veh.vb_id, veh.booking_date)}
                                                                                     className="mt-2 text-[9px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600 border border-transparent hover:border-rose-200 px-2 py-1 rounded transition-colors"
                                                                                 >
                                                                                     Cancel
@@ -841,21 +898,56 @@ const GuestBookings = () => {
                             </div>
                             
                             <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-2">Cancel Service?</h3>
-                            <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+                            <p className="text-slate-500 text-sm mb-4 leading-relaxed">
                                 Please tell us why you're cancelling. 
                                 {cancelModal.type === 'room' && " This will cancel the entire trip and all linked services."}
                             </p>
+
+                            {/* Refund Policy Notice */}
+                            {(cancelModal.type === 'room' || cancelModal.type === 'vehicle' || cancelModal.type === 'arrival') ? (
+                                <div className="mb-4 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
+                                    <p className="font-black uppercase tracking-wider mb-1">📋 Refund Policy</p>
+                                    <p>Rooms &amp; Vehicles are eligible for a refund if cancelled <strong>at least 24 hours</strong> before check-in. Activities &amp; Dining are <strong>non-refundable</strong>.</p>
+                                </div>
+                            ) : (
+                                <div className="mb-4 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-800">
+                                    <p className="font-black uppercase tracking-wider mb-1">⚠️ Non-Refundable</p>
+                                    <p>As per our policy, activities and dining services are <strong>strictly non-refundable</strong>.</p>
+                                </div>
+                            )}
 
                             <textarea
                                 value={cancelModal.reason}
                                 onChange={(e) => setCancelModal({ ...cancelModal, reason: e.target.value })}
                                 placeholder="Why are you cancelling?"
-                                className="w-full h-32 p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-gold-500 focus:bg-white transition-all outline-none text-slate-700 text-sm resize-none mb-6"
+                                className="w-full h-28 p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-gold-500 focus:bg-white transition-all outline-none text-slate-700 text-sm resize-none mb-4"
                             />
+
+                            {/* Refund Request Checkbox - only for room/vehicle/arrival if eligible */}
+                            {(cancelModal.type === 'room' || cancelModal.type === 'vehicle' || cancelModal.type === 'arrival') && (
+                                isRefundEligible(cancelModal.checkInDate) ? (
+                                    <label className="flex items-start gap-3 mb-6 cursor-pointer group">
+                                        <input
+                                            type="checkbox"
+                                            checked={cancelModal.requestRefund}
+                                            onChange={(e) => setCancelModal({ ...cancelModal, requestRefund: e.target.checked })}
+                                            className="mt-0.5 w-4 h-4 accent-gold-500 cursor-pointer"
+                                        />
+                                        <div>
+                                            <p className="text-sm font-bold text-slate-800 group-hover:text-gold-600 transition-colors">Yes, I want to request a refund</p>
+                                            <p className="text-xs text-slate-400 mt-0.5">A refund request will be submitted for review by the hotel team.</p>
+                                        </div>
+                                    </label>
+                                ) : (
+                                    <div className="mb-6 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                                        <p className="text-xs text-slate-500">⏰ <strong>Refund not available</strong> — cancellations must be made at least 24 hours before check-in.</p>
+                                    </div>
+                                )
+                            )}
 
                             <div className="flex gap-3">
                                 <button
-                                    onClick={() => setCancelModal({ isOpen: false, type: '', id: null, reason: '' })}
+                                    onClick={() => setCancelModal({ isOpen: false, type: '', id: null, reason: '', requestRefund: false, checkInDate: null })}
                                     className="flex-1 py-4 px-6 bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold rounded-2xl transition-all uppercase tracking-widest text-[10px]"
                                 >
                                     Go Back

@@ -114,8 +114,9 @@ const Profile = () => {
                                 type="email"
                                 name="guest_email"
                                 value={profileData.guest_email}
-                                onChange={handleChange}
-                                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-gold-500 outline-none"
+                                disabled
+                                className="w-full px-4 py-2 border border-slate-200 bg-slate-50 text-slate-500 rounded-lg cursor-not-allowed outline-none"
+                                title="Email address cannot be changed"
                             />
                         ) : (
                             <p className="text-slate-900 font-medium">{profileData.guest_email}</p>
