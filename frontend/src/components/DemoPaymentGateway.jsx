@@ -78,78 +78,116 @@ const DemoPaymentGateway = ({ isOpen, onClose, onPaymentSuccess, amount }) => {
         
         // Brand Colors
         const slate900 = [15, 23, 42];
+        const slate800 = [30, 41, 59];
+        const slate50 = [248, 250, 252];
         const gold500 = [234, 179, 8];
         const gold600 = [202, 138, 4];
+        const successGreen = [22, 163, 74];
+        const successBg = [220, 252, 231];
         
-        // Header
+        // Page Background (Light Slate)
+        doc.setFillColor(...slate50);
+        doc.rect(0, 0, 210, 297, 'F');
+        
+        // Header Banner
         doc.setFillColor(...slate900);
-        doc.rect(0, 0, 210, 45, 'F');
+        doc.rect(0, 0, 210, 50, 'F');
         
+        // Gold Accent Line
+        doc.setFillColor(...gold500);
+        doc.rect(0, 50, 210, 2, 'F');
+        
+        // Header Text
         doc.setTextColor(...gold500);
-        doc.setFontSize(26);
+        doc.setFontSize(28);
         doc.setFont("helvetica", "bold");
-        doc.text("JANAS GATEWAY", 105, 22, { align: 'center' });
+        doc.text("JANAS GATEWAY", 105, 25, { align: 'center' });
         
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
-        doc.text("SECURE ACADEMIC TRANSACTION", 105, 30, { align: 'center' });
+        doc.text("S E C U R E   A C A D E M I C   T R A N S A C T I O N", 105, 35, { align: 'center' });
         
-        // Main Content Area
-        doc.setTextColor(...slate900);
+        // Main Content Container (White Card)
+        doc.setFillColor(255, 255, 255);
+        doc.setDrawColor(226, 232, 240); // slate-200
+        doc.setLineWidth(0.5);
+        doc.roundedRect(15, 65, 180, 160, 5, 5, 'FD'); // Fill and Draw border
         
         // Title
-        doc.setFontSize(18);
+        doc.setTextColor(...slate900);
+        doc.setFontSize(20);
         doc.setFont("helvetica", "bold");
-        doc.text("Payment Receipt", 105, 65, { align: 'center' });
+        doc.text("OFFICIAL RECEIPT", 105, 85, { align: 'center' });
         
-        // Horizontal line
-        doc.setDrawColor(230, 230, 230);
-        doc.line(20, 75, 190, 75);
+        // Subtle Separator
+        doc.setDrawColor(241, 245, 249); // slate-100
+        doc.line(25, 95, 185, 95);
         
-        // Details
-        doc.setFontSize(12);
+        // Receipt Details
+        doc.setFontSize(11);
+        const startY = 110;
+        const lineSpacing = 16;
+        
+        const details = [
+            { label: "Date & Time:", value: new Date().toLocaleString() },
+            { label: "Reference No:", value: receiptRef },
+            { label: "Cardholder:", value: cardData.name.toUpperCase() },
+            { label: "Card Details:", value: `**** **** **** ${cardData.cardNumber.replace(/\\s/g, '').slice(-4)}` }
+        ];
+        
+        details.forEach((item, index) => {
+            const y = startY + (index * lineSpacing);
+            // Label
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(100, 116, 139); // slate-500
+            doc.text(item.label, 30, y);
+            // Value
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(...slate800);
+            doc.text(item.value, 85, y);
+        });
+        
+        // Status row
+        const statusY = startY + (details.length * lineSpacing);
         doc.setFont("helvetica", "normal");
-        doc.setTextColor(100, 100, 100);
+        doc.setTextColor(100, 116, 139);
+        doc.text("Status:", 30, statusY);
         
-        doc.text("Date & Time:", 20, 95);
-        doc.text("Reference No:", 20, 110);
-        doc.text("Cardholder:", 20, 125);
-        doc.text("Card Details:", 20, 140);
-        doc.text("Status:", 20, 155);
-        
+        // Colored Status Badge
+        doc.setFillColor(...successBg);
+        doc.roundedRect(85, statusY - 6, 40, 8, 4, 4, 'F');
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(...slate900);
+        doc.setTextColor(...successGreen);
+        doc.setFontSize(10);
+        doc.text("SUCCESS", 105, statusY, { align: 'center' });
         
-        doc.text(new Date().toLocaleString(), 80, 95);
-        doc.text(receiptRef, 80, 110);
-        doc.text(cardData.name.toUpperCase(), 80, 125);
-        doc.text(`**** **** **** ${cardData.cardNumber.replace(/\\s/g, '').slice(-4)}`, 80, 140);
+        // Total Box (Dark themed for contrast)
+        doc.setFillColor(...slate900);
+        doc.roundedRect(25, 190, 160, 25, 4, 4, 'F');
         
-        // Status with color
-        doc.setTextColor(34, 197, 94); // Green
-        doc.text("SUCCESS", 80, 155);
-        
-        // Total Box
-        doc.setFillColor(249, 250, 251); // slate-50
-        doc.setDrawColor(226, 232, 240); // slate-200
-        doc.roundedRect(20, 175, 170, 30, 5, 5, 'FD');
-        
-        doc.setTextColor(...slate900);
+        doc.setTextColor(255, 255, 255);
         doc.setFontSize(14);
         doc.setFont("helvetica", "bold");
-        doc.text("Total Amount Paid", 30, 193);
+        doc.text("Total Amount Paid", 35, 206);
         
-        doc.setTextColor(...gold600);
+        doc.setTextColor(...gold500);
         doc.setFontSize(18);
-        doc.text(`Rs. ${amount?.toLocaleString() || '0'}`, 180, 194, { align: 'right' });
+        doc.text(`Rs. ${amount?.toLocaleString() || '0'}`, 175, 207, { align: 'right' });
         
-        // Footer
-        doc.setFontSize(8);
+        // Footer Area
+        doc.setFillColor(241, 245, 249); // slate-100
+        doc.rect(0, 270, 210, 27, 'F');
+        
+        doc.setFontSize(9);
         doc.setFont("helvetica", "normal");
-        doc.setTextColor(150, 150, 150);
-        doc.text("This is a computer generated receipt from Janas Payment Gateway.", 105, 275, { align: 'center' });
-        doc.text("Academic Demonstration Mode Only", 105, 282, { align: 'center' });
+        doc.setTextColor(100, 116, 139); // slate-500
+        doc.text("This is a computer generated receipt from Janas Payment Gateway.", 105, 280, { align: 'center' });
+        
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...gold600);
+        doc.text("ACADEMIC DEMONSTRATION MODE ONLY", 105, 288, { align: 'center' });
         
         doc.save(`Janas_Receipt_${receiptRef}.pdf`);
     };

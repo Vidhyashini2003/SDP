@@ -229,6 +229,35 @@ exports.activateAccount = async (req, res) => {
             // Mark Token Used
             await connection.query("DELETE FROM activation_tokens WHERE id = ?", [tokenData.id]);
 
+            // --- Walk-in Guest Data Migration ---
+            // 1. Get the new guest_id for this user
+            const [guests] = await connection.query('SELECT guest_id FROM Guest WHERE user_id = ?', [tokenData.user_id]);
+            
+            if (guests.length > 0) {
+                const newGuestId = guests[0].guest_id;
+                
+                // 2. Find any walkin_guest record with the same email
+                const [walkins] = await connection.query('SELECT wig_id FROM walkin_guest WHERE email = ?', [tokenData.email]);
+                
+                if (walkins.length > 0) {
+                    const oldWigId = walkins[0].wig_id;
+                    
+                    // 3. Migrate all data
+                    await connection.query('UPDATE roombooking SET guest_id = ?, wig_id = NULL WHERE wig_id = ?', [newGuestId, oldWigId]);
+                    await connection.query('UPDATE activitybooking SET guest_id = ?, wig_id = NULL WHERE wig_id = ?', [newGuestId, oldWigId]);
+                    await connection.query('UPDATE hirevehicle SET guest_id = ?, wig_id = NULL WHERE wig_id = ?', [newGuestId, oldWigId]);
+                    await connection.query('UPDATE foodorder SET guest_id = ?, wig_id = NULL WHERE wig_id = ?', [newGuestId, oldWigId]);
+                    await connection.query('UPDATE damage SET guest_id = ?, wig_id = NULL WHERE wig_id = ?', [newGuestId, oldWigId]);
+                    await connection.query('UPDATE hire_vehicle_for_arrival SET guest_id = ?, wig_id = NULL WHERE wig_id = ?', [newGuestId, oldWigId]);
+                    
+                    // 4. Clean up the walkin_guest record
+                    await connection.query('DELETE FROM walkin_guest WHERE wig_id = ?', [oldWigId]);
+                    
+                    console.log(`Successfully migrated walk-in data (wig_id: ${oldWigId}) to new guest account (guest_id: ${newGuestId})`);
+                }
+            }
+            // ------------------------------------
+
             await connection.commit();
             res.json({ message: 'Account activated successfully. You can now login.' });
         }

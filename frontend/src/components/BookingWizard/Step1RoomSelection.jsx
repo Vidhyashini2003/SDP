@@ -127,16 +127,16 @@ const Step1RoomSelection = ({ bookingData, setBookingData, availableRooms, setAv
         if (type.includes('suite')) return { beds: '1 King Bed + Sofa', size: '45 m²' };
         if (type.includes('deluxe')) return { beds: '1 Queen Bed', size: '30 m²' };
         if (type.includes('family')) return { beds: '2 Queen Beds', size: '50 m²' };
-        return { beds: '2 Single Beds', size: '25 m²' };
+        return { beds: '3 Single Beds', size: '49 m²' };
     };
 
     const getRoomAmenities = (roomType) => {
-        const base = ['Free WiFi', 'Air Conditioning', 'Sea View'];
+        const base = ['Free WiFi', 'Air Conditioning'];
         const type = roomType?.toLowerCase() || '';
-        if (type.includes('suite')) return [...base, 'Jacuzzi', 'Private Balcony', 'Butler Service'];
-        if (type.includes('deluxe')) return [...base, 'Mini Bar', 'Private Balcony'];
-        if (type.includes('family')) return [...base, 'Kids Corner', 'Extra Beds'];
-        return [...base, 'Wardrobe'];
+        if (type.includes('suite')) return [...base, 'Sea View', 'Jacuzzi', 'Private Balcony', 'Butler Service'];
+        if (type.includes('deluxe')) return [...base, 'Sea View', 'Mini Bar', 'Private Balcony'];
+        if (type.includes('family')) return [...base, 'Sea View', 'Kids Corner', 'Extra Beds'];
+        return [...base];
     };
 
     // Get min checkout date
