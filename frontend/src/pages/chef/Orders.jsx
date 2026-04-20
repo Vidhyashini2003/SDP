@@ -62,8 +62,8 @@ const ChefOrders = () => {
     if (loading) return <div className="p-8">Loading culinary missions...</div>;
 
     // Orders are already filtered by date from the backend
-    const activeOrders = orders.filter(o => o.order_status === 'Pending' || o.order_status === 'Preparing');
-    const historyOrders = orders.filter(o => o.order_status === 'Prepared' || o.order_status === 'Delivered' || o.order_status === 'Cancelled' || o.order_status === 'Incomplete');
+    const activeOrders = orders.filter(o => o.order_status === 'Pending' || o.order_status === 'Preparing' || o.order_status === 'Prepared');
+    const historyOrders = orders.filter(o => o.order_status === 'Delivered' || o.order_status === 'Cancelled' || o.order_status === 'Incomplete');
 
     const recentHistory = historyOrders.slice(0, 10);
 

@@ -56,7 +56,7 @@ const Step2AddExtras = ({
     };
 
     // Food functions
-    const addFoodItem = (item, date, mealType) => {
+    const addFoodItem = (item, date, mealType, diningOption) => {
         if (!date || !mealType) {
             alert('Please select a date and meal type for this item');
             return;
@@ -69,6 +69,11 @@ const Step2AddExtras = ({
         if (existingGroupIndex !== -1) {
             const group = { ...bookingData.food[existingGroupIndex] };
             const existingItem = group.items.find(i => i.item_id === item.item_id);
+
+            // Update dining option if it was changed
+            if (diningOption) {
+                group.dining_option = diningOption;
+            }
 
             if (existingItem) {
                 group.items = group.items.map(i =>
@@ -89,6 +94,7 @@ const Step2AddExtras = ({
                     {
                         scheduled_date: date,
                         meal_type: mealType,
+                        dining_option: diningOption || 'Delivery',
                         items: [{ ...item, quantity: 1 }]
                     }
                 ]
@@ -277,6 +283,7 @@ const Step2AddExtras = ({
                             <FoodTab
                                 categorizeMenu={categorizeMenu}
                                 bookingData={bookingData}
+                                setBookingData={setBookingData}
                                 addFoodItem={addFoodItem}
                                 removeFoodItem={removeFoodItem}
                                 updateFoodQuantity={updateFoodQuantity}
@@ -435,9 +442,10 @@ const TabButton = ({ label, icon, active, onClick }) => (
     </button>
 );
 
-const FoodTab = ({ categorizeMenu, bookingData, addFoodItem, removeFoodItem, updateFoodQuantity, clearFoodBasket }) => {
+const FoodTab = ({ categorizeMenu, bookingData, setBookingData, addFoodItem, removeFoodItem, updateFoodQuantity, clearFoodBasket }) => {
     const [selectedDate, setSelectedDate] = useState(bookingData.checkIn);
     const [selectedMealType, setSelectedMealType] = useState('Breakfast');
+    const [selectedDiningOption, setSelectedDiningOption] = useState('Delivery');
 
     const getDatesInRange = (startDate, endDate) => {
         const dates = [];
@@ -506,9 +514,9 @@ const FoodTab = ({ categorizeMenu, bookingData, addFoodItem, removeFoodItem, upd
             <div className="bg-slate-900 rounded-[2rem] p-8 text-white shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-gold-500/10 rounded-full -mr-32 -mt-32 blur-3xl"></div>
                 
-                <div className="relative z-10 flex flex-col md:flex-row gap-x-8 gap-y-6 items-stretch md:items-end">
+                <div className="relative z-10 flex flex-col md:flex-row gap-x-8 gap-y-6 items-stretch md:items-start">
                     <div className="flex-1 min-w-0 space-y-4">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Select Menu Date</label>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Select Menu Date</label>
                         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
                             {stayDates.map(date => {
                                 const d = new Date(date);
@@ -527,22 +535,55 @@ const FoodTab = ({ categorizeMenu, bookingData, addFoodItem, removeFoodItem, upd
                         </div>
                     </div>
 
-                    <div className="w-full md:w-80 flex-shrink-0 space-y-4">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Meal Time</label>
-                        <div className="flex bg-slate-800 p-1.5 rounded-2xl">
-                            {mealTypes.map(type => {
-                                const disabled = isMealTypeDisabled(selectedDate, type);
-                                return (
-                                    <button
-                                        key={type}
-                                        onClick={() => !disabled && setSelectedMealType(type)}
-                                        disabled={disabled}
-                                        className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all ${selectedMealType === type ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400 hover:text-white'} ${disabled ? 'opacity-20 cursor-not-allowed' : ''}`}
-                                    >
-                                        {type}
-                                    </button>
-                                );
-                            })}
+                    <div className="flex flex-col gap-6 w-full md:w-80 flex-shrink-0">
+                        <div className="w-full space-y-4">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Meal Time</label>
+                            <div className="flex bg-slate-800 p-1.5 rounded-2xl">
+                                {mealTypes.map(type => {
+                                    const disabled = isMealTypeDisabled(selectedDate, type);
+                                    return (
+                                        <button
+                                            key={type}
+                                            onClick={() => !disabled && setSelectedMealType(type)}
+                                            disabled={disabled}
+                                            className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all ${selectedMealType === type ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400 hover:text-white'} ${disabled ? 'opacity-20 cursor-not-allowed' : ''}`}
+                                        >
+                                            {type}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="w-full space-y-4">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Dining Option</label>
+                            <div className="flex bg-slate-800 p-1.5 rounded-2xl">
+                                {['Delivery', 'Dine-in'].map(opt => {
+                                    const currentGroup = bookingData.food.find(
+                                        f => f.scheduled_date === selectedDate && f.meal_type === selectedMealType
+                                    );
+                                    const activeOption = currentGroup ? currentGroup.dining_option : selectedDiningOption;
+                                    
+                                    return (
+                                        <button
+                                            key={opt}
+                                            onClick={() => {
+                                                setSelectedDiningOption(opt);
+                                                if (currentGroup) {
+                                                    const updatedFood = bookingData.food.map(g => 
+                                                        (g.scheduled_date === selectedDate && g.meal_type === selectedMealType) 
+                                                        ? { ...g, dining_option: opt } : g
+                                                    );
+                                                    setBookingData({ ...bookingData, food: updatedFood });
+                                                }
+                                            }}
+                                            className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all ${activeOption === opt ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400 hover:text-white'}`}
+                                        >
+                                            {opt === 'Delivery' ? '🛵' : '🍽️'} {opt}
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -582,7 +623,7 @@ const FoodTab = ({ categorizeMenu, bookingData, addFoodItem, removeFoodItem, upd
                                         <div className="flex items-center">
                                             {!inCartItem ? (
                                                 <button 
-                                                    onClick={() => !isMealTypeDisabled(selectedDate, selectedMealType) && addFoodItem(item, selectedDate, selectedMealType)}
+                                                    onClick={() => !isMealTypeDisabled(selectedDate, selectedMealType) && addFoodItem(item, selectedDate, selectedMealType, selectedDiningOption)}
                                                     disabled={isMealTypeDisabled(selectedDate, selectedMealType)}
                                                     className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all transform active:scale-95 shadow-lg shadow-slate-900/10 ${isMealTypeDisabled(selectedDate, selectedMealType) ? 'bg-slate-100 text-slate-300 cursor-not-allowed' : 'bg-slate-900 hover:bg-gold-500 text-white'}`}
                                                 >

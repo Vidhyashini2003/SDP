@@ -29,7 +29,7 @@ const initCronJobs = () => {
                 const [food] = await connection.query(`
                     UPDATE foodorder 
                     SET order_status = 'Incomplete' 
-                    WHERE scheduled_date <= DATE_SUB(NOW(), INTERVAL 2 HOUR) AND order_status = 'Pending'
+                    WHERE scheduled_date < CURDATE() AND order_status = 'Pending'
                 `);
                 if(food.affectedRows > 0) console.log(`[CRON] Auto-marked ${food.affectedRows} passed food orders as Incomplete.`);
 

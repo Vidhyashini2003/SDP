@@ -672,10 +672,10 @@ exports.completeBooking = async (req, res) => {
             // 3. Create Food Orders
             if (food && food.length > 0) {
                 for (const orderGroup of food) {
-                    const { scheduled_date, meal_type, items } = orderGroup;
+                    const { scheduled_date, meal_type, items, dining_option } = orderGroup;
                     const [orderResult] = await connection.query(
                         'INSERT INTO foodorder (guest_id, wig_id, order_status, dining_option, rb_id, scheduled_date, meal_type, payment_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                        [guest_id, wig_id, 'Pending', room.diningOption || 'Delivery', rb_id, scheduled_date, meal_type, payment_id]
+                        [guest_id, wig_id, 'Pending', dining_option || room.diningOption || 'Delivery', rb_id, scheduled_date, meal_type, payment_id]
                     );
                     const order_id = orderResult.insertId;
                     foodOrderIds.push(order_id);

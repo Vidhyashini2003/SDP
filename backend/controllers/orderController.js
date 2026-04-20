@@ -211,12 +211,12 @@ exports.placeBulkOrder = async (req, res) => {
 
             // 2. Process each group (date + meal_type)
             for (const group of orderGroups) {
-                const { scheduled_date, meal_type, items } = group;
+                const { scheduled_date, meal_type, items, dining_option: group_dining_option } = group;
 
                 // Create FoodOrder
                 const [orderResult] = await connection.query(
                     'INSERT INTO foodorder (guest_id, order_status, dining_option, rb_id, scheduled_date, meal_type, payment_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                    [guest_id, 'Pending', dining_option || 'Delivery', rb_id, scheduled_date, meal_type, payment_id]
+                    [guest_id, 'Pending', group_dining_option || dining_option || 'Delivery', rb_id, scheduled_date, meal_type, payment_id]
                 );
                 const order_id = orderResult.insertId;
                 createdOrderIds.push(order_id);
