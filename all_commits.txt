@@ -1,8 +1,0 @@
-﻿80a7d7f guest updated
-10c8dca password validations
-7b15682 admin user management
-6c3ed86 manage availability
-7a8fecb Report generation in Admin
-b1ecd9c forget password
-6cc2894 authentication update
-376168b Initial commit

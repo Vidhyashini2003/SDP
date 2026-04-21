@@ -1,7 +1,61 @@
+/**
+ * controllers/guestController.js — Guest Portal Business Logic
+ *
+ * This controller handles all API logic for the guest-facing portal.
+ * Every function here is called from routes/guest.js (and some from routes/bookings.js).
+ *
+ * Functions exported:
+ *
+ *  Profile
+ *    getProfile()       — Returns full guest profile (joined with Users table)
+ *    updateProfile()    — Updates name, phone, NIC, nationality for a guest
+ *
+ *  Booking Views
+ *    getMyBookings()       — Returns flat list of room + activity + vehicle bookings
+ *    getGroupedBookings()  — Returns bookings grouped by room trip (the main "My Bookings" page)
+ *                           Each room booking includes linked activities, vehicles,
+ *                           arrival transports, food orders, and quick rides.
+ *    getActiveBookings()   — Returns only currently active room bookings (for service gating)
+ *
+ *  Cancellations
+ *    cancelRoomBooking()      — Cancels the room AND all linked services (cascading cancel).
+ *                              Handles optional refund requests (>24h before check-in).
+ *    cancelActivityBooking()  — Cancels a single activity booking
+ *    cancelFoodOrder()        — Cancels an entire food order (if not already being prepared)
+ *    cancelFoodOrderItem()    — Cancels one item from a food order; cancels order if all items cancelled
+ *    cancelArrivalTransport() — Cancels an airport transfer, notifies driver, optional refund
+ *    cancelVehicleHire()      — Cancels a per-day vehicle hire, notifies driver, optional refund
+ *
+ *  Payments
+ *    payhirevehicle()    — Processes payment for a per-day vehicle hire (creates payment record, notifies driver)
+ *    payArrivalTransport() — Processes payment for an arrival transport (after driver sets price)
+ *
+ *  Informational (shared with receptionist)
+ *    getActivities()   — Returns all 'Available' activities
+ *    getVehicles()     — Returns all 'Available' vehicles
+ *    getMenu()         — Returns all 'Available' menu items
+ *    getOrders()       — Returns all food orders for the current guest (grouped by order)
+ *
+ * Key patterns used:
+ *  - Transactions (connection.beginTransaction / commit / rollback) for operations that touch
+ *    multiple tables (cancellations with cascading updates, payment creation + booking update)
+ *  - notificationController.createNotification() to notify drivers of cancellations/payments
+ *  - requestRefund flag: refunds are ONLY created when the guest explicitly requests one during cancellation
+ */
+
 const db = require('../config/db');
 const bcrypt = require('bcryptjs');
 const notificationController = require('./notificationController');
 
+// ─────────────────────────────────────────────
+// PROFILE
+// ─────────────────────────────────────────────
+
+/**
+ * GET /api/guest/profile
+ * Returns the full profile of the logged-in guest, joining Guest and Users tables.
+ * Includes: name, email, phone, NIC/passport, nationality, role.
+ */
 exports.getProfile = async (req, res) => {
     try {
         const [rows] = await db.query(
@@ -22,6 +76,11 @@ exports.getProfile = async (req, res) => {
     }
 };
 
+/**
+ * PUT /api/guest/profile
+ * Updates guest profile fields across both the Users table (name) and Guest table (phone, NIC, nationality).
+ * Uses a transaction to ensure both updates succeed together.
+ */
 exports.updateProfile = async (req, res) => {
     const connection = await db.getConnection();
     try {

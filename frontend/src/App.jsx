@@ -1,3 +1,32 @@
+/**
+ * App.jsx — Root Application Component & Client-Side Router
+ *
+ * This file is the central hub of the frontend. It defines ALL routes for every
+ * user role using React Router v6 nested routes.
+ *
+ * Architecture:
+ *   - BrowserRouter: Enables URL-based navigation (using the browser history API)
+ *   - AuthProvider: Wraps everything so all components can access the logged-in user
+ *   - ProtectedRoute: Guards role-specific route trees; redirects unauthenticated users
+ *
+ * Layouts:
+ *   - PublicLayout:    No header/sidebar. Used for Home, Login, Register, etc.
+ *   - GuestLayout:     Full-screen guest UI with a custom sidebar (from GuestLayout.jsx)
+ *   - DashboardLayout: Top navbar + collapsible sidebar (used for all staff roles)
+ *
+ * Role → Route Prefix mapping:
+ *   - guest       → /guest/*        (GuestLayout)
+ *   - admin       → /admin/*        (DashboardLayout + adminItems sidebar)
+ *   - receptionist → /receptionist/* (DashboardLayout + receptionistItems sidebar)
+ *   - driver      → /driver/*       (DashboardLayout + driverItems sidebar)
+ *   - chef        → /chef/*         (DashboardLayout + chefItems sidebar)
+ *
+ * Sidebar items:
+ *   Each role has a pre-defined array (e.g. adminItems, receptionistItems) that is
+ *   passed to the Sidebar component to generate the left-side navigation links.
+ *   Each item has: { name, path, icon }.
+ */
+
 import { BrowserRouter, Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/Navbar';
@@ -5,7 +34,9 @@ import Sidebar from './components/Sidebar'; // Import Sidebar
 import ProtectedRoute from './components/ProtectedRoute';
 import { HomeIcon, BuildingOfficeIcon, TicketIcon, CurrencyDollarIcon, ExclamationCircleIcon, TruckIcon, ClipboardDocumentListIcon, CakeIcon, ClockIcon, BellIcon, UserIcon, UserPlusIcon } from '@heroicons/react/24/outline';
 
-// Public Pages
+// ─────────────────────────────────────────────
+// PUBLIC PAGE IMPORTS (no login required)
+// ─────────────────────────────────────────────
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -14,7 +45,9 @@ import CheckEmail from './pages/auth/CheckEmail';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 
-// Guest Pages
+// ─────────────────────────────────────────────
+// GUEST PAGE IMPORTS
+// ─────────────────────────────────────────────
 import GuestDashboard from './pages/guest/Dashboard';
 import GuestBookings from './pages/guest/Bookings'; // Import GuestBookings
 import RoomBooking from './pages/guest/RoomBooking';
@@ -26,7 +59,9 @@ import VehicleHire from './pages/guest/VehicleHire';
 import Notifications from './pages/guest/Notifications';
 import ExtendRoomBooking from './pages/guest/ExtendRoomBooking';
 
-// Staff Pages
+// ─────────────────────────────────────────────
+// STAFF PAGE IMPORTS
+// ─────────────────────────────────────────────
 import ReceptionistDashboard from './pages/receptionist/Dashboard';
 import AdminDashboard from './pages/admin/Dashboard';
 import StaffManagement from './pages/admin/StaffManagement';
@@ -53,19 +88,38 @@ import ChangePassword from './pages/common/ChangePassword';
 import CommonNotifications from './pages/common/Notifications';
 import ResourceManagement from './pages/common/ResourceManagement';
 
-// Layouts
+// ─────────────────────────────────────────────
+// LAYOUTS
+// ─────────────────────────────────────────────
+
+/**
+ * PublicLayout — Simple wrapper with no navigation.
+ * Used for pages accessible without logging in (Home, Login, Register, etc.)
+ * <Outlet /> renders whichever child route matched the current URL.
+ */
 const PublicLayout = () => (
     <Outlet />
 );
 
 import GuestLayoutComponent from './components/GuestLayout';
 
+/**
+ * GuestLayout — Wraps the guest portal pages inside the custom GuestLayout UI.
+ * GuestLayout.jsx provides the guest-specific sidebar and header.
+ */
 const GuestLayout = () => (
     <GuestLayoutComponent>
         <Outlet />
     </GuestLayoutComponent>
 );
 
+/**
+ * DashboardLayout — Used by all staff roles (admin, receptionist, driver, chef).
+ * Renders:
+ *  - Navbar: Fixed top bar with user info and logout
+ *  - Sidebar: Left navigation with role-specific links (passed via `items` prop)
+ *  - Content Area: The matched child route page, offset for the sidebar and navbar
+ */
 const DashboardLayout = ({ items }) => (
     <div className="min-h-screen bg-slate-50">
         <Navbar />
@@ -76,6 +130,12 @@ const DashboardLayout = ({ items }) => (
     </div>
 );
 
+// ─────────────────────────────────────────────
+// SIDEBAR NAVIGATION ITEMS (per role)
+// Each item: { name: string, path: string, icon: HeroIcon }
+// ─────────────────────────────────────────────
+
+/** Admin sidebar: dashboard, staff, customers, availability, resources, reports, notifications */
 const adminItems = [
     { name: 'Dashboard', path: '/admin/dashboard', icon: HomeIcon },
     { name: 'Staff Management', path: '/admin/staff', icon: ClipboardDocumentListIcon },
@@ -86,6 +146,7 @@ const adminItems = [
     { name: 'Notifications', path: '/admin/notifications', icon: BellIcon }, // Added
 ];
 
+/** Receptionist sidebar: dashboard, bookings, walk-in, activities, availability, resources, refunds, damages, notifications */
 const receptionistItems = [
     { name: 'Dashboard', path: '/receptionist/dashboard', icon: HomeIcon },
     { name: 'Manage Bookings', path: '/receptionist/bookings', icon: BuildingOfficeIcon },
@@ -98,6 +159,7 @@ const receptionistItems = [
     { name: 'Notifications', path: '/receptionist/notifications', icon: BellIcon },
 ];
 
+/** Driver sidebar: dashboard, hire requests, trips, refunds, notifications */
 const driverItems = [
     { name: 'Dashboard', path: '/driver/dashboard', icon: HomeIcon },
     { name: 'Hire Requests', path: '/driver/requests', icon: ClipboardDocumentListIcon },
@@ -106,6 +168,7 @@ const driverItems = [
     { name: 'Notifications', path: '/driver/notifications', icon: BellIcon }, // Added
 ];
 
+/** Chef sidebar: dashboard, orders, menu management, damages, order history, notifications */
 const chefItems = [
     { name: 'Dashboard', path: '/chef/dashboard', icon: HomeIcon },
     { name: 'Orders', path: '/chef/orders', icon: ClipboardDocumentListIcon },
@@ -116,12 +179,19 @@ const chefItems = [
 ];
 
 
+// ─────────────────────────────────────────────
+// ROOT APP COMPONENT
+// ─────────────────────────────────────────────
 
 function App() {
     return (
         <BrowserRouter>
+            {/* AuthProvider makes the logged-in user available everywhere via useAuth() */}
             <AuthProvider>
                 <Routes>
+
+                    {/* ── PUBLIC ROUTES ─────────────────────────────────────── */}
+                    {/* Accessible without login (Home, Login, Register, Password reset) */}
                     <Route element={<PublicLayout />}>
                         <Route path="/" element={<Home />} />
                         <Route path="/login" element={<Login />} />
@@ -132,15 +202,16 @@ function App() {
                         <Route path="/reset-password/:token" element={<ResetPassword />} />
                     </Route>
 
-                    {/* Guest Routes */}
+                    {/* ── GUEST ROUTES (/guest/*) ────────────────────────────── */}
+                    {/* Only accessible to users with role = 'guest' */}
                     <Route path="/guest" element={
                         <ProtectedRoute allowedRoles={['guest']}>
                             <GuestLayout />
                         </ProtectedRoute>
                     }>
-                        <Route path="bookings" element={<GuestDashboard />} />
-                        <Route path="my-bookings" element={<GuestBookings />} />
-                        <Route path="booking-history" element={<GuestBookings />} />
+                        <Route path="bookings" element={<GuestDashboard />} />         {/* Booking wizard */}
+                        <Route path="my-bookings" element={<GuestBookings />} />       {/* View all bookings */}
+                        <Route path="booking-history" element={<GuestBookings />} />   {/* Same view — alias */}
                         <Route path="profile" element={<Profile />} />
                         <Route path="change-password" element={<ChangePassword />} />
                         <Route path="rooms" element={<RoomBooking />} />
@@ -150,10 +221,11 @@ function App() {
                         <Route path="vehicle-hire" element={<VehicleHire />} />
                         <Route path="extend-room" element={<ExtendRoomBooking />} />
                         <Route path="notifications" element={<Notifications />} />
-                        <Route index element={<Navigate to="my-bookings" replace />} />
+                        <Route index element={<Navigate to="my-bookings" replace />} /> {/* Default: redirect to my bookings */}
                     </Route>
 
-                    {/* Admin Routes */}
+                    {/* ── ADMIN ROUTES (/admin/*) ────────────────────────────── */}
+                    {/* Only accessible to users with role = 'admin' */}
                     <Route path="/admin" element={
                         <ProtectedRoute allowedRoles={['admin']}>
                             <DashboardLayout items={adminItems} />
@@ -171,7 +243,8 @@ function App() {
                         <Route index element={<Navigate to="dashboard" replace />} />
                     </Route>
 
-                    {/* Receptionist Routes */}
+                    {/* ── RECEPTIONIST ROUTES (/receptionist/*) ─────────────── */}
+                    {/* Accessible by 'receptionist' OR 'admin' (admin can view all portals) */}
                     <Route path="/receptionist" element={
                         <ProtectedRoute allowedRoles={['receptionist', 'admin']}>
                             <DashboardLayout items={receptionistItems} />
@@ -191,7 +264,8 @@ function App() {
                         <Route index element={<Navigate to="dashboard" replace />} />
                     </Route>
 
-                    {/* Driver Routes */}
+                    {/* ── DRIVER ROUTES (/driver/*) ──────────────────────────── */}
+                    {/* Accessible by 'driver' OR 'admin' */}
                     <Route path="/driver" element={
                         <ProtectedRoute allowedRoles={['driver', 'admin']}>
                             <DashboardLayout items={driverItems} />
@@ -207,7 +281,8 @@ function App() {
                         <Route index element={<Navigate to="dashboard" replace />} />
                     </Route>
 
-                    {/* Chef Routes */}
+                    {/* ── CHEF ROUTES (/chef/*) ──────────────────────────────── */}
+                    {/* Accessible by 'chef' OR 'admin' */}
                     <Route path="/chef" element={
                         <ProtectedRoute allowedRoles={['chef', 'admin']}>
                             <DashboardLayout items={chefItems} />

@@ -1,10 +1,66 @@
+/**
+ * controllers/authController.js — Authentication & User Identity Logic
+ *
+ * This controller handles all user authentication workflows for the system.
+ * It is called from routes/auth.js and serves ALL user roles.
+ *
+ * Functions exported:
+ *
+ *  registerGuest(req, res)
+ *    — Public. Creates a new guest account (Users + Guest tables).
+ *      Sends a verification/activation email with a JWT link.
+ *
+ *  login(req, res)
+ *    — Public. Unified login for ALL roles (guest, admin, receptionist, chef, driver).
+ *      Validates credentials with bcrypt, returns a JWT token + user object.
+ *
+ *  activateAccount(req, res)
+ *    — GET:  Validates the activation token (used by frontend to pre-fill email).
+ *    — POST: Activates the account (sets password for staff; activates for guests).
+ *      IMPORTANT: Also runs walk-in guest data migration — transfers all bookings
+ *      from a temporary walk-in guest record (wig_id) to the newly registered account (guest_id).
+ *
+ *  forgotPassword(req, res)
+ *    — Public. Accepts an email, generates a reset token, and sends a password reset email.
+ *      Uses crypto.randomBytes for a secure token.
+ *
+ *  resetPassword(req, res)
+ *    — Public. Validates the reset token and hashes + saves the new password.
+ *
+ *  getMe(req, res)
+ *    — Protected. Returns the current user's profile (role-specific fields included).
+ *      Queries the role-specific table (e.g. Guest, Driver) joined with Users.
+ *
+ *  updateProfile(req, res)
+ *    — Protected. Updates name/email in the Users table for any role.
+ *
+ *  changePassword(req, res)
+ *    — Protected. Verifies the current password before setting a new hashed password.
+ *
+ * Helpers:
+ *  getRoleSchema(role) — Maps a role string to its DB table and primary key column.
+ *
+ * Key dependencies:
+ *  - bcryptjs: Password hashing (saltRounds = 12)
+ *  - jsonwebtoken via config/auth.js: Token generation and verification
+ *  - emailService: Sends activation and reset emails
+ *  - crypto: Generates cryptographically secure random tokens
+ */
+
 const db = require('../config/db');
 const { generateToken } = require('../config/auth');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const emailService = require('../utils/emailService');
 
-// Helper to get role specific ID column and table
+/**
+ * getRoleSchema(role) — Maps a role name to its corresponding database table and primary key.
+ * Used when fetching profile data that requires a JOIN to a role-specific table.
+ *
+ * @param {string} role — 'admin' | 'receptionist' | 'chef' | 'driver' | 'guest'
+ * @returns {{ table: string, idCol: string } | null}
+ *   Returns null for 'admin' (admin has no separate role table).
+ */
 const getRoleSchema = (role) => {
     switch (role) {
         case 'admin': return null; // Admin has no specific table

@@ -1,3 +1,35 @@
+/**
+ * utils/bookingValidation.js — Booking Access Validation Middleware
+ *
+ * Provides reusable Express middleware functions for validating guest booking conditions
+ * before allowing access to service booking endpoints (activities, food, vehicles, etc.).
+ *
+ * Why these exist:
+ *   The system enforces that guests can only book services (food, activities, vehicles)
+ *   if they have an ACTIVE room booking. This prevents guests from ordering services
+ *   without a valid stay in progress. These middleware functions are used as guards
+ *   on booking routes.
+ *
+ * Functions:
+ *
+ *  hasActiveBooking(req, res, next)
+ *    — Checks if the guest currently has at least one active room booking
+ *      (status = 'Booked' OR 'Checked-in' AND checkout_date >= today).
+ *    — If yes: attaches { guest_id, active_booking } to req.guestBooking and calls next().
+ *    — If no:  returns 403 with "No active room booking found".
+ *
+ *  validateBookingOwnership(req, res, next)
+ *    — Verifies that the booking ID passed in req.params.id belongs to the current guest.
+ *    — Prevents guests from cancelling or modifying bookings that don't belong to them.
+ *
+ *  checkDateOverlap(table, idColumn, guestId, startDate, endDate, excludeId?)
+ *    — Utility function (not middleware) that checks if a guest already has a booking
+ *      for the same resource in the given date range (prevents double-booking).
+ *    — Returns { hasOverlap: boolean }.
+ *
+ * All functions use req.user.id (set by verifyToken) to identify the current user.
+ */
+
 const db = require('../config/db');
 
 /**

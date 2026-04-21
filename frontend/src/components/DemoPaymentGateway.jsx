@@ -205,9 +205,9 @@ const DemoPaymentGateway = ({ isOpen, onClose, onPaymentSuccess, amount }) => {
                             <span className="text-3xl">🛡️</span>
                         </div>
                         <h2 className="text-xl font-black text-white uppercase tracking-widest italic leading-none">
-                            Janas <span className="text-gold-500 font-black">Gateway</span>
+                            Janas Blue Water Corner <span className="text-gold-500 font-black">Payment Gateway</span>
                         </h2>
-                        <p className="text-slate-400 text-[10px] uppercase font-bold tracking-[0.2em] mt-2">Secure Academic Transaction</p>
+                        <p className="text-slate-400 text-[10px] uppercase font-bold tracking-[0.2em] mt-2">Secure Transaction</p>
                     </div>
                 </div>
 
