@@ -74,6 +74,7 @@ app.get('/api/rooms', async (req, res) => {
     }
 });
 
+//
 // ─────────────────────────────────────────────
 // ROUTE MOUNTING
 // All authenticated/protected routes are prefixed with /api/
