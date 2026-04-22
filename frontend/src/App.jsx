@@ -58,6 +58,7 @@ import QuickRide from './pages/guest/QuickRide';
 import VehicleHire from './pages/guest/VehicleHire';
 import Notifications from './pages/guest/Notifications';
 import ExtendRoomBooking from './pages/guest/ExtendRoomBooking';
+import SpecialRequests from './pages/guest/SpecialRequests';
 
 // ─────────────────────────────────────────────
 // STAFF PAGE IMPORTS
@@ -221,6 +222,7 @@ function App() {
                         <Route path="vehicle-hire" element={<VehicleHire />} />
                         <Route path="extend-room" element={<ExtendRoomBooking />} />
                         <Route path="notifications" element={<Notifications />} />
+                        <Route path="special-requests" element={<SpecialRequests />} />
                         <Route index element={<Navigate to="my-bookings" replace />} /> {/* Default: redirect to my bookings */}
                     </Route>
 

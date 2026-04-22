@@ -977,3 +977,132 @@ exports.payArrivalTransport = async (req, res) => {
         res.status(500).json({ error: 'Payment failed' });
     }
 };
+
+//Special Task
+exports.createSpecialRequest = async (req, res) => {
+    const { rb_id, request_note } = req.body;
+
+    // Basic validation
+    if (!rb_id || !request_note || request_note.trim() === '') {
+        return res.status(400).json({ error: 'rb_id and request_note are required' });
+    }
+
+    try {
+        const [bookings] = await db.query(
+            `SELECT rb.rb_id FROM roombooking rb
+             JOIN Guest g ON rb.guest_id = g.guest_id
+             WHERE rb.rb_id = ? AND g.user_id = ? AND rb.rb_status NOT IN ('Cancelled', 'Completed')`,
+            [rb_id, req.user.id]
+        );
+
+        if (bookings.length === 0) {
+            return res.status(404).json({ error: 'Active room booking not found for this guest' });
+        }
+
+        const [guestRows] = await db.query('SELECT guest_id FROM Guest WHERE user_id = ?', [req.user.id]);
+        const guest_id = guestRows[0].guest_id;
+
+        const [result] = await db.query(
+            'INSERT INTO guest_special_request (guest_id, rb_id, request_note) VALUES (?, ?, ?)',
+            [guest_id, rb_id, request_note.trim()]
+        );
+
+        res.status(201).json({
+            message: 'Special request submitted successfully.',
+            request_id: result.insertId
+        });
+    } catch (error) {
+        console.error('Create Special Request Error:', error);
+        res.status(500).json({ error: 'Failed to submit special request' });
+    }
+};
+
+//Returns all special requests submitted by this guest across all their bookings.
+exports.getSpecialRequests = async (req, res) => {
+    try {
+        const [requests] = await db.query(
+            `SELECT sr.request_id, sr.rb_id, sr.request_note, sr.status, sr.created_at, sr.updated_at,
+                    r.room_type, r.room_number
+             FROM guest_special_request sr
+             JOIN roombooking rb ON sr.rb_id = rb.rb_id
+             JOIN room r ON rb.room_id = r.room_id
+             JOIN Guest g ON sr.guest_id = g.guest_id
+             WHERE g.user_id = ?
+             ORDER BY sr.created_at DESC`,
+            [req.user.id]
+        );
+
+        res.json(requests);
+    } catch (error) {
+        console.error('Get Special Requests Error:', error);
+        res.status(500).json({ error: 'Failed to fetch special requests' });
+    }
+};
+
+//Update the note text of a special request.
+exports.updateSpecialRequest = async (req, res) => {
+    const { id } = req.params;
+    const { request_note } = req.body;
+
+    if (!request_note || request_note.trim() === '') {
+        return res.status(400).json({ error: 'request_note is required' });
+    }
+
+    try {
+        const [rows] = await db.query(
+            `SELECT sr.request_id, sr.status
+             FROM guest_special_request sr
+             JOIN Guest g ON sr.guest_id = g.guest_id
+             WHERE sr.request_id = ? AND g.user_id = ?`,
+            [id, req.user.id]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Special request not found' });
+        }
+
+        if (rows[0].status !== 'Pending') {
+            return res.status(400).json({ error: `Cannot edit a request that is already '${rows[0].status}'` });
+        }
+
+        await db.query(
+            'UPDATE guest_special_request SET request_note = ? WHERE request_id = ?',
+            [request_note.trim(), id]
+        );
+
+        res.json({ message: 'Special request updated successfully.' });
+    } catch (error) {
+        console.error('Update Special Request Error:', error);
+        res.status(500).json({ error: 'Failed to update special request' });
+    }
+};
+
+//Delete a special request. Only allowed if still 'Pending'.
+exports.deleteSpecialRequest = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const [rows] = await db.query(
+            `SELECT sr.request_id, sr.status
+             FROM guest_special_request sr
+             JOIN Guest g ON sr.guest_id = g.guest_id
+             WHERE sr.request_id = ? AND g.user_id = ?`,
+            [id, req.user.id]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Special request not found' });
+        }
+
+        if (rows[0].status !== 'Pending') {
+            return res.status(400).json({ error: `Cannot delete a request that is already '${rows[0].status}'` });
+        }
+
+        await db.query('DELETE FROM guest_special_request WHERE request_id = ?', [id]);
+
+        res.json({ message: 'Special request deleted successfully.' });
+    } catch (error) {
+        console.error('Delete Special Request Error:', error);
+        res.status(500).json({ error: 'Failed to delete special request' });
+    }
+};

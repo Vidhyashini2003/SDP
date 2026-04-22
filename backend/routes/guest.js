@@ -39,6 +39,12 @@ const guestOnly = authorizeRole('guest'); // Shorthand middleware for guest role
 router.get('/profile', guestOnly, guestController.getProfile);           // View own profile
 router.put('/profile', guestOnly, guestController.updateProfile);        // Update name, phone, NIC, nationality
 
+//Special Requests
+router.post('/requests', guestOnly, guestController.createSpecialRequest);        // CREATE: Submit a new request
+router.get('/requests', guestOnly, guestController.getSpecialRequests);           // READ:   View all my requests
+router.put('/requests/:id', guestOnly, guestController.updateSpecialRequest);     // UPDATE: Edit a pending request
+router.delete('/requests/:id', guestOnly, guestController.deleteSpecialRequest);  // DELETE: Remove a pending request
+
 // --- Booking Views ---
 router.get('/bookings', guestOnly, guestController.getMyBookings);                   // All bookings (flat list)
 router.get('/bookings/grouped', guestOnly, guestController.getGroupedBookings);      // Bookings grouped by room trip (includes activities, food, vehicles)
